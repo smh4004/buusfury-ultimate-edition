@@ -138,6 +138,33 @@ def build(rom, one):
         for y, x in zip(*np.nonzero(m)): out[y, x] = one(rgb[y, x])
         return out
     looks, learned = {}, {}
+    base = actor_frames(rom, SOURCE['black'])
+    def hair_rose(slot, d, f, fr):
+        ref = base[slot][d][f] if slot in base and f < len(base[slot][d]) else None
+        if slot == COSTUME: ref = rose_frames[slot][d][-1]            # Super Saiyan's power down ends back in black hair, in the same pose
+        hair = hair_mask(fr, ref)
+        if hair is None:              # the same frame of base Goku is drawn differently: the best of his frames from that side
+            hair = hair_mask(fr, [r for v in base.values() for r in v[d]], 0.8)
+        if hair is None: hair = hair_guess(fr)
+        if hair is None:              # no yellow left (the teleport's streaks): the top of the figure is hair
+            hair = np.isin(fr, list(SKIN | GOLD)) & (bands(fr) < HAIR_BANDS)
+        return hair
+    def hair_black(slot, d, f, fr):
+        if slot != TRANSFORM: return None
+        hair = hair_mask(fr, base[slot][d][0])          # the transformation starts in black hair
+        if hair is None: hair = midway(fr)
+        if hair is None:              # gold, in the halfway frame's pose: line up with that frame, its hair blacked out
+            for ref in base[slot][d]:
+                m = midway(ref)
+                if m is not None: hair = hair_mask(fr, np.where(m, 1, ref)); break
+        return hair                   # an empty mask means it lined up and has no Super Saiyan hair
+    def midway(fr):                   # his hair halfway to gold is drawn dark brown: everything above the forehead's first light skin
+        rows = np.nonzero(np.isin(fr, [200, 201, 202]).any(1))[0]
+        if not len(rows) or np.isin(fr[:rows[0]], list(GOLD)).any(): return None
+        m = np.isin(fr, list(SKIN)) & (np.arange(fr.shape[0]) < rows[0])[:, None]
+        return m if m.sum() >= 12 else None
+    hairs = {'black': hair_black, 'rose': hair_rose}
+    rose_frames = actor_frames(rom, SOURCE['rose'])
     for form, actor in SOURCE.items():
         frames = actor_frames(rom, actor); placed = {}
         for slot, d, f, score, i, flip, y, x in saved[form]:
@@ -154,52 +181,128 @@ def build(rom, one):
         for (slot, d, f), (canvas, score) in placed.items():
             if (slot, d, f) not in placed: continue
             if score < LEARN: continue
-            src = frames[slot][d][f]; band = bands(src)
+            src = frames[slot][d][f]; band = bands(src); hair = hairs[form](slot, d, f, src)
             both = (src != 0) & (canvas != 0)
             for r, c in zip(*np.nonzero(both)):
-                keys = [(int(src[r, c]), band[r])] if band is not None else []
+                keys = [(int(src[r, c]), 'hair' if hair is not None and hair[r, c] else int(band[r, c]))]
                 if int(src[r, c]) not in KEEP: keys.append((int(src[r, c]), None))
                 for key in keys:
                     v = votes.setdefault(key, {}); v[int(canvas[r, c])] = v.get(int(canvas[r, c]), 0) + 1
         def wanted(k, v):
             if sum(v.values()) < 8: return False
-            if k[0] in KEEP:          # skin and white stay, except where the sheet all but always changes them: Super Saiyan's hair shares skin's shades
-                return form == 'rose' and k[1] is not None and max(v.values()) >= 0.8 * sum(v.values())
+            if k[0] in KEEP:          # skin stays, but Super Saiyan's hair is drawn in skin's shades: there it goes the sheet's way. White stays (see recolour)
+                if k[1] == 'hair': return k[0] != WHITE
+                return form == 'rose' and k[0] != WHITE and k[1] is not None and max(v.values()) >= 0.8 * sum(v.values())
             return k[1] is None or max(v.values()) >= SHARE * sum(v.values())
         learned[form] = {k: max(v, key=v.get) for k, v in votes.items() if wanted(k, v)}     # a colour seen at that height goes the sheet's way there; elsewhere its commonest
         looks[form] = (frames, placed)
     out = {}
     for form, (frames, placed) in looks.items():
-        def recolour(fr, slot):
+        glows = {k: {a: one(v) for a, v in g.items()} for k, g in GLOW.items()}
+        def recolour(fr, slot, d, f):
+            glow = glows['rose' if slot == TRANSFORM else form]          # Black's transformation glows pink: it ends in Rose
             maps = [learned['rose'], learned[form]] if form == 'black' and slot == TRANSFORM else [learned[form]]    # Black's transformation flashes Super Saiyan hair: Rose's pink
             band = bands(fr); res = fr.copy()
+            hair = hairs[form](slot, d, f, fr)
+            if hair is not None and hair.any() and np.isin(fr[hair], list(GOLD)).sum() < 3:     # halfway between black hair and gold: Black's dark magenta
+                mid = hair & np.isin(fr, list(MIDWAY)); hair = hair & ~mid
+                for a, rgb in MIDWAY.items(): res[mid & (fr == a)] = one(rgb)
+            if (slot, d) in FEET_UP:      # flying at the camera, his boots are at the top: they take the colours of the bottom
+                top = (band < BANDS // 3) & np.isin(fr, GI); band = band.copy(); band[top] = BANDS - 1
             for r, c in zip(*np.nonzero(fr)):
                 a = int(fr[r, c])
+                if hair is not None and a in KEEP and a != WHITE:
+                    if hair[r, c]:
+                        b = learned['rose'].get((a, 'hair'))
+                        if b is not None: res[r, c] = b
+                    continue
+                if hair is not None and not hair[r, c] and a in KEEP: continue
                 for m in maps:
-                    b = m.get((a, band[r])) if band is not None else None
+                    b = m.get((a, int(band[r, c])))
                     if b is None: b = m.get((a, None))
                     if b is not None: res[r, c] = b
+                if a in glow: res[r, c] = glow[a]
+            if form == 'rose' or slot == TRANSFORM:      # Super Saiyan hair's white shine goes Rose's pale pink, where it touches the hair; swipe trails stay white
+                pink = np.isin(res, list(HAIR_PINK)) & (fr != res)
+                near = np.zeros_like(pink)
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1): near |= np.roll(np.roll(pink, dy, 0), dx, 1)
+                res[(fr == WHITE) & near] = one(SHINE)
             return res
         res = {}
         for slot, views in frames.items():
-            res[slot] = [[placed[slot, d, f][0] if (slot, d, f) in placed else recolour(fr, slot) for f, fr in enumerate(views[d])] for d in range(3)]
+            res[slot] = [[placed[slot, d, f][0] if (slot, d, f) in placed else recolour(fr, slot, d, f) for f, fr in enumerate(views[d])] for d in range(3)]
+        if form == 'rose':     # Rose is the last form, so her transformation only plays if the game asks for it: Black's, from where he's Rose
+            b = out['black'][TRANSFORM]; res[TRANSFORM] = [[v[2]] * 2 + v[2:] for v in b]
         out[form] = res
     return out, {f: len(looks[f][1]) for f in looks}
 
 
+WHITE, SHINE = 2, (248, 136, 208)            # Rose's sheet draws the hair's shine in this pale pink
+HAIR_PINK = {141, 143, 144, 145}               # Rose's hair on the sheet, as game colours
+# Goku's energy: the glow round him as he transforms and powers up (165), the ball he charges for his special (94, 95) and the
+# transformation's sparks (4). Black's is dark purple and Rose's pink, as their ki. The dust on the ground (21) stays.
+GLOW = {'black': {165: (168, 48, 224), 94: (72, 0, 96), 95: (120, 24, 168), 4: (224, 96, 224)},
+        'rose': {165: (224, 96, 224), 94: (144, 0, 144), 95: (224, 32, 224), 4: (248, 136, 208)}}
 KEEP = {1, 2, 16, 200, 201, 202, 203, 205, 206} | set(range(111, 121))     # outline, white, skin and greys stay as Goku has them
 SHARE = 0.3
-TRANSFORM = 10
+TRANSFORM, COSTUME = 10, 11
+FEET_UP = {(15, 0)}
+HAIR_BANDS = 5                                  # twelfths of the figure that are hair, at a guess
+EYES = [215, 216]                               # Super Saiyan's green eyes
 BANDS = 12
+GOLD = {28, 248}                                # Super Saiyan hair's yellows
+MIDWAY = {16: (112, 16, 104), 202: (176, 56, 168), 201: (224, 96, 224), 200: (248, 136, 208)}     # brown hair halfway through a change
+GI = [63, 64, 65, 79, 80, 81, 157, 159, 161]    # Goku's orange and blue: line two frames of one pose up by these
+SKIN = {16, 200, 201, 202, 203, 205, 206}
+
+
+def hair_guess(fr):
+    """Super Saiyan hair with no base frame to compare: skin shades above the eyes, and below them only close to the hair's yellow."""
+    if np.isin(fr, list(GOLD)).sum() < 6: return None
+    shades = np.isin(fr, list(SKIN | {WHITE} | GOLD)); hair = np.isin(fr, list(GOLD))
+    eyes = np.nonzero(np.isin(fr, EYES).any(1))[0]
+    if len(eyes): hair |= shades & (np.arange(fr.shape[0]) < eyes[0])[:, None]
+    for _ in range(1 if len(eyes) else 2):
+        near = hair.copy()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1): near |= np.roll(np.roll(hair, dy, 0), dx, 1)
+        hair = near & shades
+    return hair
+
+
+def hair_mask(fr, ref, need=0.6):
+    """Pixels of fr drawn in skin shades where ref (the same pose in black hair) isn't skin: Super Saiyan hair. None if they don't line up."""
+    if ref is None: return None
+    ga, best = np.isin(fr, GI), (0.0, None)
+    for one in (ref if isinstance(ref, list) else [ref]):
+        if abs(int(np.isin(one, GI).sum()) - int(ga.sum())) > 0.4 * ga.sum(): continue
+        for flip in (0, 1):
+            r2 = one[:, ::-1] if flip else one
+            for dy in range(-3, 4):
+                for dx in range(-6, 7):
+                    s = np.roll(np.roll(r2, dy, 0), dx, 1); gb = np.isin(s, GI)
+                    sc = (ga & gb & (fr == s)).sum() / max(1, (ga | gb).sum())
+                    if sc > best[0]: best = (sc, s)
+    if best[0] < need: return None
+    return np.isin(fr, list(SKIN | {WHITE} | GOLD)) & ~np.isin(best[1], list(SKIN))
 
 
 def bands(fr):
-    """Each row's twelfth of an upright figure's height, or None for one lying or flying flat (no up and down to go by)."""
+    """Each pixel's twelfth of the figure's length from the top of the head. Upright, that's its row; lying or flying flat, its column,
+    counted from the end the hair is at (the side with more of the outline's black, which the hair is drawn in)."""
     rows = np.nonzero((fr != 0).any(1))[0]; cols = np.nonzero((fr != 0).any(0))[0]
-    if not len(rows): return None
+    out = np.zeros(fr.shape, int)
+    if not len(rows): return out
     h, w = rows[-1] - rows[0] + 1, cols[-1] - cols[0] + 1
-    if w > 1.3 * h: return None
-    return {r: min(BANDS - 1, BANDS * (r - rows[0]) // h) for r in range(32)}
+    if w <= 1.3 * h:
+        out[:] = np.clip(BANDS * (np.arange(fr.shape[0]) - rows[0]) // h, 0, BANDS - 1)[:, None]
+        return out
+    third = max(1, w // 3); black = fr == 1
+    left = black[:, cols[0]:cols[0] + third].sum() >= black[:, cols[-1] - third + 1:cols[-1] + 1].sum()
+    x = np.arange(fr.shape[1]); d = (x - cols[0]) if left else (cols[-1] - x)
+    out[:] = np.clip(BANDS * d // w, 0, BANDS - 1)[None, :]
+    return out
 
 
 def portraits(one):
