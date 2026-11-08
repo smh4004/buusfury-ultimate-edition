@@ -370,6 +370,26 @@
    "actor": "hercule_player",
    "owner": 8,
    "flags": 16
+  },
+  {
+   "id": "goku_black",
+   "copy": 47,
+   "actor": "goku_black",
+   "owner": 8,
+   "name": 1576,
+   "portrait": 166,
+   "flags": 16,
+   "up": "goku_rose"
+  },
+  {
+   "id": "goku_rose",
+   "copy": 47,
+   "actor": "goku_rose",
+   "owner": 8,
+   "name": 1577,
+   "portrait": 167,
+   "flags": 81,
+   "down": "goku_black"
   }
  ],
  "edit": {

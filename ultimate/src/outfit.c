@@ -36,6 +36,7 @@ static void guest_sync(void) {
     static const u8 broly[] = {3, 7, 8, ERASER_SKILL}, thirteen[] = {5, 7, 8, BOMBER_SKILL, WAVE_SKILL, SUPER13_SKILL}, piccolo[] = {3, 7, 17, BEAM_SKILL},
         fighter[] = {2, 7, 8}, a17[] = {5, 7, 8, BLITZ_SKILL, WAVE_SKILL, SUPER17_SKILL}, a18[] = {4, 7, BLITZ_SKILL, DISC_SKILL, WAVE_SKILL}, krillin[] = {3, 7, 15, DISC_SKILL}, videl[] = {1, 7},
         tien[] = {3, 7, 15, BLITZ_SKILL}, yamcha[] = {2, 7, 15}, pikkon[] = {3, 7, 8, WAVE_SKILL}, hercule[] = {1, 7},
+        black[] = {4, 7, 14, BLACK_KAME_SKILL, ROSE_SKILL},     /* Goku Black: ki blasts, Instant Transmission, the Black Kamehameha, Rose. Energy Punch and Energy Sword play animation slots Goku's figure fills with other moves */
         trunks[] = {4, 7, 20, 4, 11};            /* Future Trunks: the same moves as Trunks */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -51,6 +52,7 @@ static void guest_sync(void) {
     else if (form == FORM_YAMCHA) list = yamcha;
     else if (form == FORM_PIKKON) list = pikkon;
     else if (form == FORM_HERCULE) list = hercule;
+    else if (form == FORM_BLACK || form == FORM_ROSE) list = black;
     else if (form == FORM_FUTURE_TRUNKS) list = trunks;
     else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU || form == FORM_JANEMBA) list = fighter;
     else return;
@@ -967,6 +969,39 @@ void absorb_start(u32 *state, void *sprite) {
     ((void (*)(void *, void *))0x0800DE61)(state, sprite);
     PlaySound((void *)0x03003E5C, (u8 *)*(u32 *)0x0801C6A4 + 0x288, 0x40, 0);      /* the power-up's own sound, as the state it replaces finds it */
 }
+/* Goku Black becoming Rose: Super Saiyan's power-up with its aura in Rose's pink. The start is the game's (0x0801C3EC) with the aura's frames swapped;
+   build.py fills the frames (the field's three and the other mode's seven, recoloured) and the rest of the state's methods. */
+const u32 rose_aura_field[9] = {1}, rose_aura_other[21] = {1};
+const int rose_vt[14] = {1};
+#define SpriteBox ((void (*)(int *, void *))0x0800FDFB)
+#define VecOp ((void (*)(int *, const int *, const int *))0x08052FB5)
+#define AURA_MODE (*(volatile u8 *)0x03002BB0)
+void rose_start(u32 *state, void *sprite) {
+    int box[4], v[2], u[2], w[2], pos[2];
+    u32 *spark;
+    state[2] = 0;
+    ((void (*)(void *, void *))0x0800DE61)(state, sprite);
+    PlaySound((void *)0x03003E5C, (u8 *)SOUND_HIT + 0x288, 0x40, 0);
+    state[3] = 0;
+    if (AURA_MODE > 1) return;
+    SpriteBox(box, sprite); VecOp(v, box, box + 2);
+    u[0] = v[0] >> 1; u[1] = v[1] >> 1; w[0] = 0; w[1] = AURA_MODE ? 2 : 1;
+    VecOp(pos, u, w);
+    if (AURA_MODE) { ListAdd(ACTORS, NewSpark(0, pos, rose_aura_other, 7, 0xC88, 1024, 0x38)); return; }
+    spark = Alloc(0x48);
+    if (spark) { NewSpark((int)spark, pos, rose_aura_field, 3, 0x4000, 1024, 0x38); spark[0] = 0x0804B9E0; spark[0x44 / 4] = (u32)rose_aura_field; }
+    state[3] = (u32)spark;
+    ListAdd(ACTORS, spark);
+}
+void rose_use(u8 *record, void *sprite) {
+    if (!(form_table[record[0x14] * 24] & 1)) {
+        u32 *state = Alloc(0x10);
+        if (state) { *(u8 *)&state[1] = 4; state[0] = (u32)rose_vt; }
+        Sprite_SetFacing(sprite, 10);
+        Sprite_SetBehaviour(sprite, state);
+    }
+    else ((void (*)(u8 *, void *))0x0801A513)(record, sprite);
+}
 int super_can(u8 *record) { return SB.phase ? 0 : SS_Can(record); }
 void super_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) {
@@ -1194,6 +1229,28 @@ void beam_use(u8 *record, void *sprite) {
     Sprite_SetBehaviour(sprite, b);
 }
 
+/* The Black Kamehameha: the Kamehameha's code with Black's purple frames, or Rose's pink ones. */
+const u32 black_params[12] = {1}, rose_params[12] = {1};
+const int black_kame_vt[9] = {1};
+void black_kame_start(u32 *self, void *player) {
+    u32 *beam;
+    Kamehameha_Start(self, player);
+    beam = (u32 *)self[2];
+    if (beam) {
+        const u32 *mine = &(FORM_OF(8) == FORM_ROSE ? rose_params : black_params)[self[3] * 4];
+        beam[0x40 / 4] = (u32)mine;
+        beam[0x44 / 4] = beam[0x48 / 4] = beam[0x4C / 4] = mine[2];
+        MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (void *)((u32 *)mine[2])[2], 0x40);
+    }
+}
+void black_kame_use(u8 *record, void *sprite) {
+    int level = record[record[0x15] * 2 + 0x2E];
+    u32 *b = Alloc(0x10);
+    if (b) { b[0] = (u32)black_kame_vt; b[1] = 0; b[3] = level; }
+    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetBehaviour(sprite, b);
+}
+
 /* Full Power Energy Wave, for the androids: the Electric Kamehameha's code with green frames, as in Gero's Legacy. Gohan keeps the original. */
 #define Wave_Start ((void (*)(u32 *, void *))0x0801ADA9)
 const u32 wave_params[12] = {1};
@@ -1219,11 +1276,14 @@ void wave_use(u8 *record, void *sprite) {
 
 /* The androids' ki blasts are blue, also as in Gero's Legacy. Enemies and everyone else keep the game's. The impact burst stays as it is. */
 const u8 blue_blast[192] = {1};            /* build.py fills this: the blast's frame table, pointing at blue tiles */
+const u8 black_blast[192] = {1}, rose_blast[192] = {1};      /* Goku Black's purple and Rose's pink, the same way */
 const u8 *blast_frames(int facing) {
     const u8 *frames = (const u8 *)0x0871370C;
     if (*(u8 *)0x03001068 == 8) {
         int form = FORM_OF(8);
         if (form == FORM_A13 || form == FORM_S13 || form == FORM_ANDROID17 || form == FORM_S17 || form == FORM_ANDROID18) frames = blue_blast;
+        else if (form == FORM_BLACK) frames = black_blast;
+        else if (form == FORM_ROSE) frames = rose_blast;
     }
     return frames + facing * 48;
 }
@@ -1270,7 +1330,7 @@ void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
     if ((hit[0] & 255) == 2) {
-        if (is_ss2(form) || form == FORM_S13 || form == FORM_S17) hit[1] = scale + (scale >> 1);
+        if (is_ss2(form) || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             stats[0] = strength - 10; stats[1] = power - 10;

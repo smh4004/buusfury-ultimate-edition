@@ -131,6 +131,12 @@
     "form": "hercule",
     "flag": 2003,
     "name": "Hercule"
+   },
+   {
+    "form": "goku_black",
+    "also": "goku_rose",
+    "flag": 2025,
+    "name": "Goku Black"
    }
   ],
   "7": [

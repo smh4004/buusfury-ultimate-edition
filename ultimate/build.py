@@ -16,6 +16,7 @@ import numpy as np
 import sprites, artclean, wfz
 sys.path.insert(0, 'ultimate')
 import gogeta
+import goku_black
 
 CLEAN_SHA1 = 'f1c4b07554d2a3b1ad2f325307051e775ce68087'
 ROM_BASE = 0x08000000
@@ -42,6 +43,15 @@ POWER_UP_VT = 0x4E2B0            # the state a transformation runs in
 SUPER13_SKILL, SUPER17_SKILL = 30, 31     # Android 13 and Android 17 transform: Super Saiyan's mechanics under their own names
 WAVE_SKILL = 29                  # Full Power Energy Wave, from Gero's Legacy: the Electric Kamehameha's code with green frames
 BEAM_SKILL = 26                  # Special Beam Cannon: the Kamehameha's code with gold and purple frames
+ROSE_SKILL, BLACK_KAME_SKILL = 32, 33      # Goku Black: Super Saiyan Rose (Super Saiyan's mechanics), Black Kamehameha (the Kamehameha's code, purple, or pink as Rose)
+BLACK_NAME_UI, ROSE_NAME_UI = 1534 + 42, 1534 + 43     # form names, after Glacier's
+BLACK_PORTRAIT = 166             # speaker ids: Goku Black, then Rose
+# The Kamehameha's colours, by brightness: a cyan set (levels 1-2) and a gold set (level 3). Black's ki is dark purple and Rose's pink.
+KAME_TINT = {'black': {2: (240, 208, 248), 76: (216, 144, 240), 195: (176, 80, 224), 75: (120, 32, 176), 74: (56, 0, 88),
+                       30: (240, 208, 248), 29: (224, 168, 248), 28: (208, 128, 240), 5: (176, 80, 224), 27: (144, 48, 200), 110: (120, 32, 176), 109: (88, 16, 136), 4: (56, 0, 88)},
+             'rose': {2: (255, 232, 248), 76: (248, 184, 232), 195: (240, 136, 216), 75: (224, 64, 192), 74: (144, 0, 120),
+                      30: (255, 232, 248), 29: (248, 200, 240), 28: (248, 168, 232), 5: (240, 136, 216), 27: (232, 104, 208), 110: (224, 64, 192), 109: (184, 24, 160), 4: (144, 0, 120)}}
+BLAST_HUE = {'black': 280, 'rose': 320}    # their ki blasts
 # Strength against Big Bang per skill level: 2.5x and 2x in total damage. Each hit rounds down, which costs low levels more, so they get a bigger multiplier (measured on Android 13 at Power 80).
 NEW_MOVES = (('eraser', ERASER_SKILL, (2.95, 2.85, 2.45), 'Eraser Cannon', 'Press the B Button and release to emit a large ball of green energy that explodes on contact.  Hold the B Button longer to make the attack stronger.', (0.2, 0.6, 1, 0, 0.15, 0.6)),
              ('bomber', BOMBER_SKILL, (2.4, 2.2, 2), 'SS Deadly Bomber', 'Press the B Button and release to emit a large ball of reddish pink energy that explodes on contact.  Hold the B Button longer to make the attack stronger.', (1, 0, 0.03, 0.55, 0.12, 0.45)),
@@ -68,7 +78,7 @@ def new_actor_ids():
     """Ids add_actors will give: actors.json's new actors in order, then Super 13 and Android 13. Checked after the build."""
     cfg = json.load(open('ultimate/actors.json'))
     n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a)
-    return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}}
+    return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}, 'goku_black': n + 32, 'goku_rose': n + 33}
 
 
 DEATH_SCRIPT = 'assets/scripts/gUnknown_0877C5A4.evt'
@@ -921,6 +931,9 @@ def add_actors(rom, clean):
         p = symbol_items_icon(16 + k)
         t, size = struct.unpack_from('<II', clean, p); icon = np.frombuffer(bytes(wfz.decompress_stream(clean, p + 8, size)[0]), np.uint8).reshape(16, 16)
         cfg['dragon_ball_%d' % (k + 1)] = {'template': 152, 'raw_frames': {str(sl): [[icon], [icon], [icon]] for sl in (0, 1)}}
+    looks, _ = goku_black.build(clean, one)      # Goku Black and Rose: every frame of Goku and Super Saiyan Goku, from the owner's sheet or in its colours
+    cfg['goku_black'] = {'template': goku_black.SOURCE['black'], 'raw_frames': {str(k): v for k, v in looks['black'].items()}}
+    cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read())
     return ids, end
@@ -1007,7 +1020,7 @@ def bench_groups(guests):
     return out
 
 
-def add_outfits(rom, clean, at):
+def add_outfits(rom, clean, at, art):
     """Compile the outfit code with its table at `at`, then point the Switch Character screen's vtable at it."""
     cfg = json.load(open('ultimate/outfits.json'))['characters']
     index, table = [], []
@@ -1023,7 +1036,7 @@ def add_outfits(rom, clean, at):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1107,15 +1120,15 @@ def add_outfits(rom, clean, at):
     if rom[DAMAGE:DAMAGE + 8] != bytes.fromhex('f0b5061c0c1c0831'):
         sys.exit('Combat_Damage changed: %s' % rom[DAMAGE:DAMAGE + 8].hex())
     rom[DAMAGE:DAMAGE + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['combat_hook'] | 1)
-    end = add_eraser(rom, clean, sym, at + len(code))    # after the row edits above: it moves the skill table
+    end, art = add_eraser(rom, clean, sym, at + len(code), art)    # after the row edits above: it moves the skill table
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:
         sys.exit('Select Game party loop changed')
     rom[i:i + 2] = bytes.fromhex('082c')
-    return end
+    return end, art
 
 
-def add_eraser(rom, clean, sym, at):
+def add_eraser(rom, clean, sym, at, art):
     """Eraser Cannon and SS Deadly Bomber: recoloured copies of Big Bang's two ball animations and icons, each move's parameter table (its last word scales the damage)
     and behaviour, new skill rows, and new UI strings."""
     pal = np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3)
@@ -1123,6 +1136,10 @@ def add_eraser(rom, clean, sym, at):
     def put(data):
         nonlocal at
         at = (at + 3) & ~3; o = at; rom[o:o + len(data)] = data; at += len(data)
+        return ROM_BASE + o
+    def put_art(data):                           # tiles: with the sprites, past the code area
+        nonlocal art
+        art = (art + 3) & ~3; o = art; rom[o:o + len(data)] = data; art += len(data)
         return ROM_BASE + o
     PARAMS, OLD_VT = 0x76ACC0, 0x4D05C                    # Big Bang's table: levels 1 and 2 cyan ball, level 3 gold
     icons = struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 2 + 4)
@@ -1264,11 +1281,60 @@ def add_eraser(rom, clean, sym, at):
         struct.pack_into('<II', row, 16, sym['super_can'] | 1, sym['super_use'] | 1)
         rows[skill] = bytes(row)
         strings += [put(t.encode('utf-16-le') + b'\0\0') for t in (name, text)]
+    # Goku Black. Rose is Super Saiyan's row under its own name (its use is ss_use, as Goku's). The Black Kamehameha is the Kamehameha's code with Black's purple frames,
+    # or Rose's pink ones: black_kame_start picks by form. Its icons are the Kamehameha's in Black's purple.
+    row = bytearray(rom[SKILLS - 12 + 24 * 20:SKILLS - 12 + 24 * 21])
+    struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
+    pink = shifted(325 / 360)                   # Rose's aura and icon: Super Saiyan's, pink
+    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(pink)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
+    struct.pack_into('<I', row, 20, sym['rose_use'] | 1)
+    rows[ROSE_SKILL] = bytes(row)
+    for name, at_, count in (('rose_aura_field', 0x752D28, 3), ('rose_aura_other', 0x7520D4, 7)):
+        out = bytearray(clean[at_:at_ + 12 * count])
+        for k in range(0, 12 * count, 12):
+            t = struct.unpack_from('<I', out, k + 8)[0] - ROM_BASE
+            struct.pack_into('<I', out, k + 8, put_art(clean[t:t + out[k + 2] * out[k + 3]].translate(pink)))
+        rom[sym[name] - ROM_BASE:sym[name] - ROM_BASE + 12 * count] = out
+    vt = sym['rose_vt'] - ROM_BASE
+    for k in range(14):
+        fn = (sym['rose_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
+        struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Super Saiyan Rose', 'Press the B Button to transform into Super Saiyan Rose: attacks hit 1.5x as hard.  Press it again to change back.')]
+    for form in ('black', 'rose'):
+        tint = KAME_TINT[form]
+        remap = bytes(0 if v == 0 else one(np.array(tint.get(v, tuple(pal[v])), dtype=int)) for v in range(256)); copies = {}
+        def frames(o, count):
+            out = bytearray(clean[o:o + 12 * count])
+            for k in range(0, 12 * count, 12):
+                tiles = struct.unpack_from('<I', out, k + 8)[0]
+                if not 0x08700000 <= tiles < 0x08800000: continue
+                if tiles not in copies:
+                    t = tiles - ROM_BASE; copies[tiles] = put_art(bytes(clean[t:t + out[k + 2] * out[k + 3]]).translate(remap))
+                struct.pack_into('<I', out, k + 8, copies[tiles])
+            return put(bytes(out))
+        shape, table = {}, sym[form + '_params'] - ROM_BASE
+        for i in range(3):
+            a, strength, body, head = struct.unpack_from('<4I', clean, BEAM_PARAMS + 16 * i)
+            shape.setdefault(body, frames(body - ROM_BASE, 9)); shape.setdefault(head, frames(head - ROM_BASE, 64))
+            struct.pack_into('<4I', rom, table + 16 * i, a, strength, shape[body], shape[head])
+        if form == 'black': icon_map = remap
+    vt = sym['black_kame_vt'] - ROM_BASE
+    for k in range(9):
+        fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * k)[0]
+        struct.pack_into('<i', rom, vt + 4 * k, ((sym['black_kame_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
+    row = bytearray(clean[SKILL_ROWS + 24 * 15:SKILL_ROWS + 24 * 16])
+    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(icon_map)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
+    struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
+    struct.pack_into('<I', row, 20, sym['black_kame_use'] | 1)
+    rows[BLACK_KAME_SKILL] = bytes(row)
+    strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Black Kamehameha', 'Hold the B Button to emit a long beam of dark energy.')]
     import zone26 as z26
     if ERASER_UI + len(strings) > z26.CELL_NAME_UI: sys.exit('move CELL_NAME_UI up')
     while ERASER_UI + len(strings) < z26.CELL_NAME_UI: strings.append(put(b'\0\0'))
     strings.append(put('The Cell Games Arena'.encode('utf-16-le') + b'\0\0'))
     strings.append(put('Glacier'.encode('utf-16-le') + b'\0\0'))
+    if ERASER_UI + len(strings) != BLACK_NAME_UI: sys.exit('form names moved')
+    strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Goku Black', 'Super Saiyan Rose')]
     BLAST_TILES, BLAST_TABLE, BLAST_SITE = (0x71300C, 0x71370C), 0x71370C, 0x197F2
     if rom[BLAST_SITE:BLAST_SITE + 14] != bytes.fromhex('207cbc4a41000918090189182165'):
         sys.exit('player blast code changed')
@@ -1280,6 +1346,12 @@ def add_eraser(rom, clean, sym, at):
             sys.exit('blast frame outside its tiles: 0x%X' % p)
         struct.pack_into('<I', frames_new, k + 8, blue_new + p - ROM_BASE - BLAST_TILES[0])
     rom[sym['blue_blast'] - ROM_BASE:sym['blue_blast'] - ROM_BASE + 192] = frames_new
+    for form, hue in BLAST_HUE.items():         # Goku Black's and Rose's, the same way
+        tiles_new = put_art(clean[BLAST_TILES[0]:BLAST_TILES[1]].translate(shifted(hue / 360)))
+        fr = bytearray(clean[BLAST_TABLE:BLAST_TABLE + 192])
+        for k in range(0, 192, 12):
+            struct.pack_into('<I', fr, k + 8, tiles_new + struct.unpack_from('<I', fr, k + 8)[0] - ROM_BASE - BLAST_TILES[0])
+        rom[sym[form + '_blast'] - ROM_BASE:sym[form + '_blast'] - ROM_BASE + 192] = fr
     rom[BLAST_SITE:BLAST_SITE + 14] = bytes.fromhex('01490847c046') + struct.pack('<I', sym['blast_hook'] | 1) + bytes.fromhex('c046c046')
     # The Spirit Bomb's sprite: ultimate/art/spirit_bomb.png, a whole picture on plain white. One 64x64 frame per 8 pixels of size: up to 64 across the whole orb, above that its top left quarter.
     from PIL import Image
@@ -1322,7 +1394,7 @@ def add_eraser(rom, clean, sym, at):
             struct.pack_into('<I', rom, o, new); n += 1
     if n != 51:
         sys.exit('UI table: expected 51 references, found %d' % n)
-    return at
+    return at, art
 
 
 def add_portraits(rom, clean, at):
@@ -1346,6 +1418,10 @@ def add_portraits(rom, clean, at):
         img = frame.copy()
         img[4:60, 4:60] = remap[art(combo, struct.unpack_from('<I', combo, 0x3ECB6C + 4 * k)[0] - 0x08800000)[4:60, 4:60]]
         rom[cur:cur + 4104] = struct.pack('<II', 0, 4096) + img.tobytes()
+        table.append(ROM_BASE + cur); cur += 4104
+    if len(table) != BLACK_PORTRAIT: sys.exit('portrait ids moved')
+    for img in goku_black.portraits(one).values():        # Goku Black and Rose, from the owner's sheet, frame and all
+        rom[cur:cur + 4104] = struct.pack('<II', 0, 4096) + img.astype(np.uint8).tobytes()
         table.append(ROM_BASE + cur); cur += 4104
     rom[table_at:table_at + 4 * 256] = struct.pack('<%dI' % len(table), *table) + bytes(4 * (256 - len(table)))
     struct.pack_into('<I', rom, LIT, ROM_BASE + table_at)
@@ -1418,13 +1494,12 @@ def main():
     index, free = patch_forms(rom, clean, cfg, actors)
     os.makedirs(OUT, exist_ok=True)
     json.dump(index, open(OUT + '/_forms.json', 'w'))
-    free = add_outfits(rom, clean, (free + 3) & ~3)
-    free = add_portraits(rom, clean, free)
+    free, actors_end = add_outfits(rom, clean, (free + 3) & ~3, actors_end)
     sys.path.insert(0, 'ultimate')
     import zone26
     zone_end, zone_info = zone26.apply(rom, clean, PROTO, LOG2, actors_end, actors, debug and '--zone' in sys.argv, symbol('gUnknown_08785580'), symbol('gUnknown_08796114'), symbol('gUnknown_08786E68'))
     print('zone 26 tiles:', zone_info)
-    actors_end = zone_end
+    actors_end = add_portraits(rom, clean, zone_end)      # 4 KB each: they live with the art, past the code area
     if {k: actors[k] for k in new_actor_ids()} != new_actor_ids():
         sys.exit('actor ids differ from the ones the quest script used')
     npc = symbol('gUnknown_080783A0') - ROM_BASE      # the quest giver stands still: his wander box shrinks to his own spot
@@ -1439,6 +1514,7 @@ def main():
         struct.pack_into('<I', rom, tab + 4 * DEBUG_NATIVE, ROM_BASE + at + 1)
     os.makedirs(OUT, exist_ok=True)
     name = ('BFU_debug_enemy' if '--enemy' in sys.argv else 'BFU_debug_zone' if '--zone' in sys.argv else 'BFU_debug') if debug else 'BFU'
+    print('room left: code %d KB, art %d KB' % ((ACTORS_AT - free) >> 10, (0x1000000 - actors_end) >> 10))
     if free >= ACTORS_AT or actors_end > 0x1000000:
         sys.exit('ROM layout overflow: code ends %X (limit %X), sprites end %X' % (free, ACTORS_AT, actors_end))
     size = (actors_end + 0xFFFFF) & ~0xFFFFF
