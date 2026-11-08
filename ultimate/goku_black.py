@@ -232,7 +232,7 @@ def build(rom, one):
         res = {}
         for slot, views in frames.items():
             res[slot] = [[placed[slot, d, f][0] if (slot, d, f) in placed else recolour(fr, slot, d, f) for f, fr in enumerate(views[d])] for d in range(3)]
-        if form == 'rose':     # Rose is the last form, so her transformation only plays if the game asks for it: Black's, from where he's Rose
+        if form == 'rose':     # Rose is the last form, so his transformation only plays if the game asks for it: Black's, from where he's Rose
             b = out['black'][TRANSFORM]; res[TRANSFORM] = [[v[2]] * 2 + v[2:] for v in b]
         out[form] = res
     return out, {f: len(looks[f][1]) for f in looks}
