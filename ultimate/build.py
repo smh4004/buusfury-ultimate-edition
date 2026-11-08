@@ -1330,16 +1330,18 @@ def add_eraser(rom, clean, sym, at, art):
     struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(pink)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
     struct.pack_into('<I', row, 20, sym['rose_use'] | 1)
     rows[ROSE_SKILL] = bytes(row)
-    for name, at_, count in (('rose_aura_field', 0x752D28, 3), ('rose_aura_other', 0x7520D4, 7)):
-        out = bytearray(clean[at_:at_ + 12 * count])
-        for k in range(0, 12 * count, 12):
-            t = struct.unpack_from('<I', out, k + 8)[0] - ROM_BASE
-            struct.pack_into('<I', out, k + 8, put_art(clean[t:t + out[k + 2] * out[k + 3]].translate(pink)))
-        rom[sym[name] - ROM_BASE:sym[name] - ROM_BASE + 12 * count] = out
-    vt = sym['rose_vt'] - ROM_BASE
-    for k in range(14):
-        fn = (sym['rose_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
-        struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    red = shifted(4 / 360)                      # Super Saiyan 4's aura: Super Saiyan's, red
+    for who, tint in (('rose', pink), ('ssj4', red)):
+        for name, at_, count in ((who + '_aura_field', 0x752D28, 3), (who + '_aura_other', 0x7520D4, 7)):
+            out = bytearray(clean[at_:at_ + 12 * count])
+            for k in range(0, 12 * count, 12):
+                t = struct.unpack_from('<I', out, k + 8)[0] - ROM_BASE
+                struct.pack_into('<I', out, k + 8, put_art(clean[t:t + out[k + 2] * out[k + 3]].translate(tint)))
+            rom[sym[name] - ROM_BASE:sym[name] - ROM_BASE + 12 * count] = out
+        vt = sym[who + '_vt'] - ROM_BASE
+        for k in range(14):
+            fn = (sym[who + '_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
+            struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Super Saiyan Rose', 'Press the B Button to transform into Super Saiyan Rose: attacks hit 1.5x as hard.  Press it again to change back.')]
     for form in ('black', 'rose'):
         tint = KAME_TINT[form]

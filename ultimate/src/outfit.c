@@ -979,10 +979,13 @@ void absorb_start(u32 *state, void *sprite) {
    build.py fills the frames (the field's three and the other mode's seven, recoloured) and the rest of the state's methods. */
 const u32 rose_aura_field[9] = {1}, rose_aura_other[21] = {1};
 const int rose_vt[14] = {1};
+/* Super Saiyan 4 (Kid Goku's, GT Vegeta's): the same power-up with the aura red */
+const u32 ssj4_aura_field[9] = {1}, ssj4_aura_other[21] = {1};
+const int ssj4_vt[14] = {1};
 #define SpriteBox ((void (*)(int *, void *))0x0800FDFB)
 #define VecOp ((void (*)(int *, const int *, const int *))0x08052FB5)
 #define AURA_MODE (*(volatile u8 *)0x03002BB0)
-void rose_start(u32 *state, void *sprite) {
+static void tinted_start(u32 *state, void *sprite, const u32 *aura_field, const u32 *aura_other) {
     int box[4], v[2], u[2], w[2], pos[2];
     u32 *spark;
     state[2] = 0;
@@ -993,12 +996,14 @@ void rose_start(u32 *state, void *sprite) {
     SpriteBox(box, sprite); VecOp(v, box, box + 2);
     u[0] = v[0] >> 1; u[1] = v[1] >> 1; w[0] = 0; w[1] = AURA_MODE ? 2 : 1;
     VecOp(pos, u, w);
-    if (AURA_MODE) { ListAdd(ACTORS, NewSpark(0, pos, rose_aura_other, 7, 0xC88, 1024, 0x38)); return; }
+    if (AURA_MODE) { ListAdd(ACTORS, NewSpark(0, pos, aura_other, 7, 0xC88, 1024, 0x38)); return; }
     spark = Alloc(0x48);
-    if (spark) { NewSpark((int)spark, pos, rose_aura_field, 3, 0x4000, 1024, 0x38); spark[0] = 0x0804B9E0; spark[0x44 / 4] = (u32)rose_aura_field; }
+    if (spark) { NewSpark((int)spark, pos, aura_field, 3, 0x4000, 1024, 0x38); spark[0] = 0x0804B9E0; spark[0x44 / 4] = (u32)aura_field; }
     state[3] = (u32)spark;
     ListAdd(ACTORS, spark);
 }
+void rose_start(u32 *state, void *sprite) { tinted_start(state, sprite, rose_aura_field, rose_aura_other); }
+void ssj4_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssj4_aura_field, ssj4_aura_other); }
 void rose_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) {
         u32 *state = Alloc(0x10);
@@ -1320,8 +1325,13 @@ static int has_ss2_above(const u8 *record) {
     const u8 *row = form_table + record[0x14] * 24;
     return (row[0] & 1) && row[0x16] != 255 && is_ss2(row[0x16]) && ss2_open(record, row[0x0C]);
 }
+static void power_up(void *sprite, const void *vt);
+static int is_ssj4(int form);
 void ss_use(u8 *record, void *sprite) {
-    if (has_ss2_above(record)) SS3_Use(record, sprite);
+    if (has_ss2_above(record)) {
+        if (is_ssj4(form_table[record[0x14] * 24 + 0x16])) power_up(sprite, ssj4_vt);   /* GT Vegeta's Super Saiyan 4: a red aura */
+        else SS3_Use(record, sprite);
+    }
     else SS_Use(record, sprite);
 }
 /* GT: a Super Saiyan 3 form with a form above it (Kid Goku's) goes on to Super Saiyan 4 when Super Saiyan 3 is pressed again, for the same
@@ -1342,7 +1352,7 @@ static void power_up(void *sprite, const void *vt) {
     Sprite_SetBehaviour(sprite, state);
 }
 void ss3_use(u8 *record, void *sprite) {
-    if (ss4_above(record)) power_up(sprite, (const void *)0x0804E2B0);
+    if (ss4_above(record)) power_up(sprite, ssj4_vt);
     else SS3_Use(record, sprite);
 }
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
@@ -1352,7 +1362,7 @@ void majuub_use(u8 *record, void *sprite) {
     else SS_Use(record, sprite);
 }
 extern const u8 ssj4_rows[];
-static int is_ssj4(int form) {
+static int is_ssj4(int form) {   /* the Super Saiyan 4 forms (build.py: every form whose name ends in ssj4) */
     const u8 *p;
     for (p = ssj4_rows; *p != 255; p++) if (*p == form) return 1;
     return 0;
