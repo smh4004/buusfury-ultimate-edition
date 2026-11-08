@@ -51,6 +51,12 @@ DOWN = lambda n: ['tap DOWN 30'] * n
 UP = lambda n: ['tap UP 30'] * n
 CONFIRM = ['tap A 200', 'run 120']
 CANCEL = ['tap B 200', 'run 120']
+# The guests this route has open, in picker order (the rest stay locked and the picker skips them). Older builds lack Goku Black.
+OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black']
+OPEN_V1 = OPEN[:-1]
+def go(a, b, open_=OPEN):
+    """Down presses from guest a to guest b, round the list."""
+    return DOWN((open_.index(b) - open_.index(a)) % len(open_))
 ORDER = ['broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'android17', 'android18', 'krillin', 'videl', 'majin_buu', 'super_janemba', 'kid_buu']
 
 # 1. A save from before this change is the same save: same route, same bytes, with the new area untouched.
@@ -170,7 +176,7 @@ out = from_save(s7, broken); q = read('q')
 check('a damaged bench starts empty', 'bad pc' not in out and q['form'] == forms['broly'] and q['exp'] == h['exp'] and q['gear'] == EMPTY)
 
 # 7. The newest fighters' smaller records, Hercule's running on past the tail, and the saved flags beside them.
-t1 = hub + poke_rec(exp=500016, stat=9, gear=ROW) + TO_GUEST + DOWN(12) + CONFIRM + state('t1')
+t1 = hub + poke_rec(exp=500016, stat=9, gear=ROW) + TO_GUEST + go('broly', 'tien') + CONFIRM + state('t1')
 out = fresh(t1); a = read('t1')
 check('small: Tien on, and gear back in the bag', 'bad pc' not in out and a['form'] == forms['tien'] and a['bag'] == (ROW,))
 t2 = talk_at(t1, *zone26.HUB_AT) + poke_rec(exp=600000, stat=31) + TO_GUEST + DOWN(3) + CONFIRM + state('t2')
@@ -185,6 +191,17 @@ out = from_save(t4); a = read('t4')
 check('small: Hercule comes back from the save', 'bad pc' not in out and a['form'] == forms['hercule'] and a['exp'] == 700000 and a['stat'] == 41)
 check('the saved flags come back too', open(d + '/m.bin', 'rb').read()[0] == 0x3C)
 
+# 7b. Goku Black, a fighter version 1 had no room for: his own progress too, and Rose is him.
+b1 = talk_at(t2, *zone26.HUB_AT) + poke_rec(exp=800000, stat=61) + TO_GUEST + go('hercule', 'goku_black') + CONFIRM + state('b1')
+out = fresh(b1); a = read('b1')
+check('Goku Black on, level with the guest who was out', 'bad pc' not in out and a['form'] == forms['goku_black'] and a['exp'] == 800000)
+b2 = talk_at(b1, *zone26.HUB_AT) + poke_rec(exp=900000, stat=71) + TO_GUEST + go('goku_black', 'hercule') + CONFIRM + state('b2')
+out = fresh(b2); a = read('b2')
+check('back to Hercule: his own progress', 'bad pc' not in out and a['form'] == forms['hercule'] and a['exp'] == 800000 and a['stat'] == 61)
+b3 = talk_at(b2, *zone26.HUB_AT) + TO_GUEST + go('hercule', 'goku_black') + CONFIRM + state('b3')
+out = fresh(b3); a = read('b3')
+check('and Goku Black\'s back', 'bad pc' not in out and a['form'] == forms['goku_black'] and a['exp'] == 900000 and a['stat'] == 71)
+
 # 8. A bench saved by a build before version 2 (pass its slot-test ROM as a fourth argument): every fighter's progress carries over.
 OLD_SLOT = sys.argv[4] if len(sys.argv) > 4 else None
 if OLD_SLOT:
@@ -192,26 +209,26 @@ if OLD_SLOT:
         if os.path.exists(sav): os.remove(sav)
         return run(lines, sav, OLD_SLOT)
     maxhp = lambda v: ['poke8 %08X %02X' % (R8 + 0x18, v & 255), 'poke8 %08X %02X' % (R8 + 0x19, v >> 8)]
-    m1 = hub + poke_rec(exp=333333, stat=33, gear=ROW) + maxhp(345) + ['poke8 %08X %02X' % (R8 + 0x2E + i, v) for i, v in enumerate((3, 3, 2, 2, 1, 1))] + TO_GUEST + DOWN(3) + CONFIRM
-    m2 = talk_at(m1, *zone26.HUB_AT) + poke_rec(exp=444448, stat=44) + TO_GUEST + DOWN(9) + CONFIRM
-    m3 = talk_at(m2, *zone26.HUB_AT) + poke_rec(exp=555552, stat=55) + TO_GUEST + DOWN(1) + CONFIRM + state('m3')
+    m1 = hub + poke_rec(exp=333333, stat=33, gear=ROW) + maxhp(345) + ['poke8 %08X %02X' % (R8 + 0x2E + i, v) for i, v in enumerate((3, 3, 2, 2, 1, 1))] + TO_GUEST + go('broly', 'piccolo', OPEN_V1) + CONFIRM
+    m2 = talk_at(m1, *zone26.HUB_AT) + poke_rec(exp=444448, stat=44) + TO_GUEST + go('piccolo', 'tien', OPEN_V1) + CONFIRM
+    m3 = talk_at(m2, *zone26.HUB_AT) + poke_rec(exp=555552, stat=55) + TO_GUEST + go('tien', 'yamcha', OPEN_V1) + CONFIRM + state('m3')
     out = old(m3); a = read('m3')
     check('old build: Yamcha out after Piccolo and Tien', 'bad pc' not in out and a['form'] == forms['yamcha'])
     check('old build saved a version 1 bench', struct.unpack_from('<I', eeprom(sav), BENCH_OFFSET)[0] == 0x31484342)
     v1 = d + '/v1.sav'; shutil.copy(sav, v1)
-    t = talk_at(BOOT, *zone26.HUB_AT, sav=v1) + TO_GUEST + UP(13) + CONFIRM + state('m4')
+    t = talk_at(BOOT, *zone26.HUB_AT, sav=v1) + TO_GUEST + go('yamcha', 'broly') + CONFIRM + state('m4')
     out = from_save(t, v1); a = read('m4')
     check('new build: Broly from a version 1 bench', 'bad pc' not in out and a['form'] == forms['broly'] and a['exp'] == 333333 and a['stat'] == 33 and a['maxhp'] == 345 and a['gear'][SLOT] == ROW and a['hp'] == a['maxhp'])
     lv = a['raw'][0x4F8 + 8 * REC + 0x2E:0x4F8 + 8 * REC + 0x34]
     check('and his skill levels', tuple(lv) == (3, 3, 2, 2, 1, 1))
     check('the bench is version 2 once saved', struct.unpack_from('<I', eeprom(after), BENCH_OFFSET)[0] == 0x32484342)
-    shutil.copy(after, v1 + '2'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '2') + TO_GUEST + DOWN(12) + CONFIRM + state('m5')
+    shutil.copy(after, v1 + '2'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '2') + TO_GUEST + go('broly', 'tien') + CONFIRM + state('m5')
     out = from_save(t, v1 + '2'); a = read('m5')
     check('new build: Tien\'s small entry carried over', 'bad pc' not in out and a['form'] == forms['tien'] and a['exp'] == 555552 and a['stat'] == 55)
-    shutil.copy(after, v1 + '3'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '3') + TO_GUEST + UP(9) + CONFIRM + state('m6')
+    shutil.copy(after, v1 + '3'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '3') + TO_GUEST + go('tien', 'piccolo') + CONFIRM + state('m6')
     out = from_save(t, v1 + '3'); a = read('m6')
     check('new build: Piccolo\'s full entry carried over', 'bad pc' not in out and a['form'] == forms['piccolo'] and a['exp'] == 444448 and a['stat'] == 44)
-    shutil.copy(after, v1 + '4'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '4') + TO_GUEST + DOWN(10) + CONFIRM + state('m7')
+    shutil.copy(after, v1 + '4'); t = talk_at(BOOT, *zone26.HUB_AT, sav=v1 + '4') + TO_GUEST + go('piccolo', 'yamcha') + CONFIRM + state('m7')
     out = from_save(t, v1 + '4'); a = read('m7')
     check('new build: Yamcha too', 'bad pc' not in out and a['form'] == forms['yamcha'] and a['exp'] == 555552 and a['stat'] == 55)
 
