@@ -208,14 +208,15 @@ lock[at:at] = ['poke8 %s 00' % flag_byte(858), 'poke8 %s 00' % flag_byte(873)]
 o = run(rom, lock + ['tap DOWN 30', 'tap DOWN 30', 'tap A 150', 'run 100', 'dump j 03001068 8a8'], d)
 print('flag byte value test')
 j = open(d + '/j.bin', 'rb').read()
-check('unlocks: locked outfits are skipped (all locked stays school uniform)', j[GOHAN + FORM] == 10)
+check('unlocks: locked outfits are skipped (only the GT looks are left: a debug build opens them)', j[GOHAN + FORM] == forms['gohan_gt_noglasses'])
 
 # Saiyan armor: each outfit transforms and returns, attacks, and uses beam skills without hanging. Scrolling keeps sprites inside the frame.
-for who, char, rights, key, base, ss in (('Gohan', 1, 1, 'UP', 'gohan_armor', 'gohan_armor_ss'), ('Trunks', 3, 2, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss')):
+for who, char, rights, key, base, ss in (('Gohan', 1, 1, 'DOWN', 'gohan_armor', 'gohan_armor_ss'), ('Trunks', 3, 2, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss')):
+    presses = [o_['form'] for o_ in json.load(open('ultimate/outfits.json'))['characters'][str(char)]].index(base)    # the armor's place on the list
     rec = 0x03001560 + REC * char
     pk = ['poke8 %08x %02x' % (rec + 0x0C, 3), 'poke8 %08x %02x' % (rec + 0x0D, 20), 'poke8 %08x %02x' % (rec + 0x0E, 15), 'poke8 %08x %02x' % (rec + 0x0F, 10)]
     def skill(n): return ['poke8 %08x %02x' % (rec + 0x15, n), 'run 5', 'keys B', 'run 12', 'keys', 'run 200']
-    lines = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * rights + ['tap %s 30' % key, 'tap A 150', 'run 100'] + pk + ['dump k 03001068 8a8', 'shot armor_' + who] + skill(0) + ['dump l 03001068 8a8', 'shot armorss_' + who, 'tap A 8', 'run 30'] + skill(1) + skill(2) + skill(0) + ['run 100'] + skill(0) + ['run 300', 'dump m 03001068 8a8', 'tap A 8', 'run 30', 'keys R', 'run 20', 'keys', 'run 20']
+    lines = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * rights + ['tap %s 30' % key] * presses + ['tap A 150', 'run 100'] + pk + ['dump k 03001068 8a8', 'shot armor_' + who] + skill(0) + ['dump l 03001068 8a8', 'shot armorss_' + who, 'tap A 8', 'run 30'] + skill(1) + skill(2) + skill(0) + ['run 100'] + skill(0) + ['run 300', 'dump m 03001068 8a8', 'tap A 8', 'run 30', 'keys R', 'run 20', 'keys', 'run 20']
     o = run(rom, lines, d)
     at = 0x4F8 + REC * char + FORM
     check('armor %s: no bad jumps' % who, 'bad pc' not in o)
@@ -239,9 +240,10 @@ check('charged: no bad jumps', 'bad pc' not in o)
 check('charged: release hurts the enemy', hp[2] < hp[1])
 check('charged: stronger than the normal hit before it', hp[1] - hp[2] > hp[0] - hp[1] > 0)
 # Super Saiyan 2 hits 1.5x as hard as Super Saiyan, punches and ki. The Bomber waits out of reach during the transformations (it blows itself up near the player). The first press after the walk-in does nothing in this scene.
-def dmg(presses, blast, wait):
+def dmg(presses, blast, wait, form=None):
     R_ = 0x03001560; away = ['poke %s %x' % (ENEMY_X, x + (120 << 8)), 'poke %s %x' % (ENEMY_Y, y)]
     L = base + ['poke8 %08X 03' % (R_ + 0x0C), 'poke8 %08X 07' % (R_ + 0x0D), 'poke8 %08X 14' % (R_ + 0x0E), 'poke8 %08X 16' % (R_ + 0x0F), 'run %d' % wait]
+    if form is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, form)]           # another look of Goku's (GT Kid Goku) before the presses
     for p_ in presses:
         L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 03' % (R_ + 0x1B), 'keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in away + ['run 30']]
     o_ = run(erom, L + ['mem %s 2' % PX], d); m_ = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o_)[-1]
@@ -260,6 +262,11 @@ for kind, blast_ in (('punch', 0), ('ki blast', 1)):
     lo, hi, top = min(v for v, _ in a_), min(v for v, _ in b_), min(v for v, _ in c_)
     check('Super Saiyan 2 %s is about 1.5x Super Saiyan' % kind, all(f_ == 4 for _, f_ in a_) and all(f_ == forms['goku_ss2_b'] for _, f_ in b_) and lo > 0 and 1.3 < hi / lo < 1.7)
     check('Super Saiyan 3 %s is about 1.75x Super Saiyan' % kind, all(f_ == 6 for _, f_ in c_) and lo > 0 and (1.55 < top / lo < 1.95 or 1.55 < top / lo / 1.5 < 1.95))   # a critical hit is 1.5x again
+    # GT Kid Goku: Super Saiyan, then Super Saiyan 3 pressed twice is Super Saiyan 4, twice Super Saiyan's damage
+    k1 = [dmg([1, 1], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]; k4 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]
+    print(kind, 'Kid Super Saiyan', k1, 'Kid Super Saiyan 4', k4)
+    lo_, s4 = min(v for v, _ in k1), min(v for v, _ in k4)
+    check('Kid Goku Super Saiyan 4 %s is about 2x his Super Saiyan' % kind, all(f_ == forms['kid_goku_ssj'] for _, f_ in k1) and all(f_ == forms['kid_goku_ssj4'] for _, f_ in k4) and lo_ > 0 and (1.75 < s4 / lo_ < 2.25 or 1.75 < s4 / lo_ / 1.5 < 2.25))
 for name, rights in (('Goku', 0), ('Gohan', 1), ('Trunks', 2), ('Vegeta', 3), ('Vegito', 4), ('Broly', 5)):
     o = run(rom, ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * rights + ['tap A 150', 'run 100', 'keys A', 'run 80', 'shot hold_' + name, 'keys', 'run 3', 'shot hit_' + name, 'run 40', 'tap A 20', 'dump n 03001068 8a8'], d)
     check('charged %s: no bad jumps' % name, 'bad pc' not in o)

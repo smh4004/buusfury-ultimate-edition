@@ -23,6 +23,24 @@ def tiles_8bpp(idx):
     return bytes(out)
 
 
+_WFZ = {}
+def wfz_cache():
+    if 'c' not in _WFZ:
+        import os, pickle
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'out', 'wfz_cache.pkl')
+        try: _WFZ['c'] = pickle.load(open(path, 'rb'))
+        except Exception: _WFZ['c'] = {}
+        _WFZ['path'] = path
+    return _WFZ['c']
+
+
+def wfz_cache_save():
+    import os, pickle
+    c = _WFZ.get('c')
+    if c and c.pop('_dirty', False):
+        os.makedirs(os.path.dirname(_WFZ['path']), exist_ok=True); pickle.dump(c, open(_WFZ['path'], 'wb'))
+
+
 class Inserter:
     def __init__(self, rom, at):
         self.rom, self.cur = rom, at
@@ -31,11 +49,26 @@ class Inserter:
         a = self.cur; self.rom[a:a + len(data)] = data; self.cur = (a + len(data) + 3) & ~3
         return BASE + a
 
+    def tiles(self, raw):
+        """A tile block (8bpp tiles) -> pointer: stored (WFZ type 0), or with self.compress WFZ type 1 like BF's own
+        frames (the game's tile loader 0x0803D96E decodes both), identical blocks once (wfz.compress from Gero's tools).
+        Compressed blocks are cached in ultimate/out/wfz_cache.pkl: the encoder is slow."""
+        raw = bytes(raw)
+        if not getattr(self, 'compress', False): return self.put(struct.pack('<II', 0, len(raw)) + raw)
+        seen = self.__dict__.setdefault('_tiles', {})
+        if raw not in seen:
+            cache = wfz_cache()
+            if raw not in cache:
+                import wfz
+                cache[raw] = wfz.container(raw); cache['_dirty'] = True
+            seen[raw] = self.put(cache[raw])
+        return seen[raw]
+
     def piece(self, img, mirror=False, dx=0, dy=0):
         """img: h x w index array (an OBJ size). Returns the 16-byte piece."""
         h, w = img.shape
         sh, sz = SHAPE[(w, h)]
-        tile = self.put(struct.pack('<II', 0, w * h) + tiles_8bpp(img))
+        tile = self.tiles(tiles_8bpp(img))
         x = 8 - w // 2 + dx; y = 8 - h + dy
         a1 = (sz << 14)
         if mirror: x = 16 - w - x; a1 |= 0x1000
@@ -191,6 +224,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
     ids = {}; anims = {}
     for name, a in cfg.items():
         if name.startswith('_'): continue
+        ins.compress = a.get('compress', False)            # WFZ-compressed tile blocks (only the actors that ask)
         target = a.get('replace')                          # modify an existing actor instead of adding one
         if 'bolts_of' in a:                                # a copy of an actor with lightning on its frames: its source is built first
             src = a['bolts_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
@@ -247,6 +281,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
                 sl = ([int(v) for v in sl.split(',')] if ',' in sl else slice(*map(int, sl.split(':')))) if sl else None   # a..b or an exact list of frames
                 ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post)
                 if ptr: struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ptr)
+        ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
             ins.oy = a.get('origin_dy', 0)                 # map door regions already draw with the BF OBJ palette)
             for slot, dirs in a['raw_frames'].items():
@@ -255,7 +290,6 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
             ins.oy = 0
         for d, box in a.get('boxes', {}).items():          # per-direction (x, y, w, h) box override
             struct.pack_into('<4i', rec, 0x14 + 16 * int(d), *box)
-        ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
         for slot, spec in a.get('slots', {}).items():
             if int(slot) >= n: continue                    # the template has fewer slots
             old = struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]
@@ -299,6 +333,8 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
     rom[at:at + 4 * len(table)] = struct.pack('<%dI' % len(table), *table)
     for lit in ACTOR_LITERALS:
         struct.pack_into('<I', rom, lit, BASE + at + 4)
+    ins.compress = False
+    wfz_cache_save()
     return ids, ins.cur
 
 

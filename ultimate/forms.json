@@ -1,5 +1,5 @@
 {
- "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object.",
+ "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS).",
  "rows": [
   {
    "id": "broly",
@@ -390,6 +390,327 @@
    "portrait": 167,
    "flags": 81,
    "down": "goku_black"
+  },
+  {
+   "id": "kid_goku",
+   "copy": 0,
+   "actor": "kid_goku",
+   "owner": 0,
+   "portrait": "gt:kidgoku",
+   "up": "kid_goku_ssj"
+  },
+  {
+   "id": "kid_goku_ssj",
+   "copy": 3,
+   "actor": "kid_goku_ssj",
+   "owner": 0,
+   "portrait": "gt:kidgoku",
+   "up": "kid_goku_ssj3",
+   "down": "kid_goku"
+  },
+  {
+   "id": "kid_goku_ssj3",
+   "copy": 5,
+   "actor": "kid_goku_ssj3",
+   "owner": 0,
+   "portrait": "gt:kidgoku",
+   "up": "kid_goku_ssj4",
+   "down": "kid_goku"
+  },
+  {
+   "id": "kid_goku_ssj4",
+   "copy": 5,
+   "actor": "kid_goku_ssj4",
+   "owner": 0,
+   "portrait": "gt:kidgoku",
+   "down": "kid_goku"
+  },
+  {
+   "id": "gogeta_ssj4",
+   "copy": 41,
+   "actor": "gogeta_ssj4",
+   "owner": 7,
+   "portrait": "gt:gogeta_ssj4"
+  },
+  {
+   "id": "gohan_gt",
+   "copy": 10,
+   "actor": "gohan_gt",
+   "owner": 1,
+   "portrait": "gt:gohan",
+   "up": "gohan_gt_ssj"
+  },
+  {
+   "id": "gohan_gt_ssj",
+   "copy": 16,
+   "actor": "gohan_gt_ssj",
+   "owner": 1,
+   "portrait": "gt:gohan_ssj",
+   "down": "gohan_gt"
+  },
+  {
+   "id": "gohan_gt_noglasses",
+   "copy": 10,
+   "actor": "gohan_gt_noglasses",
+   "owner": 1,
+   "portrait": "gt:gohan",
+   "up": "gohan_gt_ng_ssj"
+  },
+  {
+   "id": "gohan_gt_ng_ssj",
+   "copy": 16,
+   "actor": "gohan_gt_ssj",
+   "owner": 1,
+   "portrait": "gt:gohan_ssj",
+   "down": "gohan_gt_noglasses"
+  },
+  {
+   "id": "saiyaman_from_gt",
+   "copy": 14,
+   "character": 111,
+   "owner": 1,
+   "name": 1186,
+   "up": 255,
+   "down": "gohan_gt"
+  },
+  {
+   "id": "saiyaman_from_gt_ng",
+   "copy": 14,
+   "character": 111,
+   "owner": 1,
+   "name": 1186,
+   "up": 255,
+   "down": "gohan_gt_noglasses"
+  },
+  {
+   "id": "goten_gt",
+   "copy": 19,
+   "actor": "goten_gt",
+   "owner": 2,
+   "portrait": [
+    "gt:goten",
+    "gt:goten",
+    "gt:goten_surprised",
+    "gt:goten_surprised",
+    "gt:goten_angry",
+    "gt:goten_surprised"
+   ],
+   "up": "goten_gt_ssj"
+  },
+  {
+   "id": "goten_gt_ssj",
+   "copy": 20,
+   "actor": "goten_gt_ssj",
+   "owner": 2,
+   "portrait": [
+    "gt:goten_ssj",
+    "gt:goten_ssj",
+    "gt:goten_ssj_surprised",
+    "gt:goten_ssj_surprised",
+    "gt:goten_ssj_angry",
+    "gt:goten_ssj_surprised"
+   ],
+   "down": "goten_gt"
+  },
+  {
+   "id": "goten_gt_green",
+   "copy": 19,
+   "actor": "goten_gt_green",
+   "owner": 2,
+   "portrait": [
+    "gt:goten",
+    "gt:goten",
+    "gt:goten_surprised",
+    "gt:goten_surprised",
+    "gt:goten_angry",
+    "gt:goten_surprised"
+   ],
+   "up": "goten_gt_green_ssj"
+  },
+  {
+   "id": "goten_gt_green_ssj",
+   "copy": 20,
+   "actor": "goten_gt_ssj",
+   "owner": 2,
+   "portrait": [
+    "gt:goten_ssj",
+    "gt:goten_ssj",
+    "gt:goten_ssj_surprised",
+    "gt:goten_ssj_surprised",
+    "gt:goten_ssj_angry",
+    "gt:goten_ssj_surprised"
+   ],
+   "down": "goten_gt_green"
+  },
+  {
+   "id": "trunks_gt",
+   "copy": 21,
+   "actor": "trunks_gt",
+   "owner": 3,
+   "portrait": "gt:trunks",
+   "up": "trunks_gt_ssj"
+  },
+  {
+   "id": "trunks_gt_ssj",
+   "copy": 22,
+   "actor": "trunks_gt_ssj",
+   "owner": 3,
+   "portrait": "gt:trunks_ssj",
+   "down": "trunks_gt"
+  },
+  {
+   "id": "vegeta_gt",
+   "copy": 26,
+   "actor": "vegeta_gt",
+   "owner": 4,
+   "portrait": "gt:vegeta_gt",
+   "up": "vegeta_gt_ssj"
+  },
+  {
+   "id": "vegeta_gt_ssj",
+   "copy": 28,
+   "actor": "vegeta_gt_ssj",
+   "owner": 4,
+   "portrait": "gt:vegeta_gt",
+   "up": "vegeta_gt_ssj4",
+   "down": "vegeta_gt"
+  },
+  {
+   "id": "vegeta_gt_ssj4",
+   "copy": 28,
+   "actor": "vegeta_gt_ssj4",
+   "owner": 4,
+   "portrait": "gt:vegeta_ssj4",
+   "down": "vegeta_gt"
+  },
+  {
+   "id": "vegeta_gt_tank",
+   "copy": 26,
+   "actor": "vegeta_gt_tank",
+   "owner": 4,
+   "portrait": "gt:vegeta_gt",
+   "up": "vegeta_gt_tank_ssj"
+  },
+  {
+   "id": "vegeta_gt_tank_ssj",
+   "copy": 28,
+   "actor": "vegeta_gt_tank_ssj",
+   "owner": 4,
+   "portrait": "gt:vegeta_gt",
+   "up": "vegeta_gt_tank_ssj4",
+   "down": "vegeta_gt_tank"
+  },
+  {
+   "id": "vegeta_gt_tank_ssj4",
+   "copy": 28,
+   "actor": "vegeta_gt_ssj4",
+   "owner": 4,
+   "portrait": "gt:vegeta_ssj4",
+   "down": "vegeta_gt_tank"
+  },
+  {
+   "id": "vegeta_gt_mustache",
+   "copy": 26,
+   "actor": "vegeta_gt_mustache",
+   "owner": 4,
+   "portrait": "gt:vegeta",
+   "up": 255
+  },
+  {
+   "id": "pan",
+   "copy": 47,
+   "actor": "pan",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan",
+   "flags": 16,
+   "up": "pan_ssj"
+  },
+  {
+   "id": "pan_ssj",
+   "copy": 47,
+   "actor": "pan_ssj",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan",
+   "flags": 81,
+   "down": "pan"
+  },
+  {
+   "id": "pan_nobandana",
+   "copy": 47,
+   "actor": "pan_nobandana",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan_nobandana",
+   "flags": 16,
+   "up": "pan_ssj_spiky"
+  },
+  {
+   "id": "pan_ssj_spiky",
+   "copy": 47,
+   "actor": "pan_ssj_spiky",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan_nobandana",
+   "flags": 81,
+   "down": "pan_nobandana"
+  },
+  {
+   "id": "pan_bug",
+   "copy": 47,
+   "actor": "pan_bug",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan_bug",
+   "flags": 16
+  },
+  {
+   "id": "pan_gi_tan",
+   "copy": 47,
+   "actor": "pan_gi_tan",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan_nobandana",
+   "flags": 16
+  },
+  {
+   "id": "pan_gi_red",
+   "copy": 47,
+   "actor": "pan_gi_red",
+   "owner": 8,
+   "name": 1578,
+   "portrait": "gt:pan_nobandana",
+   "flags": 16
+  },
+  {
+   "id": "pan_brapan",
+   "copy": 47,
+   "actor": "pan_brapan",
+   "owner": 8,
+   "name": 1581,
+   "portrait": "gt:brapan",
+   "flags": 16
+  },
+  {
+   "id": "uub",
+   "copy": 47,
+   "actor": "uub",
+   "owner": 8,
+   "name": 1579,
+   "flags": 16,
+   "up": "majuub",
+   "portrait": "gt:uub"
+  },
+  {
+   "id": "majuub",
+   "copy": 47,
+   "actor": "majuub",
+   "owner": 8,
+   "name": 1580,
+   "flags": 81,
+   "down": "uub",
+   "portrait": "gt:uub"
   }
  ],
  "edit": {

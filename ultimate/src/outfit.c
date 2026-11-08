@@ -37,7 +37,9 @@ static void guest_sync(void) {
         fighter[] = {2, 7, 8}, a17[] = {5, 7, 8, BLITZ_SKILL, WAVE_SKILL, SUPER17_SKILL}, a18[] = {4, 7, BLITZ_SKILL, DISC_SKILL, WAVE_SKILL}, krillin[] = {3, 7, 15, DISC_SKILL}, videl[] = {1, 7},
         tien[] = {3, 7, 15, BLITZ_SKILL}, yamcha[] = {2, 7, 15}, pikkon[] = {3, 7, 8, WAVE_SKILL}, hercule[] = {1, 7},
         black[] = {4, 7, 14, BLACK_KAME_SKILL, ROSE_SKILL},     /* Goku Black: ki blasts, Instant Transmission, the Black Kamehameha, Rose. Energy Punch and Energy Sword play animation slots Goku's figure fills with other moves */
-        trunks[] = {4, 7, 20, 4, 11};            /* Future Trunks: the same moves as Trunks */
+        trunks[] = {4, 7, 20, 4, 11},            /* Future Trunks: the same moves as Trunks */
+        pan[] = {3, 7, 8, 20}, pan_plain[] = {2, 7, 8},  /* Pan: ki blasts and her rush; Super Saiyan in the two looks that have it. Brapan (the Bulma-Pan fusion) fights as Pan */
+        uub[] = {4, 7, 8, 15, MAJUUB_SKILL};     /* Uub: ki blasts, rush, Kamehameha, Majuub */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
     const u8 *list;
@@ -54,6 +56,9 @@ static void guest_sync(void) {
     else if (form == FORM_HERCULE) list = hercule;
     else if (form == FORM_BLACK || form == FORM_ROSE) list = black;
     else if (form == FORM_FUTURE_TRUNKS) list = trunks;
+    else if (form >= FORM_PAN && form < FORM_PAN + 4) list = pan;          /* pan, pan_ssj, pan_nobandana, pan_ssj_spiky */
+    else if (form >= FORM_PAN + 4 && form <= FORM_PAN_LAST) list = pan_plain;
+    else if (form == FORM_UUB || form == FORM_MAJUUB) list = uub;
     else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU || form == FORM_JANEMBA) list = fighter;
     else return;
     r[0x0C] = list[0];
@@ -489,9 +494,10 @@ static void cycle(void *obj, int dir) {
         const struct outfit *o = &outfit_table[first + (at + dir * i + n * 2) % n];
         if (!outfit_open(o)) continue;
         snapshot(obj);
-        FORM_OF(c) = o->form;
+        /* back to the look the screen opened on: its own variant (Goku's halo while he is dead is form 2, the "also" of his gi) */
+        FORM_OF(c) = (o->also != 255 && SNAP_FORMS[c] == o->also && c != 8) ? o->also : o->form;
         guest_sync();
-        Sprite_SetCharacter(sprite, Form_Sprite((void *)(form_table + o->form * 24)));
+        Sprite_SetCharacter(sprite, Form_Sprite((void *)(form_table + FORM_OF(c) * 24)));
         Sprite_SetFacing(sprite, 1);
         Sprite_SetBehaviour(sprite, (void *)0x03001B58);
         PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
@@ -1318,8 +1324,38 @@ void ss_use(u8 *record, void *sprite) {
     if (has_ss2_above(record)) SS3_Use(record, sprite);
     else SS_Use(record, sprite);
 }
+/* GT: a Super Saiyan 3 form with a form above it (Kid Goku's) goes on to Super Saiyan 4 when Super Saiyan 3 is pressed again, for the same
+   ki as Super Saiyan 3; Super Saiyan 4 powers down. SS3_Can lets any Super Saiyan 3 form use the skill for free, since it only ever powered down. */
+#define CanAfford ((int (*)(u8 *, int))0x080134B9)
+static int ss4_above(const u8 *record) {
+    const u8 *row = form_table + record[0x14] * 24;
+    return (row[0] & 2) && row[0x16] != 255;
+}
 int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2, not from Super Saiyan */
+    if (ss4_above(record)) return *(u32 *)(*(u32 *)(0x0871DA98 + 0x14) + 0x0C) ? CanAfford(record, 10) : 0;
     return has_ss2_above(record) ? 0 : SS3_Can(record);
+}
+static void power_up(void *sprite, const void *vt) {
+    u32 *state = Alloc(0x10);
+    if (state) { *(u8 *)&state[1] = 4; state[0] = (u32)vt; }
+    Sprite_SetFacing(sprite, 10);
+    Sprite_SetBehaviour(sprite, state);
+}
+void ss3_use(u8 *record, void *sprite) {
+    if (ss4_above(record)) power_up(sprite, (const void *)0x0804E2B0);
+    else SS3_Use(record, sprite);
+}
+/* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
+extern const int absorb_vt[14];
+void majuub_use(u8 *record, void *sprite) {
+    if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
+    else SS_Use(record, sprite);
+}
+extern const u8 ssj4_rows[];
+static int is_ssj4(int form) {
+    const u8 *p;
+    for (p = ssj4_rows; *p != 255; p++) if (*p == form) return 1;
+    return 0;
 }
 /* Against Super Saiyan's damage, Super Saiyan 2 hits 1.5x as hard and Super Saiyan 3 1.75x. hit[1] is the attack's damage scale (1024 = normal); team 2 is the player's side.
    Damage grows with the cube of the Strength stat, so scaling the stat itself would give about three times the damage.
@@ -1330,7 +1366,11 @@ void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
     if ((hit[0] & 255) == 2) {
-        if (is_ss2(form) || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
+        if (is_ssj4(form)) {                         /* Super Saiyan 4: twice Super Saiyan's damage (from Super Saiyan 3's figure where it is that class) */
+            hit[1] = scale * 2;
+            if ((form_table[form * 24] & 2) && strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
+        }
+        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             stats[0] = strength - 10; stats[1] = power - 10;

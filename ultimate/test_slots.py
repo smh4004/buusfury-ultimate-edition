@@ -51,9 +51,10 @@ DOWN = lambda n: ['tap DOWN 30'] * n
 UP = lambda n: ['tap UP 30'] * n
 CONFIRM = ['tap A 200', 'run 120']
 CANCEL = ['tap B 200', 'run 120']
-# The guests this route has open, in picker order (the rest stay locked and the picker skips them). Older builds lack Goku Black.
-OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black']
-OPEN_V1 = OPEN[:-1]
+# The guests this route has open, in picker order (the rest stay locked and the picker skips them). Older builds lack Goku Black and GT.
+OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black',
+        'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub']
+OPEN_V1 = OPEN[:8]
 def go(a, b, open_=OPEN):
     """Down presses from guest a to guest b, round the list."""
     return DOWN((open_.index(b) - open_.index(a)) % len(open_))
@@ -201,6 +202,18 @@ check('back to Hercule: his own progress', 'bad pc' not in out and a['form'] == 
 b3 = talk_at(b2, *zone26.HUB_AT) + TO_GUEST + go('hercule', 'goku_black') + CONFIRM + state('b3')
 out = fresh(b3); a = read('b3')
 check('and Goku Black\'s back', 'bad pc' not in out and a['form'] == forms['goku_black'] and a['exp'] == 900000 and a['stat'] == 71)
+
+# 7c. GT: Pan's six looks are one fighter (one bench group); Uub is another.
+c1 = talk_at(b3, *zone26.HUB_AT) + poke_rec(exp=1000000, stat=75) + TO_GUEST + go('goku_black', 'pan') + CONFIRM + state('c1')
+out = fresh(c1); a = read('c1')
+check('Pan on, level with the guest who was out', 'bad pc' not in out and a['form'] == forms['pan'] and a['exp'] == 1000000)
+c2 = talk_at(c1, *zone26.HUB_AT) + poke_rec(exp=1100000, stat=80) + TO_GUEST + go('pan', 'pan_gi_red') + CONFIRM + state('c2')
+out = fresh(c2); a = read('c2')
+check('another of Pan\'s looks is still Pan: same progress', 'bad pc' not in out and a['form'] == forms['pan_gi_red'] and a['exp'] == 1100000 and a['stat'] == 80)
+c3 = talk_at(c2, *zone26.HUB_AT) + TO_GUEST + go('pan_gi_red', 'uub') + CONFIRM + poke_rec(exp=1200000, stat=90) + state('c3')
+c4 = talk_at(c3, *zone26.HUB_AT) + TO_GUEST + go('uub', 'pan_bug') + CONFIRM + state('c4')
+out = fresh(c4); a = read('c4')
+check('Uub keeps his own; Pan comes back with hers', 'bad pc' not in out and a['form'] == forms['pan_bug'] and a['exp'] == 1100000 and a['stat'] == 80)
 
 # 8. A bench saved by a build before version 2 (pass its slot-test ROM as a fourth argument): every fighter's progress carries over.
 OLD_SLOT = sys.argv[4] if len(sys.argv) > 4 else None

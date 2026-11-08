@@ -157,6 +157,34 @@ check('the win is waiting to be told', more(zone26.MORE_BLACK_WON) == 1)
 strong(); talk(*zone26.HUB_AT); send('run 60', 'shot black_won'); send('tap A 60', 'run 30', 'shot black_joins'); dismiss(1)
 check('Goku Black joins', more(zone26.MORE_BLACK) == 1 and more(zone26.MORE_BLACK_WON) == 0)
 
+# GT challengers (Challengers, third line): Ledgic once Goku Black is with you; his fall brings Pan and the GT looks. Then Uub, and Majuub in the next room.
+GT_MENU = ['tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150']
+hub_talk(); send(*GT_MENU, 'shot gt_menu', 'tap DOWN 12', 'tap A 150', 'shot no_uub'); dismiss(1)
+check('Uub: locked before Ledgic', at() == HUB and more(zone26.MORE_GT) == 0)
+hub_talk(); send(*GT_MENU, 'tap A 150', 'shot ledgic', 'tap A 200', 'run 200', 'shot ledgic_room')
+check('Ledgic: into his room', at() == zone26.challenge_room('ledgic') << 8 | 26)
+foe = mem(ENEMIES)[0]; check('Ledgic: he has %d HP' % zone26.LEDGIC_FIGHT[0][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.LEDGIC_FIGHT[0][1])
+for k in range(6): send('run 20', 'shot ledgic_fight_%d' % k)
+check('Ledgic: beaten', beat(zone26.challenge_room('ledgic')))
+check('Ledgic: comes home', settle(HUB))
+check('Ledgic: the win is waiting to be told', more(zone26.MORE_LEDGIC_WON) == 1)
+strong(); talk(*zone26.HUB_AT); send('run 60', 'shot ledgic_won', 'tap A 60', 'run 30', 'shot pan_says', 'tap A 60', 'run 30', 'shot gt_joins'); dismiss(1)
+check('Pan and the GT looks open', more(zone26.MORE_GT) == 1 and more(zone26.MORE_LEDGIC_WON) == 0)
+hub_talk(); send(*GT_MENU, 'tap DOWN 12', 'tap A 150', 'shot uub', 'tap A 200', 'run 200', 'shot uub_room')
+check('Uub: into his room', at() == zone26.challenge_room('uub') << 8 | 26)
+foe = mem(ENEMIES)[0]; check('Uub: he has %d HP' % zone26.UUB_FIGHT[0][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.UUB_FIGHT[0][1])
+check('Uub: beaten', beat(zone26.challenge_room('uub')))
+for _ in range(12):
+    send('run 60')
+    if at() == zone26.challenge_room('uub', 1) << 8 | 26 and mem(ENEMIES)[0]: break
+send('run 60', 'shot majuub_room')
+check('Majuub comes on in the next room', at() == zone26.challenge_room('uub', 1) << 8 | 26)
+foe = mem(ENEMIES)[0]; check('Majuub has %d HP' % zone26.UUB_FIGHT[1][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.UUB_FIGHT[1][1])
+check('Majuub: beaten', beat(zone26.challenge_room('uub', 1)))
+check('Majuub: comes home', settle(HUB))
+strong(); talk(*zone26.HUB_AT); send('run 60', 'shot uub_won', 'tap A 60', 'run 30', 'shot uub_joins'); dismiss(1)
+check('Uub joins', more(zone26.MORE_UUB) == 1 and more(zone26.MORE_UUB_WON) == 0)
+
 # Race and museum.
 z0 = zenie(); send(flag_on(234)); mem(G)
 hub_talk(); send('shot race_won'); dismiss(2)

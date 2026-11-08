@@ -8,6 +8,7 @@ make extract && make harness
 export BFU_COMBO=/path/to/log1-2-combo.gba   # USA, SHA-1 f02d179a...
 export BFU_LOG2=/path/to/log2.gba             # Legacy of Goku II (USA): Zone 26's snow tiles, Special Beam Cannon
 export BFU_PROTO=/path/to/DBZ3_cart27.GBA     # Prototype D: Super 13 and Zone 26's layouts
+export BFU_BSO=/path/to/bso_review            # the owner's Black Star Odyssey review sheet as page PNGs (p-000.png ...): the GT fighters
 python3 ultimate/build.py && python3 ultimate/build.py --debug && python3 ultimate/build.py --debug --enemy
 python3 ultimate/test_build.py
 python3 ultimate/build.py --debug --zone
@@ -19,6 +20,15 @@ The debug build starts with Vegito and guest Broly, and opens Switch Character t
 ## Outfits
 `ultimate/outfits.json` lists each character's outfits, and `ultimate/src/outfit.c` adds Up and Down to the Switch Character screen.
 Only forms with full combat animations belong in the list. An outfit's Super Saiyan row needs `down` set back to that outfit.
+
+## GT
+`ultimate/bso_import.py` reads the GT fighters from the owner's Black Star Odyssey review sheet (`BFU_BSO`, never committed: one PNG per
+page, page n = BSO's actor n, page 0 the portraits) and lines each page up against the BF actor BSO drew it from. `ultimate/gt.py` builds
+them on the BF actor of the form they play as, fills any animation slot the sheet doesn't draw from one of their own, and stores their
+tiles WFZ-compressed (`wfz.compress`, from Gero's tools; cached in `ultimate/out/wfz_cache.pkl`). Kid Goku, Gohan, Goten, Trunks and
+Vegeta get GT outfits with their transformations (Kid Goku: Super Saiyan 3 pressed again is Super Saiyan 4; GT Vegeta: Super Saiyan
+pressed again), Gogeta a Super Saiyan 4 look, and Pan, Brapan (BSO's Bulma-Pan fusion) and Uub join the guest slot. Ledgic and Uub are on the Challenge Board.
+`python3 ultimate/test_gt.py` plays every look and transformation; `test_ladder.py` plays the GT challenges.
 
 ## Zone 26 and Super 13
 

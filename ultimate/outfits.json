@@ -1,5 +1,5 @@
 {
- "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Extras will use post-game reward flags. Flags from 600 up are ours. Flags 610-612 are post-game rewards; side content will set them.",
+ "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Extras will use post-game reward flags. Flags from 600 up are ours. Flags 610-612 are post-game rewards; side content will set them. GT looks (flag 2028) open when Ledgic falls, with Pan; Uub (2030) after his own challenge. \"bench\": outfits that share one fighter's progress (Pan's looks; Brapan, the Bulma-Pan fusion from Black Star Odyssey, is a fighter of her own).",
  "characters": {
   "1": [
    {
@@ -21,6 +21,16 @@
     "form": "gohan_armor",
     "name": "Saiyan armor",
     "flag": 873
+   },
+   {
+    "form": "gohan_gt",
+    "name": "GT",
+    "flag": 2028
+   },
+   {
+    "form": "gohan_gt_noglasses",
+    "name": "GT, no glasses",
+    "flag": 2028
    }
   ],
   "3": [
@@ -33,6 +43,11 @@
     "form": "trunks_armor",
     "name": "Saiyan armor",
     "flag": 874
+   },
+   {
+    "form": "trunks_gt",
+    "name": "GT",
+    "flag": 2028
    }
   ],
   "4": [
@@ -46,6 +61,21 @@
     "form": "vegeta_armor",
     "name": "Saiyan armor",
     "flag": 875
+   },
+   {
+    "form": "vegeta_gt",
+    "name": "GT",
+    "flag": 2028
+   },
+   {
+    "form": "vegeta_gt_tank",
+    "name": "GT, tank top",
+    "flag": 2028
+   },
+   {
+    "form": "vegeta_gt_mustache",
+    "name": "GT, mustache",
+    "flag": 2028
    }
   ],
   "8": [
@@ -137,6 +167,49 @@
     "also": "goku_rose",
     "flag": 2025,
     "name": "Goku Black"
+   },
+   {
+    "form": "pan",
+    "also": "pan_ssj",
+    "name": "Pan",
+    "flag": 2028,
+    "bench": "pan"
+   },
+   {
+    "form": "pan_nobandana",
+    "also": "pan_ssj_spiky",
+    "name": "Pan, no bandana",
+    "flag": 2028,
+    "bench": "pan"
+   },
+   {
+    "form": "pan_gi_tan",
+    "name": "Pan, tan gi",
+    "flag": 2028,
+    "bench": "pan"
+   },
+   {
+    "form": "pan_gi_red",
+    "name": "Pan, red gi",
+    "flag": 2028,
+    "bench": "pan"
+   },
+   {
+    "form": "pan_bug",
+    "name": "Pan, bug costume",
+    "flag": 2028,
+    "bench": "pan"
+   },
+   {
+    "form": "pan_brapan",
+    "name": "Brapan",
+    "flag": 2028
+   },
+   {
+    "form": "uub",
+    "also": "majuub",
+    "name": "Uub",
+    "flag": 2030
    }
   ],
   "7": [
@@ -156,6 +229,41 @@
     "form": "gogeta_ssb_skin",
     "flag": 878,
     "name": "SSB Gogeta"
+   },
+   {
+    "form": "gogeta_ssj4",
+    "name": "Super Saiyan 4",
+    "flag": 2028
+   }
+  ],
+  "0": [
+   {
+    "form": 0,
+    "also": 2,
+    "name": "Orange gi",
+    "flag": 0
+   },
+   {
+    "form": "kid_goku",
+    "name": "GT",
+    "flag": 2028
+   }
+  ],
+  "2": [
+   {
+    "form": 19,
+    "name": "Gi",
+    "flag": 0
+   },
+   {
+    "form": "goten_gt",
+    "name": "GT",
+    "flag": 2028
+   },
+   {
+    "form": "goten_gt_green",
+    "name": "GT, green jacket",
+    "flag": 2028
    }
   ]
  },

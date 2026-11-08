@@ -202,6 +202,7 @@ BUILDING = (0, 92)
 MORE_FLAG, MORE_GET, MORE_PUT = 2000, 0xE7, 0xF0    # flags past the story's, kept with the bench (32 of them): an outfit's flag from 2000 up, and natives more_get(n), more_put(n, value)
 MORE_YAMCHA, MORE_TIEN, MORE_PIKKON, MORE_HERCULE = 0, 1, 2, 3
 MORE_TIER, MORE_RACE, MORE_MUSEUM, MORE_RANK_NEW, MORE_HARD, MORE_HARD_PAID, MORE_ENDLESS_NEW, MORE_HERC_WON = 4, 5, 6, 7, 13, 14, 15, 24
+MORE_LEDGIC_WON, MORE_GT, MORE_UUB_WON, MORE_UUB = 27, 28, 29, 30    # Ledgic beaten, not yet told; GT looks and Pan; Uub beaten, not yet told; Uub joined
 MORE_BLACK, MORE_BLACK_WON = 25, 26                  # Goku Black: joined; Rose beaten, not yet told    # 8-10 best rank, 11-12 last rank, 16-23 best Endless run (see ladder in outfit.c)
 LADDER = 0xDC                                       # native ladder(op): 0 start Endless, gives the first room; 1 is it on; 2 a win: pays, gives the next room; 3 it ended; 4 this run's wins; 5 best run; 6 rank(hp, max); 7 last rank; 8 best rank (1 C, 2 B, 3 A, 4 S)
 ENDLESS_STEP, ENDLESS_CAP = 20000, 1000000          # an Endless win pays this times the run's wins, up to the cap
@@ -214,6 +215,11 @@ HERCULE_ROW, HERCULE_CHAR, HERCULE_HP, HERCULE_STATS = 45, 138, 300, (100, 5, 5,
 # Goku Black's challenge, once the Hard bracket is won: Black, then Rose in a room of her own (health carries over, as in Android 13's fight).
 # Kid Buu's row: they fire beams, so they can clash with you. (actor, HP, (level + 50, Strength, Power, Endurance))
 BLACK_ROW, BLACK_FIGHT = 61, (('goku_black', 60000, (155, 90, 100, 90)), ('goku_rose', 80000, (158, 100, 115, 100)))
+# GT, once Goku Black is on your side: Ledgic (Don Kee's caped bodyguard) brawls with the Bruiser's behaviour (row 12, as in Black Star Odyssey), then Uub and Majuub
+# with Kid Buu's (beams). Each fight: its stats row, then [(actor, HP, stats)], then the flag its win sets.
+LEDGIC_ROW, LEDGIC_FIGHT = 12, (('ledgic', 70000, (156, 100, 60, 105)),)
+UUB_ROW, UUB_FIGHT = 61, (('uub', 60000, (155, 95, 100, 90)), ('majuub', 90000, (160, 105, 120, 105)))
+CHALLENGES = (('black', BLACK_ROW, BLACK_FIGHT, MORE_BLACK_WON), ('ledgic', LEDGIC_ROW, LEDGIC_FIGHT, MORE_LEDGIC_WON), ('uub', UUB_ROW, UUB_FIGHT, MORE_UUB_WON))
 SPAR_EXP, SPAR_MIN_HP, SPAR_ROOM, SPAR_HOME = 4, 2000, (6, 9), (288, 500)
 # Cell Games, from the Challenge Board: LoG2's arena, four fights in a row. Name, row whose behaviour it uses, HP, (level + 50, Strength, Power, Endurance), actor, how many.
 # Perfect Cell takes Kid Buu's row: he fires beams, so he can clash with you. All health carries over, as in the Boss Rush.
@@ -290,9 +296,18 @@ def hercule_room():
     return building_room() + 1 + len(tour_list()) * len(TIER_HP)
 
 
+def challenge_room(name, k=0):
+    """Room of fight k of a challenge (CHALLENGES order, each fight its own room after Hercule's)."""
+    n = hercule_room() + 1
+    for who, _, fights, _ in CHALLENGES:
+        if who == name: return n + k
+        n += len(fights)
+    raise KeyError(name)
+
+
 def black_room(k=0):
     """Goku Black's fight: 0 Black, 1 Rose."""
-    return hercule_room() + 1 + k
+    return challenge_room('black', k)
 
 
 def tier_rooms():
@@ -406,14 +421,15 @@ def rush_rows(W, rom, harmless=False):
     struct.pack_into('<I', r, 4, HERCULE_HP); r[0xC:0x10] = bytes(HERCULE_STATS)
     struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm('    pushn %d, 1\n    call 0x%X\n    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % (MORE_HERC_WON, MORE_PUT)))))
     rows += r
-    for k, (_, hp, stats) in enumerate(BLACK_FIGHT):          # Black falls and Rose comes on; Rose falls and you go home, as after Hercule
-        r = bytearray(rom[STATS + 28 * BLACK_ROW:STATS + 28 * (BLACK_ROW + 1)])
-        struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)
-        if harmless: r[0xD] = r[0xE] = 0
-        then = ('    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    end\n' % black_room(1) if k == 0 else
-                '    pushn %d, 1\n    call 0x%X\n    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % (MORE_BLACK_WON, MORE_PUT))
-        struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
-        rows += r
+    for who, row, fights, won in CHALLENGES:                 # Black falls and Rose comes on; Rose falls and you go home, as after Hercule. The same for each challenge.
+        for k, (_, hp, stats) in enumerate(fights):
+            r = bytearray(rom[STATS + 28 * row:STATS + 28 * (row + 1)])
+            struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)
+            if harmless: r[0xD] = r[0xE] = 0
+            then = ('    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    end\n' % challenge_room(who, k + 1) if k + 1 < len(fights) else
+                    '    pushn %d, 1\n    call 0x%X\n    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % (won, MORE_PUT))
+            struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
+            rows += r
     at = W.put(bytes(rows))
     for o in STATS_REFS:
         if struct.unpack_from('<I', rom, o)[0] != BASE + STATS:
@@ -585,9 +601,10 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
     e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row, 366 << 16 | 360, HERCULE_CHAR, 0x080555A0, 1, 0x080716EC))
     struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
     rows.append(bytes(st))
-    for k, (actor, _, _) in enumerate(BLACK_FIGHT):
-        st = bytearray(stadium); st[0] = 26; st[1] = black_room(k); st[3] = 0
-        e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row + 1 + k, 366 << 16 | 360, actor_ids[actor] + 9, 0x080555A0, 1, 0x080716EC))
+    fights = [(who, k, actor) for who, _, fs, _ in CHALLENGES for k, (actor, _, _) in enumerate(fs)]
+    for i, (who, k, actor) in enumerate(fights):
+        st = bytearray(stadium); st[0] = 26; st[1] = challenge_room(who, k); st[3] = 0
+        e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row + 1 + i, 366 << 16 | 360, actor_ids[actor] + 9, 0x080555A0, 1, 0x080716EC))
         struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
         rows.append(bytes(st))
     hub_person(W, rom)
