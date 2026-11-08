@@ -131,13 +131,31 @@ strong(); talk(*zone26.HUB_AT); send('run 60', 'shot endless_done'); dismiss(2)
 check('Endless: best run saved', mem(BENCH_FLAGS)[0] >> 16 & 255 == 13)
 
 # Hercule's dare: on the second page.
-hub_talk(); send('tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'shot more', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'shot dare', 'tap A 200', 'run 200', 'shot hercule')
+hub_talk(); send('tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'shot more', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'shot challengers', 'tap A 150', 'shot dare', 'tap A 200', 'run 200', 'shot hercule')
 check("Hercule's dare: into his room", at() == zone26.hercule_room() << 8 | 26)
 foe = mem(ENEMIES)[0]; check("Hercule's dare: he has %d HP" % zone26.HERCULE_HP, mem(foe + 0x28C)[0] >> 10 == zone26.HERCULE_HP)
 check("Hercule's dare: beaten", beat(zone26.hercule_room()))
 check("Hercule's dare: comes home", settle(HUB))
 strong(); talk(*zone26.HUB_AT); send('run 60', 'shot herc_won'); dismiss(2)
 check('Hercule unlocked', more(zone26.MORE_HERCULE) == 1)
+
+# Goku Black: Challengers, second line, once the Hard bracket is won. Black, then Rose in her own room with your health as it was.
+check('Goku Black: not joined yet', more(zone26.MORE_BLACK) == 0)
+hub_talk(); send('tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'tap DOWN 12', 'tap A 150', 'shot black', 'tap A 200', 'run 200', 'shot black_room')
+check('Goku Black: into his room', at() == zone26.black_room(0) << 8 | 26)
+foe = mem(ENEMIES)[0]; check('Goku Black: he has %d HP' % zone26.BLACK_FIGHT[0][1], mem(foe + 0x28C)[0] >> 10 == zone26.BLACK_FIGHT[0][1])
+check('Goku Black: beaten', beat(zone26.black_room(0)))
+for _ in range(12):
+    send('run 60')
+    if at() == zone26.black_room(1) << 8 | 26 and mem(ENEMIES)[0]: break
+send('run 60', 'shot rose_room')
+check('Rose comes on in the next room', at() == zone26.black_room(1) << 8 | 26)
+foe = mem(ENEMIES)[0]; check('Rose has %d HP' % zone26.BLACK_FIGHT[1][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.BLACK_FIGHT[1][1])
+check('Rose: beaten', beat(zone26.black_room(1)))
+check('Rose: comes home', settle(HUB))
+check('the win is waiting to be told', more(zone26.MORE_BLACK_WON) == 1)
+strong(); talk(*zone26.HUB_AT); send('run 60', 'shot black_won'); send('tap A 60', 'run 30', 'shot black_joins'); dismiss(1)
+check('Goku Black joins', more(zone26.MORE_BLACK) == 1 and more(zone26.MORE_BLACK_WON) == 0)
 
 # Race and museum.
 z0 = zenie(); send(flag_on(234)); mem(G)

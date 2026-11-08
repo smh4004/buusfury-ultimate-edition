@@ -506,7 +506,7 @@ def hub_npc(src):
     jz L0
     end
 L0:
-""" + pending(more(zone26.MORE_RANK_NEW), 'rank', 'P1') + pending(more(zone26.MORE_ENDLESS_NEW), 'endless_done', 'P2') + pending(more(zone26.MORE_HARD) + more(zone26.MORE_HARD_PAID) + '    push 0\n    eq\n    and\n', 'hard_won', 'P3') + pending(more(zone26.MORE_HERC_WON) + more(zone26.MORE_HERCULE) + '    push 0\n    eq\n    and\n', 'herc_won', 'P4') + pending(race_won + more(zone26.MORE_RACE) + '    push 0\n    eq\n    and\n', 'race_won', 'P5') + pending(museum_done + more(zone26.MORE_MUSEUM) + '    push 0\n    eq\n    and\n', 'museum_won', 'P6') + """
+""" + pending(more(zone26.MORE_RANK_NEW), 'rank', 'P1') + pending(more(zone26.MORE_ENDLESS_NEW), 'endless_done', 'P2') + pending(more(zone26.MORE_HARD) + more(zone26.MORE_HARD_PAID) + '    push 0\n    eq\n    and\n', 'hard_won', 'P3') + pending(more(zone26.MORE_HERC_WON) + more(zone26.MORE_HERCULE) + '    push 0\n    eq\n    and\n', 'herc_won', 'P4') + pending(more(zone26.MORE_BLACK_WON), 'black_won', 'P7') + pending(race_won + more(zone26.MORE_RACE) + '    push 0\n    eq\n    and\n', 'race_won', 'P5') + pending(museum_done + more(zone26.MORE_MUSEUM) + '    push 0\n    eq\n    and\n', 'museum_won', 'P6') + """
     pushn 889
     call flag
     pushn 890
@@ -596,6 +596,10 @@ L4:
     code('hard_won_go', put(zone26.MORE_HARD_PAID, 1) + put(zone26.MORE_PIKKON, 1) + '    push {start}\n    end\n')
     say('herc_won', "Hercule says he let you win, and he's joining your team to teach you more!")
     code('herc_won_go', put(zone26.MORE_HERCULE, 1) + '    push {start}\n    end\n')
+    steps.append(('black_won', 'say 0x%02X "A mortal, beating a god? Very well. I will fight at your side, for now."\n' % (BLACK_PORTRAIT + 1)))
+    code('black_won_go', put(zone26.MORE_BLACK, 1) + put(zone26.MORE_BLACK_WON, 0) + '    push {black_joins}\n    end\n')
+    say('black_joins', "Goku Black joins you! See Switch Character.")
+    code('black_joins_go', '    push {start}\n    end\n')
     say('race_won', "You beat the school's race record! Here's 50,000 Zenie.")
     code('race_won_go', put(zone26.MORE_RACE, 1) + '    pushn %d\n    call 0x%X\n    push {start}\n    end\n' % (zone26.RACE_PRIZE, zone26.ADD_ZENIE))
     say('museum_won', "The museum is complete, all 40 exhibits! A million Zenie and five Lazarus Crystals!")
@@ -668,8 +672,14 @@ L1:
     steps.append(('rew_ladder', 'saycode 0x%02X "Endless: your best run is %%d wins."\n' % speaker + lad(5) + '    end\n'))
     steps.append(('rew_museum', 'saycode 0x%02X "Museum: %%d of 25 Hercule and %%d of 15 Z-Fighter exhibits."\n' % speaker + '    pushn 341, 5\n    call 0xBA\n    pushn 346, 4\n    call 0xBA\n    end\n'))
     code('rew_museum_go', '    push {END}\n    end\n')
-    say('more', "- Cell Games\\n- Rewards\\n- Hercule's dare\\n- Back")
-    code('more_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    push {cell}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n    push {rewards}\n    end\nL2:\n    call 0x18\n    push 2\n    eq\n    jz L3\n    pushn 890\n    call flag\n    jz L4\n    push {dare}\n    end\nL4:\n    push {no_dare}\n    end\nL3:\n    push {menu}\n    end\n')
+    say('more', "- Cell Games\\n- Rewards\\n- Challengers\\n- Back")
+    code('more_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    push {cell}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n    push {rewards}\n    end\nL2:\n    call 0x18\n    push 2\n    eq\n    jz L3\n    push {challengers}\n    end\nL3:\n    push {menu}\n    end\n')
+    say('challengers', "- Hercule's dare\\n- Goku Black\\n- Back")
+    code('challengers_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    pushn 890\n    call flag\n    jz L4\n    push {dare}\n    end\nL4:\n    push {no_dare}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n' + more(zone26.MORE_HARD) + '    jz L5\n    push {black}\n    end\nL5:\n    push {no_black}\n    end\nL2:\n    push {more}\n    end\n')
+    say('no_black', "A man in a black gi is asking for the Hard bracket's champion. That's not you yet.")
+    code('no_black_go', '    push {END}\n    end\n')
+    steps.append(('black', 'say 0x%02X "So you are the champion. Show me how far a mortal can climb."\n' % BLACK_PORTRAIT))
+    code('black_go', '    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\n' % zone26.black_room(0))
     say('no_dare', "Hercule only fights champions. Win a tournament first!")
     code('no_dare_go', '    push {END}\n    end\n')
     say('dare', "Hercule dares you to fight him! He's sure it's a dream match. For him, that is.")
