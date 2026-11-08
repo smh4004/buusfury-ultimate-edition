@@ -14,3 +14,6 @@ Piccolo's sprites (actor r101) and the Special Beam Cannon beam (frames at 0x086
 `spirit_bomb.png`, supplied by the project owner. Source not recorded.
 - `android13_absorb/`: Android 13 absorbing the cores of 14 and 15, the project owner's 6-frame sheet, cleaned to game colours for Gero's Legacy.
 - Cell Games: Cell's forms, the Cell Juniors and the arena come from Legacy of Goku 2 at build time; nothing is stored in this repository.
+
+## Goku Black and Super Saiyan Rose
+`goku_black/sheet.png`, supplied by the project owner; original artist not stated on the image. Its frames are Buu's Fury Goku's own poses redrawn. `ultimate/goku_black.py` uses each sheet frame as drawn and fills the poses it lacks with Goku's own frames in Black's and Rose's colours (`goku_black/frames.json` records which sheet frame stands for which pose).
