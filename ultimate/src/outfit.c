@@ -68,21 +68,34 @@ static void guest_sync(void) {
 #define OUT_FIGHTER (G_BYTES[GEN_AT + 2])
 #define MIRROR (*(u8 **)0x03004A64)
 #define BENCH_OFFSET 0x1A20                  /* the three game blocks end here; EEPROM ends at 0x2000 */
-#define BENCH_MAGIC 0x31484342
-#define FULL_GROUPS 11                       /* older fighters: a whole entry each */
-#define SMALL_GROUPS 4                       /* newer fighters share what was left: no room for gear, which simply goes back in the bag */
-#define BENCH_GROUPS (FULL_GROUPS + SMALL_GROUPS)
 #define SAVE_BLOCK 0x8B0
-struct bench_entry { u8 used, gear[4], vitals[8], exp[4], stats[4], unspent, levels[14]; };
-#define SMALL_SIZE 21                        /* used, exp[3], stats[4], unspent, levels[12] */
-struct bench { u32 magic, gen, sum; u8 flags[4], more[12]; struct bench_entry e[FULL_GROUPS]; u8 tail[72]; };     /* a game saved before these existed has zero in flags, more and tail */
+/* Version 2 of the bench: every fighter gets the same 22 bytes, so 21 fit where version 1 held 15. What it leaves out comes back by itself:
+   health and ki (a benched fighter returns rested) and skill levels past the fifth (no guest has more than five moves; build.py checks).
+   A level is 0-3, so each skill's two bytes go in two nibbles. */
+#define BENCH_MAGIC 0x32484342
+#define GROUPS 21
+struct entry { u8 gear[4], maxhp[2], maxki[2], exp[4], stats[4], unspent, levels[5]; };
+struct bench { u32 magic, gen, sum; u8 flags[4], used[4]; struct entry e[GROUPS]; u8 spare[14]; };
 #define BENCH (*(struct bench *)0x0203F000)
-typedef char bench_size_ok[sizeof(struct bench) == 496 ? 1 : -1];
+typedef char bench_size_ok[sizeof(struct bench) == 496 && sizeof(struct entry) == 22 ? 1 : -1];
+/* Version 1, as earlier builds saved it: read once and converted. 11 full entries, then 4 small ones running through the tail and on into more[]. */
+#define V1_MAGIC 0x31484342
+#define V1_FULL 11
+#define V1_SMALL 4
+#define V1_SMALL_SIZE 21                     /* used, exp[3] in sixteens, stats[4], unspent, levels[12] */
+struct v1_entry { u8 used, gear[4], vitals[8], exp[4], stats[4], unspent, levels[14]; };
+struct v1_bench { u32 magic, gen, sum; u8 flags[4], more[12]; struct v1_entry e[V1_FULL]; u8 tail[72]; };
+typedef char v1_size_ok[sizeof(struct v1_bench) == 496 ? 1 : -1];
 #define Recalculate ((void (*)(void *))0x08013C67)
 #define FRAMES (*(volatile u32 *)0x03000F94)
 #define VCOUNT (*(volatile u16 *)0x04000006)
-/* Which fighter an outfit belongs to: Full Power is Broly and Super 13 is Android 13. Order follows the guest list in outfits.json; build.py checks it. */
-static const u8 bench_group[] = {0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+/* Which fighter an outfit belongs to: Full Power is Broly, Super 13 is Android 13 and Rose is Goku Black (an outfit's "also" form). Order follows the guest list in
+   outfits.json; build.py checks it. Groups 0-14 are where version 1 kept the same fighters. */
+static const u8 bench_group[] = {BENCH_GROUP_LIST};
+#define NO_GEAR ((const int *)0x080555B8)            /* each equipment slot's empty row */
+#define BAG_COUNT (*(int *)(G_BYTES + 0xE4))
+#define BAG ((u32 *)(G_BYTES + 0xE8))                /* row, with the wearer's slot plus one in the top four bits */
+#define GUEST_WEARS (9u << 28)
 
 static int group_of(int form) {
     int first = outfit_index[8][0], n = outfit_index[8][1], i;
@@ -91,84 +104,94 @@ static int group_of(int form) {
     return -1;
 }
 static void bytes_copy(u8 *to, const u8 *from, int n) { while (n-- > 0) *to++ = *from++; }
+static void bytes_zero(u8 *to, int n) { while (n-- > 0) *to++ = 0; }
 static u32 gen_of(const u8 *game) { return game[GEN_AT] | game[GEN_AT + 1] << 8; }
+static u32 sum_bytes(u32 sum, const u8 *p, int n) { while (n-- > 0) sum = sum * 31 + *p++; return sum; }
 static u32 bench_sum(const struct bench *b) {
+    u32 sum = sum_bytes(b->gen ^ 0x5A5B, b->flags, sizeof b->flags + sizeof b->used + sizeof b->e + sizeof b->spare);
+    return sum;
+}
+static u32 v1_sum(const struct v1_bench *b) {
     const u8 *p = (const u8 *)b->e; u32 sum = b->gen ^ 0x5A5A, i;
     for (i = 0; i < sizeof b->e + sizeof b->tail; i++) sum = sum * 31 + p[i];
     p = b->flags;
-    for (i = 0; i < sizeof b->flags + sizeof b->more; i++) if (p[i]) sum = sum * 31 + p[i] + i;     /* all zero leaves an older save's sum as it was */
+    for (i = 0; i < sizeof b->flags + sizeof b->more; i++) if (p[i]) sum = sum * 31 + p[i] + i;
     return sum;
 }
-static const struct bench *saved_bench(int slot) { return (const struct bench *)(MIRROR + BENCH_OFFSET + slot * sizeof(struct bench)); }
+static const u8 *saved_at(int slot) { return MIRROR + BENCH_OFFSET + slot * sizeof(struct bench); }
+static const struct bench *saved_bench(int slot) { return (const struct bench *)saved_at(slot); }
 static int bench_valid(const struct bench *b, u32 gen) { return b->magic == BENCH_MAGIC && b->gen == gen && b->sum == bench_sum(b); }
+static int v1_valid(const struct v1_bench *b, u32 gen) { return b->magic == V1_MAGIC && b->gen == gen && b->sum == v1_sum(b); }
+
+static void put_le(u8 *to, u32 v, int n) { while (n-- > 0) { *to++ = v; v >>= 8; } }
+static u32 get_le(const u8 *from, int n) { u32 v = 0; int i; for (i = 0; i < n; i++) v |= (u32)from[i] << (8 * i); return v; }
+static int nib(int v) { return v < 0 ? 0 : v > 15 ? 15 : v; }
+static void levels_pack(u8 *to, const u8 *two_bytes) { int i; for (i = 0; i < 5; i++) to[i] = nib(two_bytes[2 * i]) | nib(two_bytes[2 * i + 1]) << 4; }
+static void levels_unpack(u8 *to, const u8 *from) { int i; for (i = 0; i < 5; i++) { to[2 * i] = from[i] & 15; to[2 * i + 1] = from[i] >> 4; } }
+static void mark_used(int g) { BENCH.used[g >> 3] |= 1 << (g & 7); }
+
+static void v1_convert(const struct v1_bench *o) {
+    int g, i;
+    bytes_zero((u8 *)&BENCH, sizeof BENCH);
+    BENCH.magic = BENCH_MAGIC; BENCH.gen = o->gen; bytes_copy(BENCH.flags, o->flags, 4);
+    for (g = 0; g < V1_FULL; g++) {
+        const struct v1_entry *e = &o->e[g]; struct entry *n = &BENCH.e[g];
+        if (!e->used) continue;
+        mark_used(g);
+        bytes_copy(n->gear, e->gear, 4); bytes_copy(n->maxhp, e->vitals + 2, 2); bytes_copy(n->maxki, e->vitals + 6, 2);
+        bytes_copy(n->exp, e->exp, 4); bytes_copy(n->stats, e->stats, 4); n->unspent = e->unspent; levels_pack(n->levels, e->levels);
+    }
+    for (g = 0; g < V1_SMALL; g++) {
+        u8 b[V1_SMALL_SIZE]; struct entry *n = &BENCH.e[V1_FULL + g];
+        for (i = 0; i < V1_SMALL_SIZE; i++) { int at = g * V1_SMALL_SIZE + i; b[i] = at < (int)sizeof o->tail ? o->tail[at] : o->more[at - sizeof o->tail]; }
+        if (!b[0]) continue;
+        mark_used(V1_FULL + g);
+        for (i = 0; i < 4; i++) n->gear[i] = NO_GEAR[i];      /* small entries kept no gear and no maximum health: zero there means "as the record has it" */
+        put_le(n->exp, get_le(b + 1, 3) << 4, 4); bytes_copy(n->stats, b + 4, 4); n->unspent = b[8]; levels_pack(n->levels, b + 9);
+    }
+}
 
 /* Make the bench in memory the one that goes with this game. */
 static void bench_ready(void) {
     u32 gen = gen_of(G_BYTES); int s;
-    u8 *clear;
     if (gen && BENCH.magic == BENCH_MAGIC && BENCH.gen == gen) return;
-    if (gen && MIRROR)
+    if (gen && MIRROR) {
         for (s = 0; s < 3; s++)
-            if (bench_valid(saved_bench(s), gen)) { bytes_copy((u8 *)&BENCH, (const u8 *)saved_bench(s), sizeof(struct bench)); return; }
-    clear = (u8 *)&BENCH;
-    for (s = 0; s < (int)sizeof(struct bench); s++) clear[s] = 0;
+            if (bench_valid(saved_bench(s), gen)) { bytes_copy((u8 *)&BENCH, saved_at(s), sizeof(struct bench)); return; }
+        for (s = 0; s < 3; s++)
+            if (v1_valid((const struct v1_bench *)saved_at(s), gen)) { v1_convert((const struct v1_bench *)saved_at(s)); return; }
+    }
+    bytes_zero((u8 *)&BENCH, sizeof BENCH);
     BENCH.magic = BENCH_MAGIC; BENCH.gen = gen;
 }
 
-#define NO_GEAR ((const int *)0x080555B8)            /* each equipment slot's empty row */
-#define BAG_COUNT (*(int *)(G_BYTES + 0xE4))
-#define BAG ((u32 *)(G_BYTES + 0xE8))                /* row, with the wearer's slot plus one in the top four bits */
-#define GUEST_WEARS (9u << 28)
 
 /* Gear goes back in the bag when its wearer sits out, so it can't be worn twice; bench_fetch puts it back on if nobody else has taken it. */
-static void bench_store(struct bench_entry *e, u8 *r) {
-    int i;
-    e->used = 1;
+static void bench_store(int g, u8 *r) {
+    struct entry *e = &BENCH.e[g]; int i;
+    mark_used(g);
     for (i = 0; i < 4; i++) {
         e->gear[i] = *(const u32 *)(r + 0x3C + i * 4);
         *(u32 *)(r + 0x3C + i * 4) = NO_GEAR[i];
     }
     for (i = 0; i < BAG_COUNT; i++) if (BAG[i] >> 28 == 9) BAG[i] &= 0x0FFFFFFF;
-    bytes_copy(e->vitals, r + 0x16, 8); bytes_copy(e->exp, r + 0x24, 4); bytes_copy(e->stats, r + 0x28, 4);
-    e->unspent = r[0x2C]; bytes_copy(e->levels, r + 0x2E, 14);
+    bytes_copy(e->maxhp, r + 0x18, 2); bytes_copy(e->maxki, r + 0x1C, 2);
+    bytes_copy(e->exp, r + 0x24, 4); bytes_copy(e->stats, r + 0x28, 4);
+    e->unspent = r[0x2C]; levels_pack(e->levels, r + 0x2E);
 }
-static void bench_fetch(const struct bench_entry *e, u8 *r) {
-    int i, k;
+static void bench_fetch(int g, u8 *r) {
+    const struct entry *e = &BENCH.e[g]; int i, k;
     for (i = 0; i < 4; i++) {
         if ((int)e->gear[i] == NO_GEAR[i]) continue;
         for (k = 0; k < BAG_COUNT; k++)
             if (BAG[k] == e->gear[i]) { BAG[k] |= GUEST_WEARS; *(u32 *)(r + 0x3C + i * 4) = e->gear[i]; break; }
     }
-    bytes_copy(r + 0x16, e->vitals, 8); bytes_copy(r + 0x24, e->exp, 4); bytes_copy(r + 0x28, e->stats, 4);
-    r[0x2C] = e->unspent; bytes_copy(r + 0x2E, e->levels, 14);
-    if (*(short *)(r + 0x16) < 1) *(short *)(r + 0x16) = 1;   /* nobody comes back knocked out */
+    if (get_le(e->maxhp, 2)) bytes_copy(r + 0x18, e->maxhp, 2);
+    if (get_le(e->maxki, 2)) bytes_copy(r + 0x1C, e->maxki, 2);
+    bytes_copy(r + 0x24, e->exp, 4); bytes_copy(r + 0x28, e->stats, 4);
+    r[0x2C] = e->unspent; levels_unpack(r + 0x2E, e->levels);
 }
-
-/* Slot 8's record goes with the fighter whose outfit is on. `was` is the outfit before this choice, for a save that has never swapped.
-   A story form in slot 8 (Hercule, say) has no bench entry and changes nothing, exactly as before. */
-/* A small entry's bytes run through the tail, then on into more[]. */
-static u8 *small_byte(int group, int i) {
-    int at = (group - FULL_GROUPS) * SMALL_SIZE + i;
-    return at < (int)sizeof BENCH.tail ? &BENCH.tail[at] : &BENCH.more[at - sizeof BENCH.tail];
-}
-static void small_store(int group, u8 *r) {
-    int i;
-    for (i = 0; i < 4; i++) *(u32 *)(r + 0x3C + i * 4) = NO_GEAR[i];
-    for (i = 0; i < BAG_COUNT; i++) if (BAG[i] >> 28 == 9) BAG[i] &= 0x0FFFFFFF;
-    *small_byte(group, 0) = 1;
-    { u32 exp = *(u32 *)(r + 0x24) >> 4; for (i = 0; i < 3; i++) *small_byte(group, 1 + i) = exp >> (8 * i); }     /* in sixteens: three bytes reach past level 150 */
-    for (i = 0; i < 4; i++) *small_byte(group, 4 + i) = r[0x28 + i];
-    *small_byte(group, 8) = r[0x2C];
-    for (i = 0; i < 12; i++) *small_byte(group, 9 + i) = r[0x2E + i];
-}
-static void small_fetch(int group, u8 *r) {
-    int i;
-    { u32 exp = 0; for (i = 0; i < 3; i++) exp |= (u32)*small_byte(group, 1 + i) << (8 * i); *(u32 *)(r + 0x24) = exp << 4; }
-    for (i = 0; i < 4; i++) r[0x28 + i] = *small_byte(group, 4 + i);
-    r[0x2C] = *small_byte(group, 8);
-    for (i = 0; i < 12; i++) r[0x2E + i] = *small_byte(group, 9 + i);
-}
-static int group_used(int g) { return g < FULL_GROUPS ? BENCH.e[g].used : *small_byte(g, 0); }
+static int group_used(int g) { return BENCH.used[g >> 3] >> (g & 7) & 1; }
 static void bench_bump(void) {
     u32 gen = (BENCH.gen * 25173 + 13849 + FRAMES * 16 + VCOUNT) & 0xFFFF;
     if (!gen || gen == BENCH.gen) gen = (BENCH.gen + 1) & 0xFFFF;
@@ -237,24 +260,16 @@ static void bench_settle(int was) {
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int now = group_of(FORM_OF(8)), out = OUT_FIGHTER - 1;
     if (now < 0) return;
-    if (out < 0 || out >= BENCH_GROUPS) out = group_of(was);
+    if (out < 0 || out >= GROUPS) out = group_of(was);
     if (out < 0 || out == now) return;
     bench_ready();
-    if (out < FULL_GROUPS) bench_store(&BENCH.e[out], r); else small_store(out, r);
-    if (!group_used(now)) {
-        /* A first swap starts level with the guest who was out, rested and with nothing equipped. */
-        *(u16 *)(r + 0x16) = *(u16 *)(r + 0x18);
-        *(u16 *)(r + 0x1A) = *(u16 *)(r + 0x1C);
-    }
-    else if (now < FULL_GROUPS) bench_fetch(&BENCH.e[now], r);
-    else small_fetch(now, r);
+    bench_store(out, r);
+    if (group_used(now)) bench_fetch(now, r);       /* a first swap starts level with the guest who was out, with nothing equipped */
     bench_bump();
     OUT_FIGHTER = now + 1;
     Recalculate(r);
-    if (now >= FULL_GROUPS && group_used(now)) {         /* a small entry keeps no health: back rested */
-        *(u16 *)(r + 0x16) = *(u16 *)(r + 0x18);
-        *(u16 *)(r + 0x1A) = *(u16 *)(r + 0x1C);
-    }
+    *(u16 *)(r + 0x16) = *(u16 *)(r + 0x18);          /* and every fighter comes back rested */
+    *(u16 *)(r + 0x1A) = *(u16 *)(r + 0x1C);
 }
 
 /* The game's EEPROM write, whole, with the bench written after a game block when that slot doesn't already hold it. Same steps as the original at 0x0803FBDE. */
