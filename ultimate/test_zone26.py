@@ -90,7 +90,7 @@ forms = json.load(open('ultimate/out/BFU_debug_zone.map.json'))['forms']; rec = 
 check('the reward adds DBS Gogeta and Android 13 to the party', rec(7)[0] & 1 == 1 and rec(8)[0] & 1 == 1 and rec(7)[0x14] == forms['gogeta_dbs'] and rec(8)[0x14] == forms['android13'])
 check('joining as Android 13, the guest has SS Deadly Bomber, not Eraser Cannon, and can become Super 13', list(rec(8)[0x0C:0x12]) == [5, 7, 8, 25, 29, 30])
 check('Gohan learns Special Beam Cannon from the reward', 26 in list(rec(1)[0x0D:0x0D + rec(1)[0x0C]]))
-check('DBS Gogeta keeps his own moves and gains both transformations', list(rec(7)[0x0C:0x12]) == [5, 7, 3, 5, 20, 21])
+check('DBS Gogeta keeps his own moves and gains both transformations', list(rec(7)[0x0C:0x12]) == [5, 7, 3, 5, 20, 44])      # Blue: its own row since Nov 9
 print('   Gogeta joined at', list(rec(7)[0x28:0x2B]), 'guest at', list(rec(8)[0x28:0x2B]))
 
 # Start of the quest: from 26:1's road back to West City, walk up to the same resident, get sent in.

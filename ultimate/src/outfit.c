@@ -37,7 +37,7 @@ static void guest_sync(void) {
         fighter[] = {2, 7, 8}, a17[] = {5, 7, 8, BLITZ_SKILL, WAVE_SKILL, SUPER17_SKILL}, a18[] = {4, 7, BLITZ_SKILL, DISC_SKILL, WAVE_SKILL}, krillin[] = {5, 7, 15, DISC_SKILL, SOLAR_SKILL, KAIOKEN_SKILL}, videl[] = {2, 7, KAIOKEN_SKILL},
         tien[] = {5, 7, 15, BLITZ_SKILL, SOLAR_SKILL, KAIOKEN_SKILL}, yamcha[] = {3, 7, 15, KAIOKEN_SKILL}, pikkon[] = {3, 7, 8, WAVE_SKILL}, hercule[] = {2, 7, KAIOKEN_SKILL},
         black[] = {4, 7, 14, BLACK_KAME_SKILL, ROSE_SKILL},     /* Goku Black: ki blasts, Instant Transmission, the Black Kamehameha, Rose. Energy Punch and Energy Sword play animation slots Goku's figure fills with other moves */
-        trunks[] = {4, 7, 20, 4, 11},            /* Future Trunks: the same moves as Trunks */
+        trunks[] = {5, 7, 20, 4, 11, GALICK_SKILL},     /* Future Trunks: the same moves as Trunks, and his father's Galick Gun (Nov 9) */
         pan[] = {3, 7, 8, 20}, pan_plain[] = {2, 7, 8},  /* Pan: ki blasts and her rush; Super Saiyan in the two looks that have it. Brapan (the Bulma-Pan fusion) fights as Pan */
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL};    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
@@ -209,6 +209,9 @@ static void bench_bump(void) {
     G_BYTES[GEN_AT] = gen; G_BYTES[GEN_AT + 1] = gen >> 8;
 }
 
+/* The mastery bytes (outfit.c MASTERY) live in the bench too. Before reading them the bench must be this game's; before the first change a game
+   with no bench yet gets a generation, so the save keeps it (a game that never swapped a guest has none, and bench_ready would clear it again). */
+static void bench_mine(int writing) { bench_ready(); if (writing && !BENCH.gen) bench_bump(); }
 /* Saved flags past the story's, kept with the bench. The story's flag array has no room left. */
 static u8 *more_byte(int f) { return f < 32 ? &BENCH.flags[f >> 3] : &BENCH.flags2[(f - 32) >> 3]; }   /* 0-31, then 32-63 */
 int more_flag(int f) { bench_ready(); return *more_byte(f) >> (f & 7) & 1; }
@@ -481,9 +484,50 @@ void beam_update(u8 *b, int arg) {
 
 /* The player's keys: during a clash, and as the winning beam surges on, the fire button counts as held, so mashing it doesn't let the beam go. */
 void skills_sync(int c);
+/* Post-game gear (Nov 9; build.py GEAR): rows past the game's equipment table. Their effects are here, not in effect scripts. */
+static int wearing(const u8 *rec, int row) {
+    int i;
+    for (i = 0; i < 4; i++) if (*(const u32 *)(rec + 0x3C + 4 * i) == (u32)row) return 1;
+    return 0;
+}
+#define GEAR_TICK (*(volatile u8 *)0x0203FFC5)
+#define SHADES_TICK (*(volatile u8 *)0x0203FFC6)
+static int potara_skip(const u8 *rec) {        /* Potara Earrings: one drain unit in three passes free */
+    if (!wearing(rec, GEAR_POTARA)) return 0;
+    if (++GEAR_TICK >= 3) { GEAR_TICK = 0; return 1; }
+    return 0;
+}
+#define COMBAT_ON (*(volatile u32 *)0x03001988)
+static void pouch_heal(void) {                 /* Senzu Pouch: 1% of health back every two seconds of a fight */
+    u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE;
+    short *hp = (short *)(rec + 0x16), max = *(short *)(rec + 0x18), add = max / 100;
+    if (!COMBAT_ON || *hp <= 0 || *hp >= max || !wearing(rec, GEAR_POUCH)) return;
+    if (add < 1) add = 1;
+    *hp = *hp + add > max ? max : *hp + add;
+}
+/* Quick skill wheel (Nov 9): hold L and press a direction to pick a skill at once (up the first, right the second, down the third,
+   left the fourth). The fighter doesn't walk while L is held. A tap of L alone still steps through them as before. */
+static u16 wheel_keys[6];
+#define GUARD_AT (*(volatile u32 *)0x0203FFC8)
+static u16 *quick_wheel(u16 *keys) {
+    static const u8 pick[4] = {1, 3, 0, 2};       /* RIGHT, LEFT, UP, DOWN -> the 2nd, 4th, 1st, 3rd skill */
+    u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE;
+    int d = keys[2] & 0xF0, i;
+    if (keys[2] & 0x100) GUARD_AT = FRAMES;       /* R: the guard's first frame (a perfect guard, guard_msg) */
+    if (!(keys[1] & 0x200)) return keys;
+    if (d) {
+        for (i = 0; i < 4; i++) if (d & (0x10 << i)) break;
+        if (pick[i] < rec[0x0C] && rec[0x15] != pick[i]) { rec[0x15] = pick[i]; PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0); }
+    }
+    for (i = 0; i < 6; i++) wheel_keys[i] = keys[i];
+    wheel_keys[1] &= ~0xF0; wheel_keys[2] &= ~0xF0;
+    return wheel_keys;
+}
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
-    if ((FRAMES & 63) == 0) skills_sync(*(u8 *)0x03001068);       /* what play has earned (outfit.c: the skill book) */
+    if (FRAMES % 120 == 0) pouch_heal();
+    keys = quick_wheel(keys);
+    if ((FRAMES & 63) == 0) { skills_sync(*(u8 *)0x03001068); skills_sync((FRAMES >> 6) & 7); }      /* what play has earned (the skill book): the fighter in play, and the party in turn */
     if (CL.active && CL.p_at + 2 < FRAMES) CL.active = 0;
     if (!CL.active && FRAMES >= CL.surge) return keys;
     CL.shadow[0] = keys[0]; CL.shadow[1] = keys[1] | 2; CL.shadow[2] = 0; CL.shadow[3] = keys[3]; CL.shadow[4] = keys[4]; CL.shadow[5] = keys[5];
@@ -1131,10 +1175,13 @@ static int boss(u8 *e) {
     u8 *actor = *(u8 **)(e + 0x58);
     return actor && (actor[3] & 0x10);
 }
-int solar_can(u8 *record) { return IN_COMBAT && !SB.phase && !SOLAR_POSE && CanAfford(record, SOLAR_COST); }
+#define SOLAR_AT (*(volatile u32 *)0x0203FFCC)
+#define SOLAR_REST 360                 /* six seconds before the next one: a stunned crowd can't be kept down for good */
+int solar_can(u8 *record) { return IN_COMBAT && !SB.phase && !SOLAR_POSE && (!SOLAR_AT || FRAMES - SOLAR_AT >= SOLAR_REST) && CanAfford(record, SOLAR_COST); }
 void solar_use(u8 *record, void *player) {
     int i, n = ENEMY_COUNT, x, y;
     Spend(record, SOLAR_COST);
+    SOLAR_AT = FRAMES;
     SB.phase = FLASH_PHASE; SB.frame = 0; *BOMB_OLD = BLDCNT;
     SB.old3 = (void *)EFFECTS[3];
     SB.ticker[0] = (u32)spirit_vt;
@@ -1185,9 +1232,13 @@ void ball_here(int *sp) {
 }
 
 /* Script native: the wish for greater power. Every fighter who has joined gains 5 in each stat. */
-void wish_power(int *sp) {
-    int c, i;
-    (void)sp;
+void wish_potential(void);
+static void new_game_plus(void);
+void wish_power(int *sp) {      /* the mod's operations (one native, retail 0xEB, which no script calls): 0 the wish for power, 1 hidden potential, 2 New Game+ */
+    int c, i, n = *sp, which = sp[n];
+    *sp = n - 1;
+    if (which == 1) { wish_potential(); return; }    /* Hidden potential (Nov 9) */
+    if (which == 2) { new_game_plus(); return; }
     for (c = 0; c < 9; c++) {
         u8 *r = RECORDS + c * RECORD_SIZE;
         if (!(r[0] & 1)) continue;
@@ -1379,7 +1430,7 @@ void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]);
 static int derived_level(int c, int skill);
 #define MASTERY_BYTES ((u8 *)BENCH.e[GROUPS - 1].gear)
 void kame_use(u8 *record, void *sprite) {
-    if (record == RECORDS && derived_level(0, 15) == 2 && MASTERY_BYTES[21] < 255) MASTERY_BYTES[21]++;
+    if (record == RECORDS && derived_level(0, 15) == 2 && MASTERY_BYTES[21] < 255) { bench_mine(1); MASTERY_BYTES[21]++; }
     ((void (*)(u8 *, void *))0x0801A35B)(record, sprite);
 }
 static int is_ssj4(int form);
@@ -1616,7 +1667,7 @@ void kaioken_use(u8 *record, void *sprite) {
     if (is_kaioken(form)) SS_Use(record, sprite);
     else power_to(record, sprite, mapped(kaioken_map, form), ssj4_vt);
 }
-/* Skills beyond the seven a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
+/* Skills beyond the six a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
    loadout can hold; record +0x22 is a mask over it of the ones they know. Equipped skills sit in the record as always (+0x0D, levels
    +0x2E). The story's natives add (0xA4), remove (0xA5) and replace (0xA6) skills: ours do the same on the record and keep the book's
    mask in step, so a skill swapped out still learns, locks and unlocks. A skill learned with no free slot waits in the book; the
@@ -1626,6 +1677,7 @@ void kaioken_use(u8 *record, void *sprite) {
 extern const u8 skill_book[8][16], level_steps[][4];
 static int ss2_open(const u8 *record, int owner);
 #define KNOWN(rec) (*(u16 *)((rec) + 0x22))
+#define MAX_HELD 6         /* skills a record holds: +0x0D..+0x12. +0x13 is the equipment's flags byte (Recalculate, 0x08013C67, rewrites it), not a seventh skill */
 #define GetLevel ((int (*)(u8 *))0x080135D3)
 #define G_FLAGS ((void *)0x03001068)
 #define MASTERY ((u8 *)BENCH.e[GROUPS - 1].gear)           /* 22 bytes: one per (character, tier) in mastery_slot order, then Goku's Kamehameha count */
@@ -1656,6 +1708,7 @@ static int tier_of(int skill) { int i; for (i = 0; i < 6; i++) if (tier_skill[i]
 int mastery_level(int c, int skill) {          /* 0, 1, 2: shown as Level 1-3 */
     int t = tier_of(skill), m;
     if (t < 0 || c > 7 || (m = mastery_slot[c][t]) < 0) return 0;
+    bench_mine(0);
     return MASTERY[m] >= MASTERY_L3 ? 2 : MASTERY[m] >= MASTERY_L2 ? 1 : 0;
 }
 static int derived_level(int c, int skill) {    /* a move's level from the character's level, as the level-up script grants it */
@@ -1676,7 +1729,7 @@ void skill_add(int *sp) {
     u8 *rec = rec_of(c);
     *sp = n - 2;
     set_known(c, skill, 1);
-    if (slot_of(rec, skill) < 0 && rec[0x0C] < 7) equip(c, rec, rec[0x0C], skill);
+    if (slot_of(rec, skill) < 0 && rec[0x0C] < MAX_HELD) equip(c, rec, rec[0x0C], skill);
 }
 void skill_remove(int *sp) {
     int n = *sp, skill = sp[n], c = sp[n - 1];
@@ -1695,7 +1748,7 @@ static void learn(int c, int skill, int ok) {
     u8 *rec = rec_of(c);
     if (!ok || knows(c, skill) || slot_of(rec, skill) >= 0) { if (ok && slot_of(rec, skill) >= 0) set_known(c, skill, 1); return; }
     set_known(c, skill, 1);
-    if (rec[0x0C] < 7) equip(c, rec, rec[0x0C], skill);
+    if (rec[0x0C] < MAX_HELD) equip(c, rec, rec[0x0C], skill);
 }
 void skills_sync(int c) {
     u8 *rec;
@@ -1769,9 +1822,11 @@ int ss_tick(u8 *rec) {
     if (is_kaioken(rec[0x14])) {
         short *hp = (short *)(rec + 0x16), cost = *(short *)(rec + 0x18) / 150;
         if (cost < 1) cost = 1;
+        if (wearing(rec, GEAR_SHADES) && (SHADES_TICK ^= 1)) cost = 0;          /* King Kai's Shades: every other unit is free */
         if (*hp > cost + 1) *hp -= cost;
         else *(u16 *)(rec + 0x1E) = 0;
     }
+    if (potara_skip(rec)) return 1;
     return mastery_skip(rec);
 }
 void ss_drain_hook(void);
@@ -1794,16 +1849,23 @@ static int form_tier(int form) {
 static int mastery_train(u8 *rec, int every) {        /* -> 1 to skip this drain unit */
     int c = *(u8 *)0x03001068, t = form_tier(rec[0x14]), m, lv;
     if (c > 7 || t < 0 || (m = mastery_slot[c][t]) < 0) return 0;
+    if (wearing(rec, GEAR_GRAVITY)) every = (every + 1) / 2;     /* the Gravity Band: twice as fast */
     MASTERY_TICK++;
     if (MASTERY_TICK % every == 0 && MASTERY[m] < 255) {
         lv = mastery_level(c, tier_skill[t]);
-        MASTERY[m]++;
+        bench_mine(1); MASTERY[m]++;
         if (mastery_level(c, tier_skill[t]) != lv) PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
     }
     lv = mastery_level(c, tier_skill[t]);
     return MASTERY_TICK % 5 < lv;
 }
 static int mastery_skip(u8 *rec) { return mastery_train(rec, 10); }
+/* The wish for hidden potential: every party member's transformations gain 75 mastery (MASTERY_L2 is 100, MASTERY_L3 250). */
+void wish_potential(void) {
+    int i;
+    bench_mine(1);
+    for (i = 0; i < 21; i++) MASTERY[i] = MASTERY[i] > 255 - 75 ? 255 : MASTERY[i] + 75;
+}
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
 extern const int absorb_vt[14];
 /* Master Roshi's Max Power (Nov 9): Super Saiyan's power-up with a white aura, then hits 1.5x on Super Saiyan's ki bar. Buu's Fury has no
@@ -1848,6 +1910,7 @@ int ssj4_refill(u8 *rec, int need) {
     if (rec != RECORDS + *(u8 *)0x03001068 * RECORD_SIZE) return need;
     ssj4_track(rec);
     if (mastery_train(rec, 45)) return 0;            /* a mastered tier drains slower */
+    if (potara_skip(rec)) return 0;
     if (!SK.active) return need;
     if (SK.purple && *pool <= need) {
         SK.purple = 0;
@@ -1881,12 +1944,18 @@ void ssj4_hud(const u8 *widget, u8 *buf) {
 /* Against Super Saiyan's damage, Super Saiyan 2 hits 1.5x as hard and Super Saiyan 3 1.75x. hit[1] is the attack's damage scale (1024 = normal); team 2 is the player's side.
    Damage grows with the cube of the Strength stat, so scaling the stat itself would give about three times the damage.
    Super Saiyan 3 adds 15 to the stats where Super Saiyan adds 5: its attacks count from the Super Saiyan figure, and it keeps the extra Endurance and Speed. */
+int mastery_level(int c, int skill);
+int ng_cycle(void);
 void combat_orig(void *defender, int *hit);
 __asm__(".syntax unified\n.thumb\n.thumb_func\ncombat_orig:\npush {r4, r5, r6, r7, lr}\nadds r6, r0, #0\nadds r4, r1, #0\nadds r1, #8\nldr r3, =0x0800E9E1\nbx r3\n.ltorg\n");
 void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
     int mine = hit[3] && *((u8 *)hit[3] + 0x1D0) == 1;    /* the attacker (hit[3], the owner of a blast) is on the player's side (team 1). hit[0] is the direction */
+    if (hit[3] && !mine && *((u8 *)defender + 0x1D0) == 1) {      /* New Game+: enemies hit half again as hard for each time round */
+        int k = ng_cycle();
+        if (k) hit[1] = scale + (scale >> 1) * k;
+    }
     if (mine) {
         if (is_ssj4(form)) {                         /* Super Saiyan 4: 2.5x Super Saiyan's damage, Gogeta's 3x (from Super Saiyan 3's figure where it is that class) */
             hit[1] = form == FORM_GOGETA_SSJ4 ? scale * 3 : scale * 2 + (scale >> 1);
@@ -1896,7 +1965,8 @@ void combat_hook(void *defender, int *hit) {
             hit[1] = scale * 2;
             if (strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
         }
-        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE || is_kaioken(form)) hit[1] = scale + (scale >> 1);
+        else if (is_kaioken(form)) hit[1] = scale + (scale >> 2) * (1 + mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL));    /* Kaioken: 1.25x, 1.5x mastered, 1.75x at its third level */
+        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             stats[0] = strength - 10; stats[1] = power - 10;
@@ -1905,4 +1975,77 @@ void combat_hook(void *defender, int *hit) {
     if (mine && dragon4_live) hit[1] += hit[1] >> 2;      /* Super Saiyan 4's red Dragon Fist: 1.25x */
     combat_orig(defender, hit);
     hit[1] = scale; stats[0] = strength; stats[1] = power;
+}
+
+/* Markers on the flight map's mini-map (Nov 9; Black Star Odyssey's, bso/maps/worldmap_markers.py): every named place on Earth's map (0:50)
+   gets a yellow diamond. The mini-map object's draw (vtable 0x0804D8A0 +0x10, 0x08027A75) draws the red player arrow; this runs it and adds
+   one 8x8 8bpp sprite per place, copying the marker to OBJ tile 150 (free on that map: the HUD starts at 154). build.py fills map_marks. */
+extern const u8 map_marks[][2];
+extern const int map_mark_count;
+static const char mark_shape[8][9] = {"...K....", "..KYK...", ".KYYYK..", "KYYWYYK.", ".KYYYK..", "..KYK...", "...K....", "........"};
+int minimap_draw(void *self, u32 *ctx) {
+    int r = ((int (*)(void *, u32 *))0x08027A75)(self, ctx), i, j;
+    u8 *tile = (u8 *)(0x06010000 + 150 * 32);
+    if ((**(u16 **)0x03001980) != (0 | 50 << 8)) return r;
+    for (i = 0; i < 8; i++)
+        for (j = 0; j < 8; j += 2) {
+            char a = mark_shape[i][j], b = mark_shape[i][j + 1];
+            *(u16 *)(tile + i * 8 + j) = (a == 'Y' ? 5 : a == 'W' ? 2 : a == 'K' ? 1 : 0) | (b == 'Y' ? 5 : b == 'W' ? 2 : b == 'K' ? 1 : 0) << 8;
+        }
+    for (i = 0; i < map_mark_count; i++) {
+        u16 *oam = (u16 *)ctx[0];
+        oam[0] = map_marks[i][1] | 0x2000; oam[1] = map_marks[i][0]; oam[2] = 150;
+        ctx[0] += 8;
+    }
+    return r;
+}
+
+/* Perfect guard (Nov 9): R pressed just before an enemy's ki blast lands, facing it, sends the blast back at whoever fired it and takes no
+   damage. The player's message handler (vtable 0x0804C9F0 +0x24, 0x08010DDF) gets hits as message 0 with the hit's description: team +0,
+   box +4..+0x10, direction +0x14, the projectile +0x30. An enemy blast (vtable 0x0804B454) fires again for a new owner when +0x58 is set
+   (+0x60 the owner), as a punched one does. */
+#define PERFECT_FRAMES 10
+#define BLAST_VT 0x0804B454
+#define ObjBox ((void (*)(int *, void *))0x0800FE79)
+int guard_msg(u8 *player, int msg, u8 *desc, int d) {
+    if (msg == 0 && desc && (desc[0] == 0 || desc[0] == 2) && GUARD_AT && FRAMES - GUARD_AT <= PERFECT_FRAMES && IN_COMBAT) {
+        u32 *blast = *(u32 **)(desc + 0x30);
+        int box[4], *hr = (int *)(desc + 4);
+        if (blast && blast[0] == BLAST_VT && (desc[0x14] ^ 1) == player[0x10]) {
+            ObjBox(box, player);
+            if (hr[0] < box[2] && box[0] < hr[2] && hr[1] < box[3] && box[1] < hr[3]) {
+                *((u8 *)blast + 0x58) = 1; *(void **)((u8 *)blast + 0x60) = player;
+                GUARD_AT = 0;
+                PlaySound((void *)0x03003E5C, (u8 *)SOUND_HIT + 0x30 * 12, 0x40, 0);
+                return 1;
+            }
+        }
+    }
+    return ((int (*)(u8 *, int, u8 *, int))0x08010DDF)(player, msg, desc, d);
+}
+
+/* New Game+ (Nov 9). Bulma's time machine takes the party back to the start of the story with everything they have earned: levels, stats,
+   skills and their mastery, equipment, the bag, Zenie, items, every post-game unlock (the mod's flags and the bench). What starts over:
+   the story's flags 0-857 (its events and the rooms they open; 149 is the ending), the key items (25-82, the Dragon Balls among them),
+   and the story's seven fighters' places in the party and their looks (from the start table, 0x086FDA4C: 18 bytes each, the form at
+   +10); the opening (global script 38) joins Goku again and the story the rest, as before. Gogeta and the guest slot keep theirs: the
+   post-game gave them. Broly's flag (111) stays with his guest outfit. Each time counts (more flags 47-48, up to 3): enemies hit harder
+   by half for each (combat_hook). */
+#define NG_FLAG 47
+int ng_cycle(void) { return more_bits(NG_FLAG, 2); }
+static void new_game_plus(void) {
+    u8 *g = G_BYTES;
+    const u8 *start = (const u8 *)0x086FDA4C;
+    int i, c, broly = g[0x55 + 111 / 8] >> (111 % 8) & 1, k = ng_cycle();
+    if (k < 3) more_bits_set(NG_FLAG, 2, k + 1);
+    for (i = 0x55; i < 0xC0; i++) g[i] = 0;
+    if (broly) g[0x55 + 111 / 8] |= 1 << (111 % 8);
+    for (i = 25; i <= 82; i++) g[2 + i] = 0;
+    for (c = 0; c < 7; c++) {
+        u8 *r = RECORDS + c * RECORD_SIZE;
+        r[0] = r[1] = r[2] = 0; *(u32 *)(r + 4) = 0;
+        r[0x14] = start[18 * c + 10]; r[0x15] = 0;
+        R16(r, 0x16) = R16(r, 0x18); R16(r, 0x1A) = R16(r, 0x1C);
+    }
+    g[0] = 0;
 }

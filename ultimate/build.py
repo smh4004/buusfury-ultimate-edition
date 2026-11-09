@@ -56,6 +56,16 @@ SS2_SKILL, SS4_SKILL, KAIOKEN_SKILL = 35, 36, 37                  # Super Saiyan
 GALICK_SKILL, TENX_SKILL, FINAL_SHINE_SKILL, DRAGON4_SKILL = 38, 39, 40, 41     # Kamehameha's code violet / red, Final Flash's green, Dragon Fist's red
 SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
 MAX_POWER_SKILL = 45             # Master Roshi's Max Power (Nov 9)
+# Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
+# picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
+GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH = 162, 163, 164, 165, 166
+GEAR = ((GEAR_POTARA, 'Potara Earrings', "The Supreme Kai's earrings. Every transformation drains its ki a third slower.", 153, 3, (0, 10, 10, 10, 0), 0, 95),
+        (GEAR_GRAVITY, 'Gravity Band', "Bulma built it for Vegeta's training. Transformations are mastered twice as fast.", 67, 1, (10, 0, 5, 5, -5), 0, 215),
+        (GEAR_SHADES, "King Kai's Shades", "King Kai's own sunglasses. The Kaioken wears on your health half as much.", 117, 3, (0, 5, 5, 5, 0), 0, None),
+        (GEAR_SHELL, 'Turtle Shell', "Master Roshi's training shell. Heavy and slow, but you learn twice as fast.", 13, 0, (0, 0, 20, 20, -20), 256, 120),
+        (GEAR_POUCH, 'Senzu Pouch', "Korin's pouch of Senzu crumbs. Slowly restores your health in battle.", 121, 3, (0, 0, 5, 5, 0), 0, 75))
+GEAR_TABLE, GEAR_COUNT = 0x6F82EC, 162
+GEAR_REFS = (0x2BFC, 0x453C, 0x4814, 0xD528, 0x13E28, 0x16FBC, 0x1D400, 0x1D5F0, 0x1D968, 0x1DC74, 0x1DF88, 0x1FB4C, 0x2BD44, 0x31844, 0x31C3C, 0x321B8, 0x325AC)
 ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
 # Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
 KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
@@ -107,7 +117,7 @@ def kaioken_remap(pal, one):
     return bytes(colour(v) for v in range(256))
 
 
-# The skill book (outfit.c): per party character, the skills the loadout can hold beyond the seven slots. 21 is the story's locked Super Saiyan.
+# The skill book (outfit.c): per party character, the skills the loadout can hold beyond the six slots (record +0x13 is not a seventh: it is the equipment flags byte). 21 is the story's locked Super Saiyan.
 SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
 SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21), 1: (7, 20, 35, 6, 17, 18, 26, 21), 2: (7, 20, 16, 8, 12, 21),
@@ -171,6 +181,7 @@ HUB_NPC = 'assets/scripts/gUnknown_08783D30.evt'    # a Hercule City resident: p
 TOUR_NPC = 'assets/scripts/gUnknown_08785590.evt'   # the West City resident to the west
 QUEST_NPC = 'assets/scripts/gUnknown_08785580.evt'   # the West City resident outside the Z-Mart
 ROSHI_NPC = 'assets/scripts/gUnknown_08786C38.evt'   # Master Roshi on his island (5:1): after the ending he joins (Nov 9)
+BULMA_NPC = 'assets/scripts/gUnknown_08785744.evt'   # Bulma at Capsule Corporation (4:20): after the ending, New Game+ in the time machine (Nov 9)
 
 
 UI_EDITS = {1051: 'Press the B Button to transform into a Super Saiyan Blue. You must already be a Super Saiyan to use this technique.', 1052: 'Android 13', 1054: 'DBS Gogeta', 1055: 'SSB Gogeta', 1056: 'Super 13', 1057: 'Super Saiyan Blue'}
@@ -551,9 +562,16 @@ def popo_npc(src):
     code('summon_go', '    call music(40)\n    call play_sfx(23)\n    call 0x7A(20)\n    pushn 4, 20, 2, 120, 176\n    call load_scene\n    pushn 0, 228, 221\n    call 0x69\n    pushn 1, 244, 221\n    call 0x69\n    pushn 2, 220, 236\n    call 0x69\n    pushn 3, 236, 236\n    call 0x69\n    pushn 4, 252, 236\n    call 0x69\n    pushn 5, 228, 251\n    call 0x69\n    pushn 6, 244, 251\n    call 0x69\n    call 0x64(0)\n    call 0x64(1)\n    call 0x64(2)\n    call 0x64(3)\n    call 0x64(4)\n    call 0x64(5)\n    call 0x64(6)\n    call 0x7B(90)\n    end\n')
     dragon = 0x7A
     steps.append(('wish_say', 'say 0x%02X "You who have gathered the Dragon Balls, speak your wish!"\n' % dragon))
-    steps.append(('wish', 'say 0x%02X "- Greater power\\n- Riches\\n- New fighters\\n- Super Saiyan 2"\n' % dragon))
-    choose('wish_go', ['w_power', 'w_rich', 'w_fighters', 'w_ss2'])
-    code('w_power', '    call 0x%X\n    push {done}\n    end\n' % zone26.WISH_NATIVE)
+    steps.append(('wish', 'say 0x%02X "- Greater power\\n- Riches\\n- New fighters\\n- More"\n' % dragon))
+    choose('wish_go', ['w_power', 'w_rich', 'w_fighters', 'wish2'])
+    steps.append(('wish2', 'say 0x%02X "- Super Saiyan 2\\n- A legendary treasure\\n- Hidden potential\\n- Back"\n' % dragon))     # Nov 9: more wishes
+    choose('wish2_go', ['w_ss2', 'treasure', 'w_potential', 'wish'])
+    steps.append(('treasure', 'say 0x%02X "- Potara Earrings\\n- Gravity Band\\n- King Kai\'s Shades\\n- Senzu Pouch"\n' % dragon))
+    choose('treasure_go', ['w_gear%d' % k for k in range(4)])
+    for k, row in enumerate((GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_POUCH)):
+        code('w_gear%d' % k, '    call 0x93(%d)\n    push {done}\n    end\n' % row)
+    code('w_potential', '    pushn 1\n    call 0x%X\n    push {done}\n    end\n' % zone26.WISH_NATIVE)
+    code('w_power', '    pushn 0\n    call 0x%X\n    push {done}\n    end\n' % zone26.WISH_NATIVE)
     code('w_rich', '    pushn %d\n    call 0x%X\n    push {done}\n    end\n' % (zone26.BALL_ZENIE, zone26.ADD_ZENIE))
     code('w_fighters', '    pushn 887\n    call set_flag\n    push {done}\n    end\n')
     code('w_ss2', ''.join('    pushn %d\n    call set_flag\n' % (SS2_FLAG + k) for k in range(9)) + '    push {done}\n    end\n')
@@ -581,7 +599,7 @@ def roshi_npc(src):
     more = lambda n: '    pushn %d\n    call 0x%X\n' % (n, zone26.MORE_GET)
     put = lambda n, v: '    pushn %d, %d\n    call 0x%X\n' % (n, v, zone26.MORE_PUT)
     steps = [('ask', 'say 0x61 "Heh heh! You\'ve gotten strong. Mind if this old man tags along? I\'ve still got a trick or two!"\n'),
-             ('join', 'code\n' + put(zone26.MORE_ROSHI, 1) + '    push {joined}\n    end\n'),
+             ('join', 'code\n' + put(zone26.MORE_ROSHI, 1) + '    call 0x93(%d)\n    push {joined}\n    end\n' % GEAR_SHELL),     # and his old training shell
              ('joined', 'say 0x00 "Master Roshi joined you! Choose him in Switch Character."\n'),
              ('joined_end', 'code\n    push {END}\n    end\n'),
              ('ready', 'say 0x61 "Ready when you are! Just don\'t tell Chi-Chi I\'m out fighting!"\n'),
@@ -595,6 +613,26 @@ def roshi_npc(src):
     if not out.rstrip().endswith('    call set_flag(42)\n    end'): sys.exit("Roshi's script changed")
     out = out.rstrip()[:-len('end')] + 'push %d\n    end\n' % number['END']        # the story line's last step stops there, not in the new ones
     return out + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
+
+
+def bulma_npc(src):
+    """Bulma at Capsule Corporation. Her story line stays; after the ending she offers the time machine: New Game+ (outfit.c new_game_plus),
+    then the story's opening (global script 38) plays with the party as strong as it is."""
+    import zone26
+    if not src.rstrip().endswith('"Alright! Let me know when you\'re ready to leave!"') or 'step 1 say 0x11' not in src: sys.exit("Bulma's script changed")
+    steps = [('offer', 'say 0x11 "The time machine is fueled up! Go back to the day Goku came back? You keep all your strength."\n'),
+             ('menu', 'say 0x11 "- Go back in time\\n- Not yet"\n'),
+             ('menu_go', 'code\n    call 0x18\n    push 0\n    eq\n    jz L1\n    push {sure}\n    end\nL1:\n    push {END}\n    end\n'),
+             ('sure', 'say 0x00 "New Game+: the story starts over. Enemies hit harder each time round. Off you go!"\n'),
+             ('go', 'code\n    call 0x78(30)\n    pushn 2\n    call 0x%X\n    call 0x95(0)\n    pushn 38, 0, 0\n    call 0xD8\n    push {END}\n    end\n' % zone26.WISH_NATIVE)]
+    for _, t in steps:
+        for m in re.finditer(r'say 0x\w+ "([^"]*)"', t):
+            n = len(m.group(1).replace('\\n', ' ')); assert n < 100 and not 64 <= n <= 67, m.group(1)
+    head, rest = src.split('step 1 say 0x11', 1)
+    number = {n: k + 5 for k, (n, _) in enumerate(steps)}; number['END'] = len(steps) + 5     # her steps are 1-4 now (counted from 0), then a stop
+    first = 'step 1 code\n    call flag(149)\n    jz B1\n    push %d\n    end\nB1:\n    push 1\n    end\n' % number['offer']      # her old three steps follow, one later
+    rest = re.sub(r'(?m)^    push 4$', '    push %d' % number['END'], re.sub(r'(?m)^    push 2$', '    push 3', rest))     # 4 was past her last step
+    return head + first + 'step 2 say 0x11' + rest.replace('step 2 code', 'step 3 code', 1).replace('step 3 say', 'step 4 say', 1).rstrip('\n') + '\nstep 5 code\n    push %d\n    end\n' % number['END'] + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
 
 
 def hub_npc(src):
@@ -893,7 +931,7 @@ def debug_edits(first_form):
         if n != 1: sys.exit('ending step 1 is not code')
         open(ENDING, 'w').write(e)
     if '--enemy' in sys.argv:
-        open(ACTORS_FILE, 'a').write('enemy 8 0x70 0xB0 34   ; debug: a Bomber to test attacks on\n')
+        open(ACTORS_FILE, 'a').write('enemy %s 0x70 0xB0 %s   ; debug: a Bomber to test attacks on (BFU_RIG_ENEMY="row character": another, e.g. test_guard.py\'s Gunman)\n' % tuple(os.environ.get('BFU_RIG_ENEMY', '8 34').split()))
     s = open(FIELD).read()
     zone = '--zone' in sys.argv
     tail = '    set 0x10\n    end\n'
@@ -1253,6 +1291,24 @@ def bench_groups(guests):
     return out
 
 
+def map_marks(clean):
+    """The flight map's markers (outfit.c minimap_draw): the centre of every named place on Earth's map (area 0:50's exit list 0x0807387C,
+    35 {condition, record}: a name record starts 0x080076C5, then its box and UI string), on the mini-map: X = 160 + x / 44.75,
+    Y = -1.25 + y / 44.75 (Black Star Odyssey measured it), less 3 for the 8x8 sprite's middle. Places that come and go (the Giant
+    Airship) and the controls line are left out; the Lookout and the wasteland it leaves share one spot."""
+    EXITS, NAME_FN = 0x7387C, 0x080076C5
+    seen = []
+    for i in range(35):
+        cond, rec = struct.unpack_from('<II', clean, EXITS + 8 * i)
+        if struct.unpack_from('<I', clean, rec - ROM_BASE)[0] != NAME_FN: continue
+        x0, y0, x1, y1 = struct.unpack_from('<4H', clean, rec - ROM_BASE + 8)
+        if x1 > 4000 or (cond and (x0, y0) != (593, 1025)): continue
+        m = (int(round(160 + (x0 + x1) / 2 / 44.75)) - 3, int(round(-1.25 + (y0 + y1) / 2 / 44.75)) - 3)
+        if m not in seen: seen.append(m)
+    if len(seen) != 13: sys.exit('world map places changed: %d' % len(seen))
+    return seen
+
+
 def add_outfits(rom, clean, at, art):
     """Compile the outfit code with its table at `at`, then point the Switch Character screen's vtable at it."""
     cfg = json.load(open('ultimate/outfits.json'))['characters']
@@ -1267,6 +1323,7 @@ def add_outfits(rom, clean, at, art):
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
     c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
+    c += 'const u8 map_marks[][2] = {%s};\nconst int map_mark_count = %d;\n' % (','.join('{%d,%d}' % m for m in map_marks(clean)), len(map_marks(clean)))
     c += 'const u8 skill_book[8][16] = {%s};\n' % ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (16 - len(SKILL_BOOK[k]))) for k in range(8))
     c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
     c += 'const u8 kaioken_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base if isinstance(base, int) else fm[base], fm[n + '_kaioken']) for n, (base, _, _) in KAIOKEN.items())
@@ -1274,7 +1331,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1358,7 +1415,7 @@ def add_outfits(rom, clean, at, art):
     if rom[WRITE:WRITE + 14] != bytes.fromhex('f8b50068171c0e1c1d1c002825d0'):
         sys.exit('EEPROM write changed: %s' % rom[WRITE:WRITE + 14].hex())
     rom[WRITE:WRITE + 14] = bytes.fromhex('10b4014ca44610bc6047') + struct.pack('<I', sym['save_write'] | 1)
-    for vt, slot, want, name in ((0x4AEF8, 0x28, 0x0802084D, 'beam_update'), (0x4C9F0, 0x84, 0x0804F8C9, 'player_input')):     # every beam's update, and the player's keys
+    for vt, slot, want, name in ((0x4AEF8, 0x28, 0x0802084D, 'beam_update'), (0x4C9F0, 0x84, 0x0804F8C9, 'player_input'), (0x4D8A0, 0x10, 0x08027A75, 'minimap_draw'), (0x4C9F0, 0x24, 0x08010DDF, 'guard_msg')):     # every beam's update, the player's keys, the flight map's mini-map, the player's hits
         if ROM_BASE + vt + struct.unpack_from('<i', rom, vt + slot)[0] != want:
             sys.exit('vtable changed at 0x%X' % (vt + slot))
         struct.pack_into('<i', rom, vt + slot, (sym[name] | 1) - (ROM_BASE + vt))
@@ -1653,7 +1710,7 @@ def add_eraser(rom, clean, sym, at, art):
         c = pal[v].astype(int)
         return one(c + ((255 - c) * 0.6).astype(int))
     pale = bytes(paled(v) for v in range(256))
-    rows[SOLAR_FLARE_SKILL] = move_row(4, pale, 'Solar Flare', 'Press the B Button to flash a blinding light: every ordinary enemy on screen is stunned for a few seconds. Bosses are not fooled.', 'solar_can', 'solar_use')
+    rows[SOLAR_FLARE_SKILL] = move_row(4, pale, 'Solar Flare', 'Press the B Button to flash a blinding light: every ordinary enemy on screen is stunned for a few seconds. Bosses are not fooled. Six seconds between flashes.', 'solar_can', 'solar_use')
     rows[SOLAR_FLARE_SKILL][0] = 0xFF
     # The transformations' own rows (Nov 9). Super Saiyan 2 and 4: Super Saiyan 3's icon with a 2 (cyan as its 3) or a purple 4. Kaioken: Super
     # Saiyan's Z in red. Super Saiyan Blue: the Z in blue (its name and text are UI 1057 and 1051, UI_EDITS).
@@ -1671,7 +1728,7 @@ def add_eraser(rom, clean, sym, at, art):
         ('Super Saiyan 4', 'Press the B Button to transform into a Super Saiyan 4: attacks hit 2.5x as hard, on a ki bar of its own. You must be in the form below it. Press it again to change back.'))
     kk_red = shifted(0 / 360)
     rows[KAIOKEN_SKILL] = tier_row(20, [iconlib.recolour(i, kk_red) for i in ss_icons], 'kaioken_can', 'kaioken_use',
-        ('Kaioken', 'Press the B Button to use the Kaioken: attacks hit 1.5x as hard, but it wears on your health. It cannot be used with Super Saiyan. Press it again to stop.'))
+        ('Kaioken', 'Press B for the Kaioken: hits 1.25x as hard, up to 1.75x as you master it, but it wears on your health. Not with Super Saiyan.'))
     ssb_row = bytearray(clean[SKILL_ROWS + 24 * 22:SKILL_ROWS + 24 * 22 + 24])
     struct.pack_into('<II', ssb_row, 4, *[put_art(iconlib.recolour(i, ssb_blue)) for i in ss_icons])
     struct.pack_into('<HHII', ssb_row, 12, 1057, 1051, sym['ssb_can'] | 1, sym['ssb_use'] | 1)
@@ -1754,6 +1811,25 @@ def add_eraser(rom, clean, sym, at, art):
     for k in range(14):
         fn = (sym['absorb_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    # The post-game gear (GEAR): the table moves to the art area with the new rows after the game's, and its 17 references follow.
+    gear = bytearray(clean[GEAR_TABLE:GEAR_TABLE + 44 * GEAR_COUNT])
+    for row_id, name, text, base, slot, stats, exp, hue in GEAR:
+        if row_id != len(gear) // 44: sys.exit('gear rows out of order')
+        g = bytearray(clean[GEAR_TABLE + 44 * base:GEAR_TABLE + 44 * base + 44])
+        struct.pack_into('<HH', g, 0, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
+        strings += [put(t.encode('utf-16-le') + b'\0\0') for t in (name, text)]
+        p = struct.unpack_from('<I', g, 0x10)[0] - ROM_BASE; t_, size = struct.unpack_from('<II', clean, p)
+        pic = bytes(wfz.decompress_stream(clean, p + 8, size)[0]) if t_ else bytes(clean[p + 8:p + 8 + size])
+        if hue is not None: pic = pic.translate(shifted(hue / 360))
+        struct.pack_into('<I', g, 0x10, put_art(struct.pack('<II', 0, len(pic)) + pic))
+        g[0x14], g[0x15] = slot, 51                                     # worn from level 1
+        g[0x16:0x1B] = bytes(v & 255 for v in stats)
+        struct.pack_into('<IiII', g, 0x1C, exp, -1, 0, 0)               # not sold; no flags or effect script: outfit.c does the work
+        gear += g
+    at_gear = put_art(bytes(gear))
+    for ref in GEAR_REFS:
+        if struct.unpack_from('<I', rom, ref)[0] != ROM_BASE + GEAR_TABLE: sys.exit('gear table reference moved: 0x%X' % ref)
+        struct.pack_into('<I', rom, ref, at_gear)
     for k in range(ERASER_SKILL, max(rows) + 1):   # ids not built yet: the empty row, so the table stays in id order
         rows.setdefault(k, bytes(clean[SKILL_ROWS:SKILL_ROWS + 24]))
     if struct.unpack_from('<I', rom, 0x13618)[0] != ROM_BASE + SKILL_ROWS:
@@ -1861,6 +1937,8 @@ def main():
         saved.setdefault(POPO_NPC, open(POPO_NPC).read())
         open(POPO_NPC, 'w').write(popo_npc(saved[POPO_NPC]))
         saved.setdefault(ROSHI_NPC, open(ROSHI_NPC).read())
+        saved.setdefault(BULMA_NPC, open(BULMA_NPC).read())
+        open(BULMA_NPC, 'w').write(bulma_npc(saved[BULMA_NPC]))
         open(ROSHI_NPC, 'w').write(roshi_npc(saved[ROSHI_NPC]))
         saved.setdefault(DEATH_SCRIPT, open(DEATH_SCRIPT).read())
         open(DEATH_SCRIPT, 'w').write(death_script(saved[DEATH_SCRIPT]))

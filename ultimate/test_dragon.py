@@ -12,6 +12,16 @@ ITEMS = 0x03001068 + 2 + zone26.BALL_ITEM            # the inventory's byte arra
 LAND = {5: (2888, 1684), 7: (2024, 2120), 8: (864, 1796), 11: (1576, 1064), 13: (792, 876), 15: (2196, 892), 14: (2192, 1212)}
 fly = lambda x, y: e + move(p3, x, y) + ['run 4', 'tap A 100', 'run 60', 'keys A', 'run 300', 'keys', 'run 100']
 W = Image.new('RGB', (5 * 240, 3 * 160)); cell = [0]
+# The flight map's mini-map marks every place you can land (outfit.c minimap_draw): a yellow diamond with a white centre at each.
+out = run(e + ['run 30', 'shot flightmap'])
+fm = Image.open('%s/flightmap.png' % d).convert('RGB')
+src = open('ultimate/build.py').read(); ns = {'struct': struct, 'ROM_BASE': 0x08000000, 'sys': sys}
+exec(src[src.index('def map_marks'):src.index('def add_outfits')], ns)
+marks = ns['map_marks'](open('baserom.gba', 'rb').read())
+lit = sum(1 for x, y in marks if fm.getpixel((x + 3, y + 3))[0] > 200 and fm.getpixel((x + 3, y + 3))[1] > 200)
+print('   map markers drawn: %d of %d' % (lit, len(marks)))
+check('the flight map marks every place you can land', lit == len(marks) and 'bad pc' not in out)
+fm.resize((480, 320)).save(d + '/flightmap_x2.png')
 def paste(name):
     W.paste(Image.open('%s/%s.png' % (d, name)).convert('RGB'), (cell[0] % 5 * 240, cell[0] // 5 * 160)); cell[0] += 1
 for k, (world, area, x, y) in enumerate(zone26.BALLS):
@@ -26,10 +36,11 @@ for k, (world, area, x, y) in enumerate(zone26.BALLS):
 W.save(d + '/balls.png')
 # Master Roshi on his island (land 5) joins once the story is over: his question, the join, then his line for later.
 l = fly(*LAND[5]) + ['mem 0300197C 1']; pl = ptr(l)
-talk = l + move(pl, 392, 398) + ['run 40', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 60', 'run 60', 'shot roshi_ask', 'tap A 40', 'run 60', 'shot roshi_joined', 'tap A 40', 'run 60', 'mem 0203F00C 1', 'tap A 40', 'run 60', 'shot roshi_ready', 'tap A 40', 'run 60']
-out = run(talk)
+talk = l + move(pl, 392, 398) + ['run 40', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 60', 'run 60', 'shot roshi_ask', 'tap A 40', 'run 60', 'shot roshi_joined', 'tap A 40', 'run 60', 'mem 0203F00C 1', 'tap A 40', 'run 60', 'shot roshi_ready', 'tap A 40', 'run 60', 'dump g 03001068 8a8']
+out = run(talk); g = open(d + '/g.bin', 'rb').read()
 bench = [int(x.split(':')[1].split()[0], 16) for x in out.splitlines() if x.startswith('mem 0203f00c')]
 check('Master Roshi joins at Kame House after the ending', bench and bench[-1] >> 31 & 1 and 'bad pc' not in out)
+check('and gives his Turtle Shell', 165 in [struct.unpack_from('<I', g, 0xE8 + 4 * i)[0] & 0xFFFFFFF for i in range(min(g[0xE4], 250))])
 # Summon: hold all seven, land at the Lookout, talk to Mr. Popo.
 pokes = ['poke8 %08X 01' % (ITEMS + k) for k in range(7)]
 look = fly(648, 1076) + pokes + ['mem 0300197C 1']
@@ -37,9 +48,20 @@ out = run(look); check('at the Lookout', at(out) == (1 << 8 | 6))
 pl = ptr(look)
 start_ = look + move(pl, 288, 494) + ['run 2', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 80', 'run 180', 'shot sum1', 'tap A 20', 'run 500', 'shot sum2', 'tap A 20', 'run 180', 'shot wish']
 before = run(start_ + ['dump g 03001068 8a8']); g0 = open(d + '/g.bin', 'rb').read()
-for wish, name in enumerate(('power', 'rich', 'fighters', 'ss2')):
-    t = start_ + ['tap DOWN 12'] * wish + ['tap A 20', 'run 180', 'shot done_' + name, 'tap A 20', 'run 400', 'mem 0300197C 1', 'mem %08X 2' % (ITEMS & ~3), 'mem 0300155C 1', 'shot after_' + name, 'dump g 03001068 8a8']
+page = lambda downs: ['tap DOWN 12'] * downs + ['tap A 20', 'run 180']          # a line of the dragon's menu; a page's menu shows after its text
+MORE = page(3)
+WISHES = {'power': page(0), 'rich': page(1), 'fighters': page(2), 'ss2': MORE + page(0), 'potential': MORE + page(2),
+          'potara': MORE + page(1) + ['shot treasure'] + page(0), 'pouch': MORE + page(1) + page(3)}      # Nov 9: a second page, and four treasures
+MASTERY = 0x0203F000 + 20 + 20 * 22
+for name, keys in WISHES.items():
+    t = start_ + keys[:-2] + ['tap A 20', 'run 180', 'shot done_' + name, 'mem %08X 6' % MASTERY, 'tap A 20', 'run 400', 'mem 0300197C 1', 'mem %08X 2' % (ITEMS & ~3), 'mem 0300155C 1', 'shot after_' + name, 'dump g 03001068 8a8']
     out = run(t); g = open(d + '/g.bin', 'rb').read()
+    bag = [struct.unpack_from('<I', g, 0xE8 + 4 * i)[0] & 0xFFFFFFF for i in range(min(g[0xE4], 250))]
+    if name == 'potential':
+        m = [int(v, 16) for v in [l_ for l_ in out.splitlines() if l_.startswith('mem %08x' % MASTERY)][-1].split(':')[1].split()]
+        check('hidden potential: every transformation gains mastery', (m[0] & 255) >= 75)
+    if name == 'potara': check('a legendary treasure: the Potara Earrings', 162 in bag)
+    if name == 'pouch': check('a legendary treasure: the Senzu Pouch', 166 in bag)
     check('wish %s: back at the Lookout' % name, at(out) == (1 << 8 | 6) and 'bad pc' not in out)
     check('wish %s: the balls are gone' % name, all(g[2 + zone26.BALL_ITEM + k] == 0 for k in range(7)))
     if name == 'power': check('greater power: everyone who has joined gains 5 in each stat', g[0x4F8 + 0x28] == g0[0x4F8 + 0x28] + 5)
@@ -47,7 +69,7 @@ for wish, name in enumerate(('power', 'rich', 'fighters', 'ss2')):
     if name == 'fighters': check('new fighters join', g[0x55 + 887 // 8] >> (887 % 8) & 1)
     if name == 'ss2': check('Super Saiyan 2 opens', g[0x55 + 864 // 8] & 255 == 255 and g[0x55 + 872 // 8] & 1)
 W2 = Image.new('RGB', (5 * 240, 2 * 160))
-for i, n in enumerate(('sum1', 'sum2', 'wish', 'done_power', 'after_power', 'after_rich')):
+for i, n in enumerate(('sum1', 'sum2', 'wish', 'done_power', 'after_power', 'after_rich', 'treasure', 'done_potara', 'done_potential', 'after_pouch')):
     W2.paste(Image.open('%s/%s.png' % (d, n)).convert('RGB'), (i % 5 * 240, i // 5 * 160))
 W2.save(d + '/summon.png')
 if fails: print('FAILED:', fails); sys.exit(1)

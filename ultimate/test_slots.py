@@ -53,7 +53,7 @@ CONFIRM = ['tap A 200', 'run 120']
 CANCEL = ['tap B 200', 'run 120']
 # The guests this route has open, in picker order (the rest stay locked and the picker skips them). Older builds lack Goku Black and GT.
 OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black',
-        'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub']
+        'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub', 'roshi']     # Master Roshi (Nov 9)
 OPEN_V1 = OPEN[:8]
 def go(a, b, open_=OPEN):
     """Down presses from guest a to guest b, round the list."""
@@ -70,6 +70,8 @@ newdebug = OUT + '/BFU_debug_PERSONAL_USE_ONLY.gba'
 out2 = run(one, new_sav, newdebug); gb = open(d + '/o.bin', 'rb').read()
 check('no bad jumps in old or new', 'bad pc' not in out + out2)
 moved = list(range(0x55 + 75, 0x55 + 85)) + list(range(0xC0, 0xC5)) + [0xE2, 0xE3]      # only the custom flags moved
+# the skill book (Nov 9) learns what play has earned as soon as a record syncs (Goku's Kaioken, Vegeta's Galick Gun...): skills, their levels, the book's mask
+moved += [0x4F8 + c * 0x68 + o for c in range(9) for o in list(range(0x0C, 0x14)) + [0x15, 0x22, 0x23] + list(range(0x2E, 0x3C))]
 strip = lambda g: bytes(b for i, b in enumerate(g) if i not in moved)
 check('the same route leaves the same game state, apart from where the new flags live', strip(ga) == strip(gb))
 sa, sb = open(old_sav, 'rb').read(), open(new_sav, 'rb').read()
