@@ -557,10 +557,29 @@ void kk_track(void);
 #define SEQUENCE_VT 0x0804AAF4
 #define IN_EWRAM(p) ((u32)(p) >= 0x02000000 && (u32)(p) < 0x02040000)
 static int postgame_foe(const u8 *e);
+/* Dabura's flying special (states 0x78-0x7F: he fades, rises off the screen while it flashes white, untouchable, and hits from out of
+   sight) is for his own story room. The owner, of Super 13: "replace that shit don't make him do that at 60%". On a copy of his behaviour
+   0x78 or 0x79 goes back to his ordinary fighting (0x71), with what the special's start set undone: +0x1CC = 1 (can be hit) and +0x174 = 0
+   (the lift). Going to 0x6E re-entered it every frame; leaving it without the reset kept him untouchable (Nov 9, both tried). */
+#define STATE_TABLE 0x0870F514
+#define DABURA_AI 0x6E                 /* Dabura's first state (his row's +8) */
+#define DABURA_SPECIAL 0x79            /* his mid-fight special (0x79-0x7F; 0x78 leads into it) */
+#define DABURA_FIGHT 0x71              /* one of his ordinary fighting states */
+#define STATE_GOTO(obj, n) ((u32 (*)(void *, ...))(*(u32 *)(obj) + *(int *)(*(u32 *)(obj) + 0x68)))(obj, n)     /* vtable +0x68: the behaviour tree's goto (sub_08018920) */
 static void no_story_walk(u8 *e) {
     int depth = *(int *)(e + 0x23C);
+    const u8 *row = *(const u8 **)(e + 0x224);
     u32 *seq, k, n;
     if (depth < 1 || depth > 5) return;
+    if (depth == 1 && *(const u32 *)(row + 8) == DABURA_AI) {
+        u32 st = *(u32 *)(e + 0x244);
+        if (st == STATE_TABLE + 8 * (DABURA_SPECIAL - 1) || st == STATE_TABLE + 8 * DABURA_SPECIAL) {
+            STATE_GOTO(e, DABURA_FIGHT);
+            *(u32 *)(e + 0x1CC) = 1;            /* hittable again (the special clears it) */
+            *(u32 *)(e + 0x174) = 0;            /* and back on the ground (the special lifts him: -20 px) */
+            return;
+        }
+    }
     seq = *(u32 **)(e + 0x240 + 8 * (depth - 1));
     if (!IN_EWRAM(seq) || seq[0] != SEQUENCE_VT) return;
     n = seq[2] < 8 ? seq[2] : 8;

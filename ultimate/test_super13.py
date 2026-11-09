@@ -4,7 +4,8 @@
 The zone's route to Super 13 (as test_zone26.py), then a fighter with stats 180 walks up to him and punches from whichever side he
 stands, for about 100 seconds, with no teleports. Nov 9, the owner: "can't even damage and he's stuck walking up". He ran Dabura's
 behaviour, whose mid-fight scene walks to a point of Dabura's own room, inside this arena's rocks; up there he was drawn behind them and
-no hit reached him (outfit.c arena_keep, no_story_walk). Checks: he takes damage past that scene, and stays on the open snowfield."""
+no hit reached him; then "replace that, don't make him do that at 60%": his flying special (outfit.c arena_keep, no_story_walk). Checks: he
+never starts the special, takes most of his damage, and stays on the open snowfield."""
 import json, os, struct, subprocess, sys, tempfile, queue, threading
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
@@ -54,11 +55,11 @@ a = find(75000); check('Super 13 has 75000 HP', a is not None)
 if a is None: sys.exit('FAILED: %s' % fails)
 foe = a - 0x28C; pl = mem(0x03001C34)[0]
 send('poke %08X %08X' % (pl + 0x1B0, 180 | 180 << 16), 'poke %08X %08X' % (pl + 0x1B4, 180 | 180 << 16), 'run 2')     # a level 200 fighter's stats
-hps, spots, scene = [], [], None
+hps, spots, special = [], [], []
 for k in range(150):
     hp = mem(foe + 0x28C)[0] >> 10; fx, fy = [v >> 8 for v in mem(foe + 0x1A0, 2)]; px, py = [v >> 8 for v in mem(pl + 0x1A0, 2)]
     state = (mem(foe + 0x244)[0] - 0x0870F514) // 8
-    if scene is None and state == 0x79: scene = hp                    # Dabura's mid-fight scene begins
+    if 0x79 <= state <= 0x7F: special.append((k, hex(state)))          # Dabura's flying special (outfit.c no_story_walk)
     hps.append(hp); spots.append((fx, fy))
     dx, dy = fx - px, fy - py
     send('poke8 03001577 7F')                                          # the fighter stays up
@@ -70,10 +71,10 @@ for k in range(150):
         send('keys ' + (key.strip() or 'UP'), 'run 32', 'keys')
     send('run 8')
     if k % 30 == 0: send('shot fight_%03d' % k)
-print('   HP every 15 steps:', hps[::15], 'scene began at', scene)
+print('   HP every 15 steps:', hps[::15])
 check('punches land on him', hps[-1] < 75000)
-check('his mid-fight scene comes and goes, and punches land after it', scene is not None and min(hps) < scene - 10000)
-check('he loses at least 40% of his health in about 100 seconds (the build before the fix: 8%)', min(hps) < 45000)
+check('he never goes into Dabura\'s flying special (rising off screen, the white flash)%s' % ((': ' + str(special[:4])) if special else ''), not special)
+check('he loses at least half his health in about 100 seconds (the build before the fix: 8%)', min(hps) < 37500)
 out = [(x, y) for x, y in spots if y < 120 or not 48 <= x <= 272]
 check('he stays on the open snowfield, out of the rocks%s' % ((': ' + str(out[:5])) if out else ''), not out)
 check('no bad jumps', not bad[0])
