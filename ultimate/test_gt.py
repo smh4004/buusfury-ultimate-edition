@@ -117,8 +117,10 @@ CASES = [
     ('goku', 0, 2, [7, 15, 20, 35, 22], [(20, 4, 'SS'), (35, 'goku_ss2_b', 'SS2'), (35, 2, 'SS2 off'), (20, 4, 'SS again'), (35, 'goku_ss2_b', 'SS2'), (22, 6, 'SS3'), (22, 2, 'SS3 off')]),     # retail Goku (form 2: dead, with his halo); Super Saiyan 2 is its own skill (Nov 9)
     ('kid_goku', 0, 'kid_goku', [7, 15, 20, 22, 36], [(20, 'kid_goku_ssj', 'SS'), (20, 'kid_goku', 'SS off'), (20, 'kid_goku_ssj', 'SS'), (22, 'kid_goku_ssj3', 'SS3'),
                                                   (36, 'kid_goku_ssj4', 'SS4'), (36, 'kid_goku', 'SS4 off')]),
-    ('gohan_gt', 1, 'gohan_gt', [7, 17, 20, 35], [(20, 'gohan_gt_ssj', 'SS'), (20, 'gohan_gt', 'SS off'), (20, 'gohan_gt_ssj', 'SS'), (35, 'gohan_gt_ss2', 'SS2'), (35, 'gohan_gt', 'SS2 off')]),
-    ('gohan_gt_ng', 1, 'gohan_gt_noglasses', [7, 17, 20], [(20, 'gohan_gt_ng_ssj', 'SS'), (20, 'gohan_gt_noglasses', 'SS off')]),
+    # Super Saiyan 2 follows Super Saiyan in its own skill (Nov 9): Super Saiyan pressed again goes up to 2, and in 2 powers down
+    ('gohan_gt', 1, 'gohan_gt', [7, 17, 20, 35], [(20, 'gohan_gt_ssj', 'SS'), (20, 'gohan_gt_ss2', 'SS again: 2'), (20, 'gohan_gt', 'SS in 2: off'),
+                                                (20, 'gohan_gt_ssj', 'SS'), (35, 'gohan_gt_ss2', 'SS2'), (35, 'gohan_gt', 'SS2 off')]),
+    ('gohan_gt_ng', 1, 'gohan_gt_noglasses', [7, 17, 20], [(20, 'gohan_gt_ng_ssj', 'SS'), (20, 'gohan_gt_ng_ss2', 'SS again: 2'), (20, 'gohan_gt_noglasses', 'SS in 2: off')]),
     ('goten_gt', 2, 'goten_gt', [7, 16, 20], [(20, 'goten_gt_ssj', 'SS'), (20, 'goten_gt', 'SS off')]),
     ('goten_gt_green', 2, 'goten_gt_green', [7, 16, 20], [(20, 'goten_gt_green_ssj', 'SS'), (20, 'goten_gt_green', 'SS off')]),
     ('trunks_gt', 3, 'trunks_gt', [7, 20], [(20, 'trunks_gt_ssj', 'SS'), (20, 'trunks_gt', 'SS off')]),

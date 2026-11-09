@@ -203,7 +203,8 @@ def kaioken_remap(pal, one):
 # The skill book (outfit.c): per party character, the skills the loadout can hold beyond the six slots (record +0x13 is not a seventh: it is the equipment flags byte). 21 is the story's locked Super Saiyan.
 SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21, FP_SKILL), 2: (7, 20, 16, 8, 12, 21),
+# (literal ids: test_build.py reads this with ast.literal_eval; 47 is FP_SKILL)
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
               3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 # A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,

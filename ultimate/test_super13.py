@@ -56,6 +56,8 @@ if a is None: sys.exit('FAILED: %s' % fails)
 foe = a - 0x28C; pl = mem(0x03001C34)[0]
 send('poke %08X %08X' % (pl + 0x1B0, 180 | 180 << 16), 'poke %08X %08X' % (pl + 0x1B4, 180 | 180 << 16), 'run 2')     # a level 200 fighter's stats
 hps, spots, special = [], [], []
+frames0 = mem(0x03000F94)[0]                                      # the game's frame counter: does it keep up with the emulator?
+emu = 0
 for k in range(150):
     hp = mem(foe + 0x28C)[0] >> 10; fx, fy = [v >> 8 for v in mem(foe + 0x1A0, 2)]; px, py = [v >> 8 for v in mem(pl + 0x1A0, 2)]
     state = (mem(foe + 0x244)[0] - 0x0870F514) // 8
@@ -70,11 +72,17 @@ for k in range(150):
         key = ('RIGHT' if dx > 14 else 'LEFT' if dx < -14 else '') + (' DOWN' if dy > 18 else ' UP' if dy < -18 else '')
         send('keys ' + (key.strip() or 'UP'), 'run 32', 'keys')
     send('run 8')
+    emu += 8 + (2 + 3 * 6 + 8 if abs(dx) <= 22 and abs(dy) <= 26 else 32)
     if k % 30 == 0: send('shot fight_%03d' % k)
 print('   HP every 15 steps:', hps[::15])
+print('   game frames %d in %d emulated' % (mem(0x03000F94)[0] - frames0, emu))
 check('punches land on him', hps[-1] < 75000)
 check('he never goes into Dabura\'s flying special (rising off screen, the white flash)%s' % ((': ' + str(special[:4])) if special else ''), not special)
-check('he loses at least half his health in about 100 seconds (the build before the fix: 8%)', min(hps) < 37500)
+# How much he loses is chaotic: the same fight played on builds an unrelated change apart took him to 36%, 41% and 73% (Nov 9). What the
+# fix is about: he takes damage all fight, never a long untouchable stretch (the bug: 8% in all, nothing after he reached the rocks).
+check('he loses at least a quarter of his health in about 100 seconds (the build before the fix: 8%%): %d%%' % ((75000 - min(hps)) * 100 // 75000), min(hps) < 56250)
+still = max(len(list(g)) for _, g in __import__('itertools').groupby(hps))
+check('no stretch of 45 steps (about 30 seconds) without a hit landing: longest %d' % still, still < 45)
 out = [(x, y) for x, y in spots if y < 120 or not 48 <= x <= 272]
 check('he stays on the open snowfield, out of the rocks%s' % ((': ' + str(out[:5])) if out else ''), not out)
 check('no bad jumps', not bad[0])
