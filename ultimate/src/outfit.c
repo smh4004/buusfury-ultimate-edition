@@ -224,7 +224,7 @@ static void more_flag_set(int f, int on) {
 /* Script natives: more_get(n) and more_put(n, value). more_put(MORE_POINTS, n) instead gives whoever is playing n stat points to spend (a Time Chamber wave's prize). */
 #define MORE_POINTS 255
 int mastery_level(int c, int skill);
-/* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (room << 8 | world), 252 Goku playing, 253 the quest can start
+/* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (area << 8 | world), 252 Goku playing, 253 the quest can start
    (after the ending, Goku's Super Saiyan mastered, Goku playing) */
 void more_get(int *sp) {
     int n = *sp, f = sp[n], me = *(u8 *)0x03001068;
@@ -542,6 +542,9 @@ void *player_input(void) {
     kk_track();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
+    /* Battle of Gods: Beerus fights Vegeta at the party, on Capsule Corporation's own grounds, which has no fighting (area record +8
+       is 0; the area's load copies it here). While that fight is on, fighting is on there too. */
+    if (!COMBAT_ON && *(volatile u16 *)0x0300197C == 0x1404 && more_flag(MORE_BOG_FIGHT)) COMBAT_ON = 1;
     if ((FRAMES & 63) == 0) { skills_sync(*(u8 *)0x03001068); skills_sync((FRAMES >> 6) & 7); }      /* what play has earned (the skill book): the fighter in play, and the party in turn */
     if (CL.active && CL.p_at + 2 < FRAMES) CL.active = 0;
     if (!CL.active && FRAMES >= CL.surge) return keys;

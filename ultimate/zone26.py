@@ -1,6 +1,6 @@
 """Zone 26: the prototype's cut Super 13 dungeon as new areas 26:1..15. Layouts and collision come from Prototype D, reskinned
 by reskin.py. One flat BG3 layer, stored tile pages; the prototype's one-way debug doors are replaced by zone26.json."""
-import json, os, struct, sys
+import json, os, re, struct, sys
 import numpy as np
 from wfz import decompress_stream
 import reskin
@@ -226,7 +226,7 @@ TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115
            (3, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (4, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
 TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 60000, (43, 76, 111)   # all four: Geromantium Kataginu, Gloves and Tabi, with ten Senzu Beans
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
-import bog                                          # Battle of Gods (more flags 47-53, its rooms and Beerus's rows)
+import bog                                          # Battle of Gods (more flags 47-55, its people and Beerus in the real areas: add_bog)
 from bog import MORE_BOG_DONE
 MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
 # Time Chamber waves (Mr. Popo, Waves): a category's four partners in a row, no rest between, 1.5x their health. The first clear of each gives WAVE_POINTS stat points, later ones Zenie.
@@ -348,11 +348,6 @@ def challenge_room(name, k=0):
 def black_room(k=0):
     """Goku Black's fight: 0 Black, 1 Rose."""
     return challenge_room('black', k)
-
-
-def bog_first():
-    """Battle of Gods: its rooms follow the challenges' (bog.ROOMS order)."""
-    return hercule_room() + 1 + sum(len(c['fights']) for c in CHALLENGES)
 
 
 def tier_rooms():
@@ -487,7 +482,7 @@ def rush_rows(W, rom, harmless=False):
     for k, (hp, stats) in enumerate(bog.ROWS):    # Battle of Gods: Beerus, on copies of Kid Buu's row (he fires beams)
         r = bytearray(rom[STATS + 28 * bog.KID_BUU_ROW:STATS + 28 * (bog.KID_BUU_ROW + 1)])
         struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)        # (never harmless: losing to him is part of the story, and test_bog.py loses)
-        then = bog.after_fight(k, bog_first(), MORE_PUT, False) + ('    call 0x2F\n    call 0x33(0)\n' if k == len(bog.ROWS) - 1 else '') + '    end\n'
+        then = bog.after_fight(k, MORE_PUT, False) + ('    call 0x2F\n    call 0x33(0)\n' if k == len(bog.ROWS) - 1 else '') + '    end\n'
         struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
         rows += r
     at = W.put(bytes(rows))
@@ -518,6 +513,63 @@ def hub_person(W, rom):
 def condition(W, text):
     import bfscript
     return W.put(bytes(bfscript.asm(text)))
+
+
+def area_actors(rom, area):
+    """(area record offset, its actor record pointers) as they stand now."""
+    e = next(AREAS + 56 * q for q in range(COUNT) if (rom[AREAS + 56 * q], rom[AREAS + 56 * q + 1]) == area)
+    count = rom[e + 4]; lst = struct.unpack_from('<I', rom, e + 0x14)[0]
+    return e, list(struct.unpack_from('<%dI' % count, rom, lst - BASE)) if count else []
+
+
+def set_actors(W, rom, e, ptrs):
+    struct.pack_into('<I', rom, e + 0x14, W.put(struct.pack('<%dI' % len(ptrs), *ptrs))); rom[e + 4] = len(ptrs)
+
+
+NPC_SPAWN, ENEMY_SPAWN = 0x08017DA3, 0x0800FD55
+
+
+def unless(W, rom, cond, text):
+    """A spawn condition: the old one (0 always, 0x1NNNN story flag NNNN set, 0x2NNNN clear, or a script) and `text`'s value too."""
+    import bfscript
+    if cond == 0: old = ''
+    elif cond >> 16 in (1, 2): old = '    pushn %d\n    call %s\n' % (cond & 0xFFFF, 'flag' if cond >> 16 == 1 else 'not_flag')
+    else:
+        dis = bfscript.disasm(rom[cond - BASE:cond - BASE + 96], names=bfscript.load_names())
+        body = (dis[0] if isinstance(dis, tuple) else dis).split('    end\n')[0]
+        if re.search(r'\b(jz|jmp|loop)\b', body) or not body.strip(): sys.exit('spawn condition 0x%X: not a plain test' % cond)
+        old = body
+    return condition(W, old + text + ('    and\n' if old else '') + '    end\n')
+
+
+def add_bog(W, rom, actor_ids, quest_list, bog_row):
+    """Battle of Gods (bog.py), in the game's own areas: the quest's people stand there at their stages, Beerus is an enemy there while
+    his fight is on, and where he fights in town or the desert, the people and enemies who live there stand aside meanwhile (their own
+    spawn conditions, and MORE_BOG_FIGHT clear). All by spawn conditions on new copies of the records: the areas' own records are unchanged."""
+    g = lambda f: '    pushn %d\n    call 0x%X\n' % (f, MORE_GET)
+    def who(key): return actor_ids[key] + 9 if key in ('beerus', 'whis') else bog.CHARS[key]
+    for area in bog.ASIDE:
+        e, ptrs = area_actors(rom, area); new = []
+        for p in ptrs:
+            w = list(struct.unpack_from('<8I', rom, p - BASE))
+            if w[0] in (NPC_SPAWN, ENEMY_SPAWN):
+                w[1] = unless(W, rom, w[1], g(bog.MORE_BOG_FIGHT) + '    push 0\n    eq\n'); p = W.put(struct.pack('<8I', *w))
+            new.append(p)
+        set_actors(W, rom, e, new)
+    for area, people, (on, off) in bog.PEOPLE:
+        cond = condition(W, bog.when(MORE_GET, on, off))
+        e, ptrs = area_actors(rom, area)
+        set_actors(W, rom, e, ptrs + [W.put(struct.pack('<8I', NPC_SPAWN, cond, y << 16 | x, quest_list, who(key), 1, 0x080716EC, 0)) for key, x, y in people])
+    for k, (area, x, y, (on, off)) in enumerate(bog.FOES):
+        cond = condition(W, bog.when(MORE_GET, on, off))
+        e, ptrs = area_actors(rom, area)
+        set_actors(W, rom, e, ptrs + [W.put(struct.pack('<8I', ENEMY_SPAWN, cond, bog_row + k, y << 16 | x, who('beerus'), 0x080555A0, 1, 0x080716EC))])
+    # Whis at Capsule Corporation: before the quest (it can start), between King Kai's planet and the party (to take you back), and after it
+    cond = condition(W, g(bog.Q_READY) + g(bog.MORE_BOG_START) + '    push 0\n    eq\n    and\n'
+                     + g(bog.MORE_BOG_START) + g(bog.MORE_BOG_LOST) + '    push 0\n    eq\n    and\n' + g(bog.MORE_BOG_FIGHT) + '    push 0\n    eq\n    and\n    or\n'
+                     + g(bog.MORE_BOG_TOLD) + '    or\n    end\n')
+    e, ptrs = area_actors(rom, bog.CAPSULE)
+    set_actors(W, rom, e, ptrs + [W.put(struct.pack('<8I', NPC_SPAWN, cond, bog.WHIS_AT[1] << 16 | bog.WHIS_AT[0], quest_list, who('whis'), 1, 0x080716EC, 0))])
 
 
 def add_balls(W, rom, actor_ids, popo_list):
@@ -669,24 +721,7 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
         struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
         rows.append(bytes(st))
     bog_row = tier_row + 1 + len(fights)
-    def who(key): return actor_ids[key] + 9 if key in ('beerus', 'whis') else bog.CHARS[key]
-    for name, src, people, foe, _ in bog.ROOMS:          # Battle of Gods: copies of the movie's places, with their people, or Beerus to fight
-        st = bytearray(next(rom[AREAS + 56 * q:AREAS + 56 * q + 56] for q in range(COUNT) if (rom[AREAS + 56 * q], rom[AREAS + 56 * q + 1]) == src))
-        st[0] = 26; st[1] = bog.room_of(name, bog_first()); st[3] = 0
-        if foe: st[8] = 1                               # +8: fighting allowed (Capsule Corporation's own is 0: no punches at home)
-        here = [W.put(struct.pack('<8I', 0x08017DA3, 0, y << 16 | x, quest_list, who(key), 1, 0x080716EC, 0)) for key, x, y in people]
-        if foe:
-            k, x, y = foe
-            here.append(W.put(struct.pack('<8I', 0x0800FD55, 0, bog_row + k, y << 16 | x, who('beerus'), 0x080555A0, 1, 0x080716EC)))
-        st[4] = len(here); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<%dI' % len(here), *here))); struct.pack_into('<I', st, 0x10, 0)
-        rows.append(bytes(st))
-    e = next(AREAS + 56 * q for q in range(COUNT) if (rom[AREAS + 56 * q], rom[AREAS + 56 * q + 1]) == bog.CAPSULE)     # Whis at Capsule Corporation
-    count = rom[e + 4]; lst = struct.unpack_from('<I', rom, e + 0x14)[0]
-    ptrs = list(struct.unpack_from('<%dI' % count, rom, lst - BASE)) if count else []
-    g = lambda f: '    pushn %d\n    call 0x%X\n' % (f, MORE_GET)
-    cond = condition(W, g(bog.Q_READY) + g(bog.MORE_BOG_START) + g(bog.MORE_BOG_TOLD) + '    push 0\n    eq\n    and\n    or\n    end\n')
-    rec = W.put(struct.pack('<8I', 0x08017DA3, cond, bog.WHIS_AT[1] << 16 | bog.WHIS_AT[0], quest_list, who('whis'), 1, 0x080716EC, 0))
-    struct.pack_into('<I', rom, e + 0x14, W.put(struct.pack('<%dI' % (count + 1), *ptrs, rec))); rom[e + 4] = count + 1
+    add_bog(W, rom, actor_ids, quest_list, bog_row)
     hub_person(W, rom)
     add_balls(W, rom, actor_ids, popo_list)
     if debug_door:          # debug: on Snake Way, Down on the very spot you start reaches 26:1 and the rest of the road stays walkable; x 48-96 walk up reaches Broly; x<48 starts the ending

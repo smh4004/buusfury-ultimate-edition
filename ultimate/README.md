@@ -101,21 +101,30 @@ actor's id moves; `<rom>.map.json` records its id (character = id + 9). Checked 
 The owner: "build the entire movie Battle of Gods and super saiyan god ritual into the post game and once completed grant access to SSG",
 Super Saiyan God "upon mastery of the super saiyan skill". `ultimate/bog.py` holds the quest; `test_bog.py` plays all of it (its rig's
 official warps to Capsule Corporation: `BFU_HUB_WARP="4, 20, 1, 192, 196"`).
+- Every scene is in the game's own areas, the movie's places where Buu's Fury has them (the owner, Nov 9: "don't have BoG take place in
+  zone 26 use the accurate locations from the movie if you can"; it had been in zone 26 copies of the areas).
 - After the ending, with Goku's Super Saiyan mastered and Goku playing, Whis waits at Capsule Corporation. King Kai calls; Whis takes Goku to
-  King Kai's planet (a zone 26 copy of Grand Kai's Planet), where Beerus asks about a Super Saiyan God and they fight. Beerus can't really be
-  beaten there; when Goku falls, the game's death script carries on to the party instead of the game over (`bog.death_branch`).
-- Bulma's party (a copy of Capsule Corporation, with Bulma, Vegeta, Gohan, Videl, Goten, Trunks, Beerus and Whis): the pudding, Bulma's
-  slap, Vegeta's fury; the Switch Character menu opens for his fight. Win or fall, the ritual follows.
-- The ritual: Shenron, five Saiyans and Videl's baby. Super Saiyan God is Goku's from here (outfit.c skills_sync). Then the god fight on a
-  copy of Kami's Lookout: lose, and it's back to the party to try again (or home); win, and Whis brings everyone home to Capsule Corporation,
-  where Beerus spares the Earth.
-- Every scene is a step of the West City resident's event list (`build.py quest_npc` appends them); its first step asks `more_get(251)`
-  where you are (room << 8 | world) and goes to the scene for that place; more flags 47-53 hold the story's progress. Natives 0xF8-0xFF are
-  all taken, so the quest asks `more_get` (251 area, 252 Goku playing, 253 the quest can start) instead of new natives.
-- Rooms: six after the challenges' (`zone26.bog_first`). Capsule Corporation's area record has +8 = 0 (no fighting at home): its fight copy
-  sets it. Beerus's rows are copies of Kid Buu's (row 61): 250000 HP on King Kai's planet (2,000,000 broke Kid Buu's behaviour: likely an
-  overflow in its health checks; he stopped attacking and the game crashed), 20000 at the party, 120000 for the god fight; they are never
-  made harmless in debug builds, since losing is part of the story.
+  King Kai's planet. Buu's Fury has no North Kai's planet (Cell destroyed it; in the Buu saga King Kai lives on Grand Kai's), so it is
+  Grand Kai's Planet (1-0B). Beerus asks about a Super Saiyan God and they fight. Beerus can't really be beaten there; when Goku falls,
+  the game's death script carries on to the party instead of the game over (`bog.death_branch`).
+- Bulma's party at Capsule Corporation (4-14), as in the movie, with Bulma, Vegeta, Gohan, Videl, Goten, Trunks, Beerus and Whis: the
+  pudding, Bulma's slap, Vegeta's fury; the Switch Character menu opens for his fight, on the party grounds. The area has no fighting
+  (record +8 = 0; its load copies that to 0x03001988), so `outfit.c player_input` turns fighting on there while MORE_BOG_FIGHT is set.
+  Win or fall, the ritual follows.
+- The ritual: Shenron, five Saiyans and Videl's baby. Super Saiyan God is Goku's from here (outfit.c skills_sync). Then the god fight along
+  the movie's path: West City (4-01), a forest (Fukurou Forest, 13-01), the desert's rock formations (Diablo Desert, 11-01); the cavern and
+  the sky have no area here. Each leg is a Beerus row; a won leg carries the fight to the next place at once (no rest), the last brings
+  everyone home to Capsule Corporation, where Beerus spares the Earth. A lost leg goes back to the party, to try that leg again.
+- Who stands where is all spawn conditions (`zone26.add_bog`, on new copies of the records): the quest's people at their stages (`bog.PEOPLE`),
+  Beerus as an enemy while his fight is on (`bog.FOES`, more flag 52), and in West City and the desert the people and enemies who live there
+  stand aside meanwhile (their own condition, a story flag or a short script, and flag 52 clear: `zone26.unless`).
+- Every scene is a step of the West City resident's event list (`build.py quest_npc` appends them); its first step sends talks at Capsule
+  Corporation and on Grand Kai's Planet (`more_get(251)`: area << 8 | world) to the quest's dispatcher, which picks the scene by the story's
+  progress (more flags 47-55). Natives 0xF8-0xFF are all taken, so the quest asks `more_get` (251 area, 252 Goku playing, 253 the quest can
+  start) instead of new natives.
+- Beerus's rows are copies of Kid Buu's (row 61): 250000 HP on King Kai's planet (2,000,000 broke Kid Buu's behaviour: likely an overflow in
+  its health checks; he stopped attacking and the game crashed), 20000 at the party, 35000 / 40000 / 50000 for the god fight's legs; they
+  are never made harmless in debug builds, since losing is part of the story.
 - Script constants above 255 need `pushn` (`push` keeps one byte).
 - Super Saiyan God (skill 46, a crimson Z): Goku's three base looks with crimson hair (`build.py ssg_hair`: his hair is the only big black
   patch on him), from base with the red aura, 1.75x without Super Saiyan's +5, half Super Saiyan's drain (`ss_tick`), back to base; no other
