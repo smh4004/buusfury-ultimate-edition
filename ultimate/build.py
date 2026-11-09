@@ -148,6 +148,24 @@ def kaioken_rows(clean):
 BEAM_BODY = (0x721188, 12)
 
 
+def region_rows(clean, out, remap, put, cache, size_of=lambda o, k: o[k + 2] * o[k + 3], lo=None, hi=None):
+    """Recolour the tiles of a set of frame rows (`out`, 12 bytes a row, the tile pointer at +8) as ONE copy of the whole span they cover,
+    every row pointing at the same offset in it as in the game's own data. The game loads a beam's tiles as one block and finds a frame's
+    by its offset from the first: copies made a block at a time (and a block at the first size seen: 0x08719E68 is used as 64, 128 and
+    256 bytes) put other frames' tiles in those places, and the Galick Gun's, 10x's and Super Kamehameha's tubes came out as rounded pills
+    with stray coloured squares (Nov 9, the owner: "fix every beam so they don't have that fucked up garbled texture"). `cache` holds the
+    span copies of one recolouring; size_of(out, k) is a row's tile bytes (header layouts differ)."""
+    rows = [(k, struct.unpack_from('<I', out, k + 8)[0]) for k in range(0, len(out) - 11, 12)]
+    spans = [(t, size_of(out, k)) for k, t in rows if 0x08700000 <= t < 0x08800000 and size_of(out, k)]
+    if not spans: return out
+    a = lo if lo is not None else min(t for t, _ in spans)
+    b = hi if hi is not None else max(t + n for t, n in spans)
+    if (a, b) not in cache: cache[(a, b)] = put(bytes(clean[a - ROM_BASE:b - ROM_BASE]).translate(remap))
+    for k, t in rows:
+        if a <= t < b: struct.pack_into('<I', out, k + 8, cache[(a, b)] + t - a)
+    return out
+
+
 def body_block(frames):
     """frames(rom offset, rows) -> its recoloured copy; -> body pointer -> the same rows in one copy of the whole block."""
     at = frames(BEAM_BODY[0], BEAM_BODY[1])
@@ -1669,13 +1687,7 @@ def add_eraser(rom, clean, sym, at, art):
         remap = bytes(recolour(v) for v in range(256)); copies = {}
         def ball(rec):
             """One animation: four facings of 120 bytes, each up to ten {header, attributes, tile data} rows."""
-            out = bytearray(clean[rec:rec + 480])
-            for k in range(0, 480, 12):
-                head, _, tiles = struct.unpack_from('<III', out, k)
-                if tiles:
-                    if tiles not in copies:
-                        o = tiles - ROM_BASE; copies[tiles] = put(bytes(clean[o:o + (head >> 16 & 255) * (head >> 24 & 255)]).translate(remap))
-                    struct.pack_into('<I', out, k + 8, copies[tiles])
+            out = region_rows(clean, bytearray(clean[rec:rec + 480]), remap, put, copies, lambda o, k: (struct.unpack_from('<I', o, k)[0] >> 16 & 255) * (struct.unpack_from('<I', o, k)[0] >> 24 & 255))
             return put(bytes(out))
         if name == 'disc':
             l2u = open(LOG2, 'rb').read()      # USA cart: palette and tiles at the addresses its decomp gives
@@ -1713,14 +1725,7 @@ def add_eraser(rom, clean, sym, at, art):
         return one(np.array(BEAM_TINT.get(v, tuple(pal[v])), dtype=int))
     remap = bytes(beam_colour(v) for v in range(256)); copies = {}
     def frames(o, count):
-        out = bytearray(clean[o:o + 12 * count])
-        for k in range(0, 12 * count, 12):
-            tiles = struct.unpack_from('<I', out, k + 8)[0]
-            if not 0x08700000 <= tiles < 0x08800000: continue
-            if tiles not in copies:
-                t = tiles - ROM_BASE; copies[tiles] = put(bytes(clean[t:t + out[k + 2] * out[k + 3]]).translate(remap))
-            struct.pack_into('<I', out, k + 8, copies[tiles])
-        return put(bytes(out))
+        return put(bytes(region_rows(clean, bytearray(clean[o:o + 12 * count]), remap, put, copies)))
     BEAM_PARAMS, BEAM_VT = 0x71DA68, 0x4D9F8
     # The beam itself is LoG2's Special Beam Cannon: 7 rows a facing (muzzle 2, body 3, tip 2) laid into BF's 16-row facings (muzzle 0-1, body 3-5 and spare frame 6, tip 7-8 and 10-11).
     # Rows 13-14, a small end piece LoG2 doesn't have, keep the recoloured Kamehameha's. Every level uses this one thin shape.
@@ -1839,14 +1844,7 @@ def add_eraser(rom, clean, sym, at, art):
         tint = KAME_TINT[form]
         remap = bytes(0 if v == 0 else one(np.array(tint.get(v, tuple(pal[v])), dtype=int)) for v in range(256)); copies = {}
         def frames(o, count):
-            out = bytearray(clean[o:o + 12 * count])
-            for k in range(0, 12 * count, 12):
-                tiles = struct.unpack_from('<I', out, k + 8)[0]
-                if not 0x08700000 <= tiles < 0x08800000: continue
-                if tiles not in copies:
-                    t = tiles - ROM_BASE; copies[tiles] = put_art(bytes(clean[t:t + out[k + 2] * out[k + 3]]).translate(remap))
-                struct.pack_into('<I', out, k + 8, copies[tiles])
-            return put(bytes(out))
+            return put(bytes(region_rows(clean, bytearray(clean[o:o + 12 * count]), remap, put_art, copies)))
         shape, table = {}, sym[form + '_params'] - ROM_BASE
         body_at = body_block(frames)
         for i in range(3):
@@ -1870,14 +1868,7 @@ def add_eraser(rom, clean, sym, at, art):
     for k, (name, skill, power, tint, title, text) in enumerate(KAME_VARIANTS):     # Galick Gun, 10x Kamehameha: the Kamehameha's code, own frames and strength
         remap = bytes(0 if v == 0 else one(np.array(tint.get(v, tuple(pal[v])), dtype=int)) for v in range(256)); copies = {}
         def frames(o, count):
-            out = bytearray(clean[o:o + 12 * count])
-            for j in range(0, 12 * count, 12):
-                tiles = struct.unpack_from('<I', out, j + 8)[0]
-                if not 0x08700000 <= tiles < 0x08800000: continue
-                if tiles not in copies:
-                    t = tiles - ROM_BASE; copies[tiles] = put_art(bytes(clean[t:t + out[j + 2] * out[j + 3]]).translate(remap))
-                struct.pack_into('<I', out, j + 8, copies[tiles])
-            return put(bytes(out))
+            return put(bytes(region_rows(clean, bytearray(clean[o:o + 12 * count]), remap, put_art, copies)))
         shape, table = {}, sym['kv_params'] - ROM_BASE + 48 * k
         body_at = body_block(frames)
         for i in range(3):
@@ -1898,12 +1889,7 @@ def add_eraser(rom, clean, sym, at, art):
     def tinted_frames(rows_at, count, lo, hi, remap, cache):
         """A copy of `count` {header, attributes, tiles} rows whose tiles in [lo, hi) are recoloured (each block once)."""
         out = bytearray(clean[rows_at - ROM_BASE:rows_at - ROM_BASE + 12 * count])
-        for j in range(0, 12 * count, 12):
-            h, _, tiles = struct.unpack_from('<III', out, j)
-            if lo <= tiles < hi:
-                if tiles not in cache: cache[tiles] = put_art(bytes(clean[tiles - ROM_BASE:tiles - ROM_BASE + (h >> 16 & 255) * (h >> 24 & 255)]).translate(remap))
-                struct.pack_into('<I', out, j + 8, cache[tiles])
-        return bytes(out)
+        return bytes(region_rows(clean, out, remap, put_art, cache, lambda o, k: (struct.unpack_from('<I', o, k)[0] >> 16 & 255) * (struct.unpack_from('<I', o, k)[0] >> 24 & 255), lo, hi))
     def behaviour(vt_sym, orig_vt, mine):
         vt = sym[vt_sym] - ROM_BASE
         for j in range(9):
