@@ -27,6 +27,7 @@ CODE_END = 0x54FBC
 HEAP_WORDS = 0xFDFE - 0x400      # the top 4 KB of work RAM belongs to outfit.c
 SPACE = 0x800000                 # new data starts at the old 8 MB end: forms, then code
 ACTORS_AT = 0x840000             # moved actor table and imported sprites
+ROM32 = '--rom16' not in sys.argv  # 32 MB: the GT actors live above 16 MB and the save chip moves to 0x0DFFFF00 (lib/rom32.py). --rom16: the old 16 MB layout
 COMBO_SHA1 = 'f02d179accbeb9b68bcaef8720eb0ae426dde6ee'
 PROTO = os.environ.get('BFU_PROTO', 'protoD.gba')   # Prototype D cart: Super 13 and Zone 26
 LOG2 = os.environ.get('BFU_LOG2', 'log2.gba')      # Legacy of Goku II (USA): Zone 26's snow tiles
@@ -435,8 +436,18 @@ def popo_npc(src):
     pages = zone26.SPAR
     say('menu1', '\\n'.join('- %s' % c for c, _ in pages[:3]) + '\\n- More')
     choose('menu1_go', ['cat0', 'cat1', 'cat2', 'menu2'])
-    say('menu2', '\\n'.join('- %s' % c for c, _ in pages[3:]) + '\\n- Back')
-    choose('menu2_go', ['cat3', 'cat4', 'cat5', 'menu1'])
+    say('menu2', '\\n'.join('- %s' % c for c, _ in pages[3:]) + '\\n- Waves')
+    choose('menu2_go', ['cat3', 'cat4', 'cat5', 'waves'])
+    # Waves: a category's four in a row, no rest between. The first clear of each gives stat points.
+    say('waves', "Waves: all four of a group in a row, no rest. Clear one the first time for %d stat points." % zone26.WAVE_POINTS)
+    say('waves1', '\\n'.join('- %s' % c for c, _ in pages[:3]) + '\\n- More')
+    choose('waves1_go', ['wave0', 'wave1', 'wave2', 'waves2'])
+    say('waves2', '\\n'.join('- %s' % c for c, _ in pages[3:]) + '\\n- Back')
+    choose('waves2_go', ['wave3', 'wave4', 'wave5', 'menu1'])
+    for k, (c, people) in enumerate(pages):
+        broly = any(p[0] == 'Broly' for p in people)
+        gate, tail = ('    call flag(111)\n    jz L1\n', 'L1:\n    push {locked}\n    end\n') if broly else ('', '')
+        code('wave%d' % k, gate + zone26.spar_on() + '    call 0x78(30)\n    pushn 26, %d, 1, 120, 150\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\n' % zone26.challenge_room('wave%d' % k) + tail)
     room = zone26.spar_first()
     for c, (_, people) in enumerate(pages):
         say('cat%d' % c, '\\n'.join('- %s' % p[0] for p in people))
@@ -542,7 +553,10 @@ C1:
     for k in range(len(trials)):
         start += '    pushn %d\n    call flag\n    pushn %d\n    call not_flag\n    and\n    jz T%d\n    push {trial%d}\n    end\nT%d:\n' % (won(k), paid(k), k, k, k)
     allpaid = ''.join('    pushn %d\n    call flag\n%s' % (paid(k), '    and\n' if k else '') for k in range(len(trials)))
-    start += allpaid + '    pushn %d\n    call not_flag\n    and\n    jz L3\n    push {all_won}\n    end\nL3:\n    push {board}\n    end\n' % zone26.TRIAL_ALL
+    start += allpaid + '    pushn %d\n    call not_flag\n    and\n    jz L3\n    push {all_won}\n    end\nL3:\n' % zone26.TRIAL_ALL
+    for k in range(len(zone26.TRIALS2)):          # Trials II: won and not yet paid
+        start += more(zone26.MORE_T2_WON + k) + more(zone26.MORE_T2_PAID + k) + '    push 0\n    eq\n    and\n    jz U%d\n    push {trial2_%d}\n    end\nU%d:\n' % (k, k, k)
+    start += ''.join(more(zone26.MORE_T2_PAID + k) + ('    and\n' if k else '') for k in range(len(zone26.TRIALS2))) + more(zone26.MORE_T2_ALL) + '    push 0\n    eq\n    and\n    jz U9\n    push {all2_won}\n    end\nU9:\n    push {board}\n    end\n'
     code('start', start)
     steps.append(('old', 'say' + old.rstrip() + '\n'))
     code('after_old', '    push {END}\n    end\n')
@@ -685,8 +699,35 @@ L1:
     steps.append(('rew_ladder', 'saycode 0x%02X "Endless: your best run is %%d wins."\n' % speaker + lad(5) + '    end\n'))
     steps.append(('rew_museum', 'saycode 0x%02X "Museum: %%d of 25 Hercule and %%d of 15 Z-Fighter exhibits."\n' % speaker + '    pushn 341, 5\n    call 0xBA\n    pushn 346, 4\n    call 0xBA\n    end\n'))
     code('rew_museum_go', '    push {END}\n    end\n')
-    say('more', "- Cell Games\\n- Rewards\\n- Challengers\\n- Back")
-    code('more_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    push {cell}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n    push {rewards}\n    end\nL2:\n    call 0x18\n    push 2\n    eq\n    jz L3\n    push {challengers}\n    end\nL3:\n    push {menu}\n    end\n')
+    say('more', "- Cell Games\\n- Rewards\\n- Challengers\\n- Next")
+    code('more_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    push {cell}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n    push {rewards}\n    end\nL2:\n    call 0x18\n    push 2\n    eq\n    jz L3\n    push {challengers}\n    end\nL3:\n    push {more2}\n    end\n')
+    say('more2', "- Trials II\\n- Dojo\\n- Back")
+    code('more2_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    pushn %d\n    call flag\n    jz L4\n    push {trials2}\n    end\nL4:\n    push {no_trials2}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n    push {dojo}\n    end\nL2:\n    push {menu}\n    end\n' % zone26.TRIAL_ALL)
+    say('no_trials2', "Clear the first four Trials and claim their prize. Then come back for harder ones!")
+    code('no_trials2_go', '    push {END}\n    end\n')
+    say('trials2', "Trials II: harder foes, more Zenie and better gear. Clear all four for a set of Geromantium!")
+    say('trial2_menu', '\\n'.join('- %s vs %s' % (t[1], t[4]) for t in zone26.TRIALS2))
+    code('trial2_go', ''.join('    call 0x18\n    push %d\n    eq\n    jz L%d\n    call 0x95(%d)\n    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\nL%d:\n' % (k, k + 1, t[0], zone26.challenge_room('trial2_%d' % k), k + 1) for k, t in enumerate(zone26.TRIALS2)) + '    push {END}\n    end\n')
+    for k, t in enumerate(zone26.TRIALS2):
+        say('trial2_%d' % k, "Well done, %s! You beat %s! Take %s Zenie and the %s." % (t[1], t[4], '{:,}'.format(zone26.TRIAL2_PRIZE), t[6]))
+        code('trial2_%d_go' % k, put(zone26.MORE_T2_PAID + k, 1) + '    pushn %d\n    call 0x%X\n    call 0x93(%d)\n    push {END}\n    end\n' % (zone26.TRIAL2_PRIZE, zone26.ADD_ZENIE, t[5]))
+    say('all2_won', "All of Trials II cleared! Take the Geromantium Kataginu, Gloves and Tabi, and ten Senzu Beans.")
+    code('all2_won_go', put(zone26.MORE_T2_ALL, 1) + '    pushn %d, %d\n    call 0x81\n' % (zone26.TRIAL_ITEM, zone26.TRIAL_ITEMS) + ''.join('    call 0x93(%d)\n' % g for g in zone26.TRIAL2_GEAR) + '    push {END}\n    end\n')
+    # Dojo: a page of fighters, then a fight with a CPU copy of the one picked, if you have them
+    say('dojo', "The Dojo: spar with a copy of any fighter you've met. Each win pays %s Zenie." % '{:,}'.format(zone26.DOJO_PRIZE))
+    say('dojo_menu', '\\n'.join('- %s' % c for c, _ in zone26.DOJO) + '\\n- Back')
+    code('dojo_menu_go', ''.join('    call 0x18\n    push %d\n    eq\n    jz L%d\n    push {dojo_page%d}\n    end\nL%d:\n' % (k, k + 1, k, k + 1) for k in range(len(zone26.DOJO))) + '    push {menu}\n    end\n')
+    n = 0
+    for k, (_, people) in enumerate(zone26.DOJO):
+        say('dojo_page%d' % k, '\\n'.join('- %s' % p[0] for p in people) + '\\n- Back')
+        go = ''
+        for i, (name, actor, lock) in enumerate(people):
+            test = ('    pushn %d\n    call flag\n' % lock[1] if lock[0] == 'flag' else more(lock[1])) if lock else '    push 1\n'
+            go += '    call 0x18\n    push %d\n    eq\n    jz L%d\n' % (i, i + 1) + test + '    jz N%d\n    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\nN%d:\n    push {dojo_locked}\n    end\nL%d:\n' % (i, zone26.challenge_room('dojo%d' % n), i, i + 1)
+            n += 1
+        code('dojo_page%d_go' % k, go + '    push {dojo_menu}\n    end\n')
+    say('dojo_locked', "You haven't met that fighter yet.")
+    code('dojo_locked_go', '    push {END}\n    end\n')
     say('challengers', "- Hercule's dare\\n- Goku Black\\n- GT challengers\\n- Back")
     code('challengers_go', '    call 0x18\n    push 0\n    eq\n    jz L1\n    pushn 890\n    call flag\n    jz L4\n    push {dare}\n    end\nL4:\n    push {no_dare}\n    end\nL1:\n    call 0x18\n    push 1\n    eq\n    jz L2\n' + more(zone26.MORE_HARD) + '    jz L5\n    push {black}\n    end\nL5:\n    push {no_black}\n    end\nL2:\n    call 0x18\n    push 2\n    eq\n    jz L3\n    push {gt}\n    end\nL3:\n    push {more}\n    end\n')
     say('gt', "- Ledgic\\n- Uub\\n- Back")
@@ -726,6 +767,7 @@ L1:
     for name, text in steps:
         for m in re.finditer(r'say(?:code)? 0x\w+ "([^"]*)"', text):
             n = len(m.group(1).replace('\\n', ' ')); assert n < 100 and not 64 <= n <= 67, m.group(1)
+            if m.group(1).startswith('- '): assert all(len(l) <= 22 for l in m.group(1).split('\\n')), 'menu line too wide (it wraps and breaks the menu): ' + m.group(1)
     number = {n: k for k, (n, _) in enumerate(steps)}; number['END'] = len(steps)
     return head + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
 
@@ -921,6 +963,38 @@ def player_anim_lengths(clean):
     return out
 
 
+# Super Saiyan 4's ki bar (outfit.c ssj4_hud / ssj4_drain). The HUD's EP bar images are 48x16 8bpp pixel blocks indexed by the offsets of the
+# draw buffer (the three HUD sprites' 0x500 bytes of tiles): green's bar part at 0x7137D8 (copied whole), yellow 0x713AD8, orange 0x713FD8. The purple one is the orange with its five shades swapped for the OBJ palette's purples (no palette change).
+SSJ4_PURPLE = {0x6B: 0x9B, 0x6C: 0x9C, 0x04: 0x93, 0x6D: 0x94, 0x6E: 0x5B}
+BAR_COLS, ORANGE_BAR = 0x71F40, 0x713FD8
+
+
+def ssj4_bar(rom):
+    offs = [struct.unpack_from('<I', rom, BAR_COLS + 16 * c + 4 * k)[0] for c in range(41) for k in range(3)]
+    if not all(o < 0x500 for o in offs):
+        sys.exit('EP bar column table changed')
+    orange = rom[ORANGE_BAR:ORANGE_BAR + 0x500]
+    if not {orange[o] for o in offs} <= set(SSJ4_PURPLE) | {1}:
+        sys.exit('orange EP bar changed: %s' % sorted({orange[o] for o in offs}))
+    return bytes(SSJ4_PURPLE.get(b, b) for b in orange)
+
+
+def thumb_bl(at, to):
+    off = to - (at + 4)
+    return struct.pack('<HH', 0xF000 | (off >> 12) & 0x7FF, 0xF800 | (off >> 1) & 0x7FF)
+
+
+def ssj4_ki_hooks(rom, sym):
+    DRAIN = 0xE506                   # the Super Saiyan 3 class's drain: from here ssj4_drain decides, then jumps back to either branch
+    if rom[DRAIN:DRAIN + 10] != bytes.fromhex('0a14011c20310b889342'):
+        sys.exit('Super Saiyan 3 drain changed: %s' % rom[DRAIN:DRAIN + 10].hex())
+    rom[DRAIN:DRAIN + 10] = bytes.fromhex('014b1847c046') + struct.pack('<I', sym['ssj4_drain'] | 1)
+    HUD = 0xBCAE                     # the HUD's copy of its bars to VRAM: ssj4_hud(widget, buffer) recolours and copies
+    if rom[HUD:HUD + 18] != bytes.fromhex('a08971490522400140181202291c3df03cfa'):
+        sys.exit('HUD copy changed: %s' % rom[HUD:HUD + 18].hex())
+    rom[HUD:HUD + 18] = bytes.fromhex('201c291c024b') + thumb_bl(HUD + 6, 0x46AA6) + bytes.fromhex('02e0c046') + struct.pack('<I', sym['ssj4_hud'] | 1)
+
+
 def add_actors(rom, clean):
     combo = open(COMBO, 'rb').read()
     if hashlib.sha1(combo).hexdigest() != COMBO_SHA1:
@@ -969,7 +1043,7 @@ def add_actors(rom, clean):
     cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg.update(gt.actors(clean, pal, lengths))      # GT: Black Star Odyssey's fighters (bso_import.py; BFU_BSO points at the owner's sheet)
     cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss']
-    ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read())
+    ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, end
 
 
@@ -1072,10 +1146,11 @@ def add_outfits(rom, clean, at, art):
     d = tempfile.mkdtemp()
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
     c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b')) or k in SS2_LIKE), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
+    c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1126,13 +1201,13 @@ def add_outfits(rom, clean, at, art):
     row = SKILLS + 24 * SUPER_BLUE_SKILL                  # Super Saiyan 3's code runs on the form table's up and down, so only the words change
     if struct.unpack_from('<II', rom, row + 4) != (0x08019D25, 0x08019D29):
         sys.exit('skill row %d is in use' % SUPER_BLUE_SKILL)
-    rom[row:row + 24] = rom[SKILLS + 24 * 22:SKILLS + 24 * 23]
+    rom[row:row + 12] = rom[SKILLS + 24 * 22:SKILLS + 24 * 22 + 12]     # SKILLS is a row's +12: names, usable, use. Its level and icons stay (Super Saiyan's)
     struct.pack_into('<HH', rom, row, 1057, 1051)
     row = SKILLS + 24 * SPIRIT_SKILL                     # an unused skill row: its stubs become the Spirit Bomb
     if struct.unpack_from('<II', rom, row + 4) != (0x08019D25, 0x08019D29):
         sys.exit('skill row %d is in use' % SPIRIT_SKILL)
     struct.pack_into('<HHII', rom, row, SPIRIT_NAME, SPIRIT_NAME + 3, sym['spirit_usable'] | 1, sym['spirit_use'] | 1)
-    rom[row + 12:row + 24] = rom[SKILLS + 24 * 15 + 12:SKILLS + 24 * 15 + 24]
+    rom[row - 8:row] = rom[SKILLS + 24 * 15 - 8:SKILLS + 24 * 15]       # the Kamehameha's icons; no level (0xFF, as the stub had)
     row = SKILLS + 24 * 20                               # Super Saiyan's use goes up to Super Saiyan 2 where a form has one; Super Saiyan 3 waits for it
     if struct.unpack_from('<I', rom, row + 8)[0] != 0x0801A513 or struct.unpack_from('<I', rom, SKILLS + 24 * 22 + 4)[0] != 0x0801A55F:
         sys.exit('Super Saiyan skill rows changed')
@@ -1161,6 +1236,7 @@ def add_outfits(rom, clean, at, art):
     if rom[DAMAGE:DAMAGE + 8] != bytes.fromhex('f0b5061c0c1c0831'):
         sys.exit('Combat_Damage changed: %s' % rom[DAMAGE:DAMAGE + 8].hex())
     rom[DAMAGE:DAMAGE + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['combat_hook'] | 1)
+    ssj4_ki_hooks(rom, sym)
     end, art = add_eraser(rom, clean, sym, at + len(code), art)    # after the row edits above: it moves the skill table
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:
@@ -1444,6 +1520,10 @@ def add_eraser(rom, clean, sym, at, art):
             struct.pack_into('<I', rom, o, new); n += 1
     if n != 51:
         sys.exit('UI table: expected 51 references, found %d' % n)
+    t = struct.unpack_from('<I', rom, 0x13618)[0] - ROM_BASE      # the retail moves keep their level byte and icons (row +0..+11)
+    bad = [k for k in range(ERASER_SKILL) if k not in (SPIRIT_SKILL, SUPER_BLUE_SKILL) and rom[t + 24 * k:t + 24 * k + 12] != clean[SKILL_ROWS + 24 * k:SKILL_ROWS + 24 * k + 12]]
+    if bad:
+        sys.exit('skill rows %s lost their level or icons' % bad)
     return at, art
 
 
@@ -1543,7 +1623,7 @@ def main():
     rom = bytearray(open('buusfury_modern.gba', 'rb').read())
     if len(rom) != 0x800000 or set(rom[-16:]) != {0xFF}:
         sys.exit('modern ROM has outgrown the 8 MB base; move SPACE')
-    rom += b'\xff' * 0x800000
+    rom += b'\xff' * (0x1800000 if ROM32 else 0x800000)
     actors, actors_end = add_actors(rom, clean)
     index, free = patch_forms(rom, clean, cfg, actors)
     os.makedirs(OUT, exist_ok=True)
@@ -1568,10 +1648,16 @@ def main():
         struct.pack_into('<I', rom, tab + 4 * DEBUG_NATIVE, ROM_BASE + at + 1)
     os.makedirs(OUT, exist_ok=True)
     name = ('BFU_debug_enemy' if '--enemy' in sys.argv else 'BFU_debug_zone' if '--zone' in sys.argv else 'BFU_debug') if debug else 'BFU'
-    print('room left: code %d KB, art %d KB' % ((ACTORS_AT - free) >> 10, (0x1000000 - actors_end) >> 10))
-    if free >= ACTORS_AT or actors_end > 0x1000000:
-        sys.exit('ROM layout overflow: code ends %X (limit %X), sprites end %X' % (free, ACTORS_AT, actors_end))
-    size = (actors_end + 0xFFFFF) & ~0xFFFFF
+    high_end = sprites.HIGH_END or 0x1000000
+    print('room left: code %d KB, art %d KB%s' % ((ACTORS_AT - free) >> 10, (0x1000000 - actors_end) >> 10, ', above 16 MB %d KB' % ((0x2000000 - high_end) >> 10) if ROM32 else ''))
+    if free >= ACTORS_AT or actors_end > 0x1000000 or high_end > 0x2000000:
+        sys.exit('ROM layout overflow: code ends %X (limit %X), sprites end %X, high sprites end %X' % (free, ACTORS_AT, actors_end, high_end))
+    if ROM32:
+        import rom32
+        rom32.apply(rom, clean)                       # BF's EEPROM at 0x0DFFFF00, where a 32 MB cartridge answers
+        size = rom32.SIZE
+    else:
+        size = (actors_end + 0xFFFFF) & ~0xFFFFF
     out = bytes(rom[:size])
     if bps.apply(clean, bps.make(clean, out)) != out:
         sys.exit('BPS round trip failed')

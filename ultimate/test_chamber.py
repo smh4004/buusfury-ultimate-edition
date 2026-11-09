@@ -89,6 +89,43 @@ for c, (cat, people) in enumerate(zone26.SPAR):
         check('%s: the win comes back to the Lookout, rested' % name, at() == (1 << 8 | 6))
         room += 1
 print(exp)
+# Waves: a group's four in a row with no rest; the first clear gives stat points, a later one Zenie.
+FLAGS2 = 0x0203F1E2
+def more(n): a = FLAGS2 + (n - 32) // 8; return mem(a & ~3)[0] >> (8 * (a & 3) + n % 8) & 1
+for c, (cat, people) in enumerate(list(zone26.SPAR) + [zone26.SPAR[0]]):
+    c %= len(zone26.SPAR); again = more(zone26.MORE_WAVE + c)
+    talk(288, 472); send('run 220', 'tap A 20', 'run 100', *['tap DOWN 12'] * 3, 'tap A 20', 'run 100', *['tap DOWN 12'] * 3, 'tap A 20', 'run 100')
+    if c == 0 and not again: sheet('waves_say')
+    send('tap A 20', 'run 100')
+    if c == 0 and not again: sheet('waves_menu')
+    send(*(['tap DOWN 12'] * c if c < 3 else ['tap DOWN 12'] * 3 + ['tap A 20', 'run 100'] + ['tap DOWN 12'] * (c - 3)), 'tap A 20', 'run 160')
+    pts0, z0 = mem(REC0 + 0x2C)[0] & 255, mem(0x0300155C)[0]
+    ok = True
+    for k, (name, row, char) in enumerate(people):
+        room = zone26.challenge_room('wave%d' % c, k)
+        for _ in range(10):
+            if at() == (room << 8 | 26) and mem(ENEMIES)[0]: break
+            send('run 60')
+        ok &= at() == (room << 8 | 26)
+        if k == 0: sheet('wave%d_%s' % (c, 'again' if again else 'first'))
+        for attempt in range(30):                        # some story foes (Buu with Gotenks) don't show in the enemy count: go by the list and the room
+            if at() != (room << 8 | 26): break
+            foe = mem(ENEMIES)[0]
+            if not foe: send('run 60'); continue
+            x, y = mem(foe + 0x1A0, 2); pl = mem(PLAYER)[0]
+            send('poke %08X %08X' % (foe + 0x28C, 2 << 10), 'poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17))
+            send('poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (20 << 8)), 'poke8 %08X 01' % (pl + 0x10), 'run 2', 'tap A 14', 'tap A 14', 'tap A 14', 'run 40')
+        ok &= at() != (room << 8 | 26)
+    check('wave %s: all four rooms in turn' % cat, ok)
+    for _ in range(14):
+        send('run 180', 'tap A 20')
+        if at() == (1 << 8 | 6): break
+    send('run 60')
+    check('wave %s: back to the Lookout' % cat, at() == (1 << 8 | 6))
+    pts, z = mem(REC0 + 0x2C)[0] & 255, mem(0x0300155C)[0]
+    print('   wave %s: points %d -> %d, Zenie %d -> %d' % (cat, pts0, pts, z0, z))       # level-ups on the way add their own points
+    if again: check('wave %s again: %d Zenie' % (cat, zone26.WAVE_ZENIE), z - z0 >= zone26.WAVE_ZENIE)
+    else: check('wave %s: first clear gives %d stat points and marks it' % (cat, zone26.WAVE_POINTS), pts - pts0 >= zone26.WAVE_POINTS and more(zone26.MORE_WAVE + c) == 1)
 # Losing: no game over, back to the Lookout rested, and the next fight works.
 def lose(tag):
     room = zone26.spar_first() + 10                              # Kid Buu hits hard and often

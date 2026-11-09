@@ -46,6 +46,9 @@ class Inserter:
         self.rom, self.cur = rom, at
 
     def put(self, data):
+        if getattr(self, 'high_on', False):           # an actor marked high: the area above 16 MB (32 MB builds)
+            a = self.hcur; self.rom[a:a + len(data)] = data; self.hcur = (a + len(data) + 3) & ~3
+            return BASE + a
         a = self.cur; self.rom[a:a + len(data)] = data; self.cur = (a + len(data) + 3) & ~3
         return BASE + a
 
@@ -216,15 +219,20 @@ def stretch(dirs, n):
     return [[d[i] for i in idx] for d in dirs]
 
 
-def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
+HIGH_END = None
+
+
+def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, high=None):
     """cfg: {name: {"template": actor id, "slots": {slot: sheet id}}}. Moves the actor table to `at`, appends one
     actor per entry (record cloned from the template, animation slots replaced), returns ({name: actor id}, end)."""
     ins = Inserter(rom, at + 4 * (ACTOR_COUNT + len(cfg)) + 16)
+    ins.hcur = high                                        # start of the high area, or None: everything goes low
     table = list(struct.unpack_from('<%dI' % ACTOR_COUNT, rom, ACTOR_LIST))
     ids = {}; anims = {}
     for name, a in cfg.items():
         if name.startswith('_'): continue
         ins.compress = a.get('compress', False)            # WFZ-compressed tile blocks (only the actors that ask)
+        ins.high_on = bool(a.get('high')) and high is not None
         target = a.get('replace')                          # modify an existing actor instead of adding one
         if 'bolts_of' in a:                                # a copy of an actor with lightning on its frames: its source is built first
             src = a['bolts_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
@@ -320,6 +328,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
             ids[name] = len(table); table.append(ins.put(bytes(rec)))
     # Transforming plays slot 10, and an empty one draws junk from address 0 over other sprites' tiles. Gohan's orange gi (actor 101) never transformed in the original; here it does.
     # Going from Super Saiyan to Super Saiyan 2 plays the power-up on the Super Saiyan actor, and most have no slot 10 (Goku's does): 11 frames of their own ki pose, as long as a retail power-up.
+    ins.high_on = False
     for key in cfg.get('_powerup', ()):
         at_ = key if isinstance(key, int) else ids[key]
         o = table[at_] - BASE; n = struct.unpack_from('<I', rom, o)[0] & 0xFF; rec = bytearray(rom[o:o + 0x54 + 4 * n])
@@ -333,8 +342,10 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None):
     rom[at:at + 4 * len(table)] = struct.pack('<%dI' % len(table), *table)
     for lit in ACTOR_LITERALS:
         struct.pack_into('<I', rom, lit, BASE + at + 4)
-    ins.compress = False
+    ins.compress = ins.high_on = False
     wfz_cache_save()
+    global HIGH_END
+    HIGH_END = ins.hcur
     return ids, ins.cur
 
 

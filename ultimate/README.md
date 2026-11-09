@@ -15,6 +15,10 @@ python3 ultimate/build.py --debug --zone
 python3 ultimate/test_zone26.py && python3 ultimate/test_story.py
 ```
 Output goes to `ultimate/out/` (git-ignored). Share only `.bps` patches. New forms are defined in `ultimate/forms.json`.
+
+The ROM is 32 MB: the GT fighters' frames sit above 16 MB, and `ultimate/lib/rom32.py` (from Black Star Odyssey) moves BF's
+EEPROM address from 0x0D000000 to 0x0DFFFF00, where a 32 MB cartridge answers (GBATEK; smaller carts answer there too). Saves keep
+their 8 KB layout, so a save from a 16 MB build loads. `--rom16` builds the old 16 MB layout as a fallback.
 The debug build starts with Vegito and guest Broly, and opens Switch Character then saves when the intro ends.
 
 ## Outfits
@@ -29,6 +33,12 @@ tiles WFZ-compressed (`wfz.compress`, from Gero's tools; cached in `ultimate/out
 Vegeta get GT outfits with their transformations (Kid Goku: Super Saiyan 3 pressed again is Super Saiyan 4; GT Vegeta: Super Saiyan
 pressed again), Gogeta a Super Saiyan 4 look, and Pan, Brapan (BSO's Bulma-Pan fusion) and Uub join the guest slot. Ledgic and Uub are on the Challenge Board.
 `python3 ultimate/test_gt.py` plays every look and transformation; `test_ladder.py` plays the GT challenges.
+
+Super Saiyan 4 has its own ki bar. A transformed form spends and drains one pool (Super Saiyan's, drawn yellow over the green EP bar, or
+Super Saiyan 3's, orange) and powers down when it runs dry. Super Saiyan 4 uses Super Saiyan 3's pool, drawn purple from the OBJ palette's
+own purples (no palette change), and keeps the orange the fighter had left as a second bar. Only one drains at a time, at half Super
+Saiyan 3's rate: the purple first, while the orange waits; then the orange, then the form powers down (`outfit.c` `ssj4_hud`, `ssj4_drain`; hooks at 0x0800BCAE and 0x0800E506). Damage: Super Saiyan 4 hits 2.5x
+Super Saiyan, Gogeta's 3x (`combat_hook`). `python3 ultimate/test_ki.py` (on the `--debug --enemy` build) plays both.
 
 ## Zone 26 and Super 13
 

@@ -65,7 +65,7 @@ def actors(clean, pal, lengths):
             if s in have or s >= n: continue
             alt = next((a for a in FILL.get(s, (0,)) + (0,) if _pick(frames[name], a) is not None), 0)
             have[s] = _pick(frames[name], alt); missing.append((s, alt))
-        cfg = {'template': tpl, 'raw_frames': {str(k): v for k, v in sorted(have.items()) if k < n}, 'compress': True}
+        cfg = {'template': tpl, 'raw_frames': {str(k): v for k, v in sorted(have.items()) if k < n}, 'compress': True, 'high': True}   # above 16 MB in a 32 MB build
         if name == 'ledgic': cfg['big'] = True
         else: cfg['grow'] = lengths
         out[name] = cfg

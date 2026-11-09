@@ -39,10 +39,15 @@ out = run(b); check('the debug door reaches Broly at Volcano Summit', at(out) ==
 room = b[:b.index('shot broly_room') + 1]
 run(room + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read(); i = w.find(struct.pack('<I', 20240 << 10))
 check('Broly is in the room at full HP', i >= 0)
+# Broly guards for a while (how long moves with the build's timing): keep striking, a few blows at a time, until one lands.
 run(b + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read()
 x, y = struct.unpack_from('<II', w, i - 0xEC); p2 = ptr(b)
 kill = b + ['poke %08X %08X' % (0x02000000 + i, 2 << 10), 'poke8 03001577 7F', 'poke %08X %08X' % (p2 + 0x1A0, x), 'poke %08X %08X' % (p2 + 0x1A4, y + (20 << 8)), 'keys UP', 'run 6', 'keys']
-kill += ['tap A 14'] * 6 + ['poke8 03001577 7F', 'run 500', 'shot broly_end0', 'tap A 100', 'shot broly_end1', 'tap A 100', 'tap A 100', 'tap A 100', 'run 60', 'shot broly_end2', 'run 500', 'shot broly_end3', 'tap A 60', 'shot broly_end4', 'tap A 60', 'run 300', 'shot broly_end5', DUMP, 'keys LEFT', 'run 20', 'keys', 'mem 03001C34 1']
+for k in range(8):
+    kill += ['tap A 14'] * 6
+    run(kill + ['dump w 02000000 40000'])
+    if struct.unpack_from('<I', open(d + '/w.bin', 'rb').read(), i)[0] != 2 << 10: break        # a blow landed
+kill += ['poke8 03001577 7F', 'run 500', 'shot broly_end0', 'tap A 100', 'shot broly_end1', 'tap A 100', 'tap A 100', 'tap A 100', 'run 60', 'shot broly_end2', 'run 500', 'shot broly_end3', 'tap A 60', 'shot broly_end4', 'tap A 60', 'run 300', 'shot broly_end5', DUMP, 'keys LEFT', 'run 20', 'keys', 'mem 03001C34 1']
 out = run(kill); flag, rec = state(); r = rec(8)
 check('no bad jumps through the end of the Broly fight', 'bad pc' not in out)
 check('beating Broly sets flag 111 and adds him to the party', flag(111) == 1 and r[0] & 1 == 1)

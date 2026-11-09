@@ -68,10 +68,13 @@ def outfit_steps(c, start, want):
 
 def case(name, c, look, skills, steps, pos, poke_form=None):
     """steps: (skill, the form it should leave, tag). skills: the record's skill list for the test (all learned)."""
-    if c not in pos:                                     # not in this party (Gogeta): the form, worn by whoever is first on the picker
+    if c not in pos and c != 7:                                   # not in this party (Gogeta): the form, worn by whoever is first on the picker
         poke_form = poke_form or look; c = min(pos, key=pos.get)
     r = Rig(name); R = RECS + c * RS
-    r.send('guardon 0x09000000', *route); r.send('tap A 60', 'tap A 60', 'run 30'); r.mem(G)
+    r.send('guardon 0x09000000', *route)
+    if c == 7:                                           # Gogeta joins (his record's first byte), as in test_build: on the picker after Vegito
+        r.send('poke8 %08X 03' % R); pos = dict(pos); pos[7] = max(p for k, p in pos.items() if k != 8) + 2
+    r.send('tap A 60', 'tap A 60', 'run 30'); r.mem(G)
     if poke_form is not None:
         r.send(*['tap RIGHT 40'] * pos[c]); r.send('poke8 %08X %02X' % (R + 0x14, F(poke_form)), 'run 4'); r.snap('picker'); r.send('tap A 200', 'run 60')
     else:
@@ -93,7 +96,7 @@ def case(name, c, look, skills, steps, pos, poke_form=None):
     walk('stand')
     r.send('keys LEFT', 'run 4', 'keys', 'run 2', 'tap A 8', 'run 4'); r.snap('punch'); r.send('run 30')
     for s in skills:
-        if s in (7, 8, 15, 16, 17): use(s, 30 if s == 15 else 10, 60, shots=3, gap=10, tap=s == 7)
+        if s in (3, 5, 7, 8, 15, 16, 17): use(s, 30 if s in (3, 5, 15) else 10, 90 if s in (3, 5) else 60, shots=4 if s in (3, 5) else 3, gap=10, tap=s == 7)
     for skill, want, tag in steps:
         use(skill, 4, 0, shots=6, gap=10)
         for _ in range(20):                          # a transformation takes a few seconds (Majuub's longer), and so does changing back
@@ -128,7 +131,8 @@ CASES = [
     ('pan_bug', 8, 'pan_bug', [7, 8], []), ('pan_brapan', 8, 'pan_brapan', [7, 8], []),
     ('uub', 8, 'uub', [7, 8, 15, MAJUUB], [(MAJUUB, 'majuub', 'Majuub'), (MAJUUB, 'uub', 'Majuub off')]),
 ]
-EXTRA = [('gogeta_ssj4', 0, None, [7, 15], [], 'gogeta_ssj4')]
+EXTRA = []
+CASES.append(('gogeta_ssj4', 7, 'gogeta_ssj4', [7, 3, 5], []))    # Gogeta's own moves: Energy Blast, Big Bang Kamehameha, Dragon Fist Explosion
 only = os.environ.get('GT_ONLY')
 jobs = [threading.Thread(target=case, args=(n, c, l, s, st, pos)) for n, c, l, s, st in CASES if not only or n in only.split(',')]
 jobs += [threading.Thread(target=case, args=(n, c, l, s, st, pos, pf)) for n, c, l, s, st, pf in EXTRA if not only or n in only.split(',')]

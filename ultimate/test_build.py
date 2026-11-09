@@ -240,12 +240,13 @@ check('charged: no bad jumps', 'bad pc' not in o)
 check('charged: release hurts the enemy', hp[2] < hp[1])
 check('charged: stronger than the normal hit before it', hp[1] - hp[2] > hp[0] - hp[1] > 0)
 # Super Saiyan 2 hits 1.5x as hard as Super Saiyan, punches and ki. The Bomber waits out of reach during the transformations (it blows itself up near the player). The first press after the walk-in does nothing in this scene.
-def dmg(presses, blast, wait, form=None):
+def dmg(presses, blast, wait, form=None, swap=None):
     R_ = 0x03001560; away = ['poke %s %x' % (ENEMY_X, x + (120 << 8)), 'poke %s %x' % (ENEMY_Y, y)]
     L = base + ['poke8 %08X 03' % (R_ + 0x0C), 'poke8 %08X 07' % (R_ + 0x0D), 'poke8 %08X 14' % (R_ + 0x0E), 'poke8 %08X 16' % (R_ + 0x0F), 'run %d' % wait]
     if form is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, form)]           # another look of Goku's (GT Kid Goku) before the presses
     for p_ in presses:
         L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 03' % (R_ + 0x1B), 'keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in away + ['run 30']]
+    if swap is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, swap)]           # the form the damage scale reads, on the actor the presses loaded
     o_ = run(erom, L + ['mem %s 2' % PX], d); m_ = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o_)[-1]
     px, py = int(m_[0], 16), int(m_[1], 16); near = ['poke %s %x' % (ENEMY_X, px - ((40 if blast else 18) << 8)), 'poke %s %x' % (ENEMY_Y, py)]
     L += away + ['run 1', 'poke %s %x' % (ENEMY_HP, 9000 << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']     # the Bomber punches back if it arrives early
@@ -262,11 +263,18 @@ for kind, blast_ in (('punch', 0), ('ki blast', 1)):
     lo, hi, top = min(v for v, _ in a_), min(v for v, _ in b_), min(v for v, _ in c_)
     check('Super Saiyan 2 %s is about 1.5x Super Saiyan' % kind, all(f_ == 4 for _, f_ in a_) and all(f_ == forms['goku_ss2_b'] for _, f_ in b_) and lo > 0 and 1.3 < hi / lo < 1.7)
     check('Super Saiyan 3 %s is about 1.75x Super Saiyan' % kind, all(f_ == 6 for _, f_ in c_) and lo > 0 and (1.55 < top / lo < 1.95 or 1.55 < top / lo / 1.5 < 1.95))   # a critical hit is 1.5x again
-    # GT Kid Goku: Super Saiyan, then Super Saiyan 3 pressed twice is Super Saiyan 4, twice Super Saiyan's damage
+    # GT Kid Goku: Super Saiyan, then Super Saiyan 3 pressed twice is Super Saiyan 4, 2.5x Super Saiyan's damage
     k1 = [dmg([1, 1], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]; k4 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]
     print(kind, 'Kid Super Saiyan', k1, 'Kid Super Saiyan 4', k4)
     lo_, s4 = min(v for v, _ in k1), min(v for v, _ in k4)
-    check('Kid Goku Super Saiyan 4 %s is about 2x his Super Saiyan' % kind, all(f_ == forms['kid_goku_ssj'] for _, f_ in k1) and all(f_ == forms['kid_goku_ssj4'] for _, f_ in k4) and lo_ > 0 and (1.75 < s4 / lo_ < 2.25 or 1.75 < s4 / lo_ / 1.5 < 2.25))
+    check('Kid Goku Super Saiyan 4 %s is about 2.5x his Super Saiyan' % kind, all(f_ == forms['kid_goku_ssj'] for _, f_ in k1) and all(f_ == forms['kid_goku_ssj4'] for _, f_ in k4) and lo_ > 0 and (2.25 < s4 / lo_ < 2.75 or 2.25 < s4 / lo_ / 1.5 < 2.75))
+    # Gogeta's Super Saiyan 4 hits 3x as hard as his form would without the boost. The scale goes by the form, so on one loaded actor (Kid
+    # Goku's Super Saiyan 4, with his strikes and stats) the form is set to Gogeta's, then to plain Kid Goku's (no boost, and neither is
+    # Super Saiyan 3's class, so the stats are the same): the ratio is the boost alone. His own moves are test_gt's.
+    g4 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku'], forms['gogeta_ssj4']) for w_ in (1, 4, 7)]
+    g1 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku'], forms['kid_goku']) for w_ in (1, 4, 7)]
+    print(kind, 'Gogeta Super Saiyan 4', g4, 'unboosted', g1)
+    check('Gogeta Super Saiyan 4 %s is 3x unboosted' % kind, all(f_ == forms['gogeta_ssj4'] for _, f_ in g4) and min(v for v, _ in g1) > 0 and any(2.7 < a[0] / b[0] < 3.3 for a, b in zip(g4, g1)))
 for name, rights in (('Goku', 0), ('Gohan', 1), ('Trunks', 2), ('Vegeta', 3), ('Vegito', 4), ('Broly', 5)):
     o = run(rom, ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * rights + ['tap A 150', 'run 100', 'keys A', 'run 80', 'shot hold_' + name, 'keys', 'run 3', 'shot hit_' + name, 'run 40', 'tap A 20', 'dump n 03001068 8a8'], d)
     check('charged %s: no bad jumps' % name, 'bad pc' not in o)

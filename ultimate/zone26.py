@@ -219,8 +219,45 @@ BLACK_ROW, BLACK_FIGHT = 61, (('goku_black', 60000, (155, 90, 100, 90)), ('goku_
 # with Kid Buu's (beams). Each fight: its stats row, then [(actor, HP, stats)], then the flag its win sets.
 LEDGIC_ROW, LEDGIC_FIGHT = 12, (('ledgic', 70000, (156, 100, 60, 105)),)
 UUB_ROW, UUB_FIGHT = 61, (('uub', 60000, (155, 95, 100, 90)), ('majuub', 90000, (160, 105, 120, 105)))
-CHALLENGES = (('black', BLACK_ROW, BLACK_FIGHT, MORE_BLACK_WON), ('ledgic', LEDGIC_ROW, LEDGIC_FIGHT, MORE_LEDGIC_WON), ('uub', UUB_ROW, UUB_FIGHT, MORE_UUB_WON))
 SPAR_EXP, SPAR_MIN_HP, SPAR_ROOM, SPAR_HOME = 4, 2000, (6, 9), (288, 500)
+# Trials II (More, then Next): the same four heroes against harder story foes, once the first four are paid. Party slot, name, enemy row, character, opponent, equipment, its name.
+TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115, 49, 'Super Buu', 75, 'Geromantis Gloves'),
+           (3, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (4, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
+TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 60000, (43, 76, 111)   # all four: Geromantium Kataginu, Gloves and Tabi, with ten Senzu Beans
+MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
+MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
+# Time Chamber waves (Mr. Popo, Waves): a category's four partners in a row, no rest between, 1.5x their health. The first clear of each gives WAVE_POINTS stat points, later ones Zenie.
+WAVE_HP, WAVE_POINTS, WAVE_ZENIE = (3, 2), 3, 30000
+# Dojo (More, then Next): fight a CPU copy of a fighter you have, on Kid Buu's row (beams, so it can clash with you).
+# (name, character number or actor name, what unlocks it: None, ('flag', n) or ('more', n), as their guest outfits)
+DOJO = (('Saiyans', (('Goku', 115, None), ('Vegeta', 279, None), ('Gohan', 110, None))),
+        ('Friends', (('Piccolo', 'piccolo', ('flag', 879)), ('Android 18', 'android18', ('flag', 880)), ('Pan', 'pan', ('more', MORE_GT)))),
+        ('Rivals', (('Broly', 38, ('flag', 111)), ('Goku Black', 'goku_black', ('more', MORE_BLACK)), ('Uub', 'uub', ('more', MORE_UUB)))))
+DOJO_HP, DOJO_STATS, DOJO_ROW, DOJO_PRIZE = 40000, (152, 85, 85, 85), 61, 20000
+
+
+def _challenge(who, fights, end='', room='stadium', home=None, won=None):
+    """One challenge: fights [(actor or character, HP or None for its row's, stats or None, row)], each in its own room; the last one's fall
+    runs `end`, sets `won` (a more flag) and sends you home (the Challenge Board unless `home` says (area, room, x, y))."""
+    return dict(who=who, fights=fights, end=end, room=room, home=home or (3, 1, 208, 134), won=won)
+
+
+def dojo_list():
+    return [f for _, people in DOJO for f in people]
+
+
+def challenges():
+    out = [_challenge('black', [(a, hp, st, BLACK_ROW) for a, hp, st in BLACK_FIGHT], won=MORE_BLACK_WON),
+           _challenge('ledgic', [(a, hp, st, LEDGIC_ROW) for a, hp, st in LEDGIC_FIGHT], won=MORE_LEDGIC_WON),
+           _challenge('uub', [(a, hp, st, UUB_ROW) for a, hp, st in UUB_FIGHT], won=MORE_UUB_WON)]
+    out += [_challenge('trial2_%d' % k, [(char, TRIAL2_HP, TRIAL2_STATS, row)], won=MORE_T2_WON + k) for k, (_, _, row, char, *_r) in enumerate(TRIALS2)]
+    for k, (_, people) in enumerate(SPAR):
+        prize = ('    pushn %d\n    call 0x%X\n    jz W1\n    pushn %d\n    call 0x%X\n    push 0\n    jz W2\nW1:\n    pushn %d, 1\n    call 0x%X\n    pushn %d, %d\n    call 0x%X\nW2:\n'
+                 % (MORE_WAVE + k, MORE_GET, WAVE_ZENIE, ADD_ZENIE, MORE_WAVE + k, MORE_PUT, MORE_POINTS, WAVE_POINTS, MORE_PUT))
+        out.append(_challenge('wave%d' % k, [(char, 'wave', None, row) for _, row, char in people], spar_off() + prize, 'white', (6, 1) + SPAR_HOME))
+    out += [_challenge('dojo%d' % k, [(actor, DOJO_HP, DOJO_STATS, DOJO_ROW)], '    pushn %d\n    call 0x%X\n' % (DOJO_PRIZE, ADD_ZENIE)) for k, (_, actor, _) in enumerate(dojo_list())]
+    return out
+
 # Cell Games, from the Challenge Board: LoG2's arena, four fights in a row. Name, row whose behaviour it uses, HP, (level + 50, Strength, Power, Endurance), actor, how many.
 # Perfect Cell takes Kid Buu's row: he fires beams, so he can clash with you. All health carries over, as in the Boss Rush.
 CELL = (('Imperfect Cell', 115, 30000, (145, 65, 60, 55), 'cell_imperfect', 1),
@@ -299,9 +336,9 @@ def hercule_room():
 def challenge_room(name, k=0):
     """Room of fight k of a challenge (CHALLENGES order, each fight its own room after Hercule's)."""
     n = hercule_room() + 1
-    for who, _, fights, _ in CHALLENGES:
-        if who == name: return n + k
-        n += len(fights)
+    for c in CHALLENGES:
+        if c['who'] == name: return n + k
+        n += len(c['fights'])
     raise KeyError(name)
 
 
@@ -343,6 +380,9 @@ def spar_on():
 
 def spar_off():
     return ''.join('    pushn %d\n    call clear_flag\n' % f for f in CELL_COUNT)
+
+
+CHALLENGES = challenges()
 
 
 def tour_list():
@@ -421,13 +461,19 @@ def rush_rows(W, rom, harmless=False):
     struct.pack_into('<I', r, 4, HERCULE_HP); r[0xC:0x10] = bytes(HERCULE_STATS)
     struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm('    pushn %d, 1\n    call 0x%X\n    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % (MORE_HERC_WON, MORE_PUT)))))
     rows += r
-    for who, row, fights, won in CHALLENGES:                 # Black falls and Rose comes on; Rose falls and you go home, as after Hercule. The same for each challenge.
-        for k, (_, hp, stats) in enumerate(fights):
+    for c in CHALLENGES:                 # Black falls and Rose comes on; Rose falls and you go home, as after Hercule. The same for each challenge.
+        fights = c['fights']; arrive = (360, 420) if c['room'] == 'stadium' else (120, 150)
+        for k, (_, hp, stats, row) in enumerate(fights):
             r = bytearray(rom[STATS + 28 * row:STATS + 28 * (row + 1)])
-            struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)
+            if hp == 'wave':                                   # a Time Chamber wave: the partner's story row, as sparring has it, with half again its health
+                struct.pack_into('<I', r, 0, struct.unpack_from('<I', r, 0)[0] * SPAR_EXP // 10)
+                struct.pack_into('<I', r, 4, max(struct.unpack_from('<I', r, 4)[0], SPAR_MIN_HP) * WAVE_HP[0] // WAVE_HP[1])
+            else:
+                struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)
             if harmless: r[0xD] = r[0xE] = 0
-            then = ('    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    end\n' % challenge_room(who, k + 1) if k + 1 < len(fights) else
-                    '    pushn %d, 1\n    call 0x%X\n    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % (won, MORE_PUT))
+            then = ('    call 0x78(30)\n    pushn 26, %d, 1, %d, %d\n    call 0x77\n    call 0x79(30)\n    end\n' % ((challenge_room(c['who'], k + 1),) + arrive) if k + 1 < len(fights) else
+                    c['end'] + ('    pushn %d, 1\n    call 0x%X\n' % (c['won'], MORE_PUT) if c['won'] is not None else '')
+                    + '    call max_hp\n    set hp\n    call max_ki\n    set ki\n    call 0x78(60)\n    pushn %d, %d, 1, %d, %d\n    call 0x77\n    call 0x79(30)\n    call 0x2F\n    call 0x33(0)\n    end\n' % c['home'])
             struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
             rows += r
     at = W.put(bytes(rows))
@@ -601,10 +647,11 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
     e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row, 366 << 16 | 360, HERCULE_CHAR, 0x080555A0, 1, 0x080716EC))
     struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
     rows.append(bytes(st))
-    fights = [(who, k, actor) for who, _, fs, _ in CHALLENGES for k, (actor, _, _) in enumerate(fs)]
-    for i, (who, k, actor) in enumerate(fights):
-        st = bytearray(stadium); st[0] = 26; st[1] = challenge_room(who, k); st[3] = 0
-        e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row + 1 + i, 366 << 16 | 360, actor_ids[actor] + 9, 0x080555A0, 1, 0x080716EC))
+    fights = [(c, k, actor) for c in CHALLENGES for k, (actor, *_r) in enumerate(c['fights'])]
+    for i, (c, k, actor) in enumerate(fights):
+        st = bytearray(stadium if c['room'] == 'stadium' else white); st[0] = 26; st[1] = challenge_room(c['who'], k); st[3] = 0
+        char = actor_ids[actor] + 9 if isinstance(actor, str) else actor
+        e = W.put(struct.pack('<8I', 0x0800FD55, 0, tier_row + 1 + i, (366 << 16 | 360) if c['room'] == 'stadium' else (80 << 16 | 120), char, 0x080555A0, 1, 0x080716EC))
         struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
         rows.append(bytes(st))
     hub_person(W, rom)

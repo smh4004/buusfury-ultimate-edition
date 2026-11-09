@@ -82,7 +82,7 @@ static void guest_sync(void) {
 #define BENCH_MAGIC 0x32484342
 #define GROUPS 21
 struct entry { u8 gear[4], maxhp[2], maxki[2], exp[4], stats[4], unspent, levels[5]; };
-struct bench { u32 magic, gen, sum; u8 flags[4], used[4]; struct entry e[GROUPS]; u8 spare[14]; };
+struct bench { u32 magic, gen, sum; u8 flags[4], used[4]; struct entry e[GROUPS]; u8 flags2[4], spare[10]; };   /* flags2: more flags 32-63 (older saves: zero) */
 #define BENCH (*(struct bench *)0x0203F000)
 typedef char bench_size_ok[sizeof(struct bench) == 496 && sizeof(struct entry) == 22 ? 1 : -1];
 /* Version 1, as earlier builds saved it: read once and converted. 11 full entries, then 4 small ones running through the tail and on into more[]. */
@@ -115,7 +115,7 @@ static void bytes_zero(u8 *to, int n) { while (n-- > 0) *to++ = 0; }
 static u32 gen_of(const u8 *game) { return game[GEN_AT] | game[GEN_AT + 1] << 8; }
 static u32 sum_bytes(u32 sum, const u8 *p, int n) { while (n-- > 0) sum = sum * 31 + *p++; return sum; }
 static u32 bench_sum(const struct bench *b) {
-    u32 sum = sum_bytes(b->gen ^ 0x5A5B, b->flags, sizeof b->flags + sizeof b->used + sizeof b->e + sizeof b->spare);
+    u32 sum = sum_bytes(b->gen ^ 0x5A5B, b->flags, sizeof b->flags + sizeof b->used + sizeof b->e + sizeof b->flags2 + sizeof b->spare);
     return sum;
 }
 static u32 v1_sum(const struct v1_bench *b) {
@@ -208,16 +208,27 @@ static void bench_bump(void) {
 }
 
 /* Saved flags past the story's, kept with the bench. The story's flag array has no room left. */
-int more_flag(int f) { bench_ready(); return BENCH.flags[f >> 3] >> (f & 7) & 1; }
+static u8 *more_byte(int f) { return f < 32 ? &BENCH.flags[f >> 3] : &BENCH.flags2[(f - 32) >> 3]; }   /* 0-31, then 32-63 */
+int more_flag(int f) { bench_ready(); return *more_byte(f) >> (f & 7) & 1; }
 static void more_flag_set(int f, int on) {
     bench_ready();
-    if ((BENCH.flags[f >> 3] >> (f & 7) & 1) == on) return;
-    if (on) BENCH.flags[f >> 3] |= 1 << (f & 7); else BENCH.flags[f >> 3] &= ~(1 << (f & 7));
+    if ((*more_byte(f) >> (f & 7) & 1) == on) return;
+    if (on) *more_byte(f) |= 1 << (f & 7); else *more_byte(f) &= ~(1 << (f & 7));
     bench_bump();
 }
-/* Script natives: more_get(n) and more_put(n, value). */
+/* Script natives: more_get(n) and more_put(n, value). more_put(MORE_POINTS, n) instead gives whoever is playing n stat points to spend (a Time Chamber wave's prize). */
+#define MORE_POINTS 255
 void more_get(int *sp) { int n = *sp; sp[n] = more_flag(sp[n]); }
-void more_put(int *sp) { int n = *sp; more_flag_set(sp[n - 1], sp[n] != 0); *sp = n - 2; }
+void more_put(int *sp) {
+    int n = *sp, f = sp[n - 1], v = sp[n];
+    *sp = n - 2;
+    if (f == MORE_POINTS) {
+        u8 *r = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE;
+        r[0x2C] = r[0x2C] + v > 255 ? 255 : r[0x2C] + v;
+        return;
+    }
+    more_flag_set(f, v != 0);
+}
 
 #define MORE_FLAG 0x7D0                      /* an outfit's flag from here up is more_flag(flag - MORE_FLAG) */
 static int outfit_open(const struct outfit *o) {
@@ -1327,9 +1338,10 @@ static int has_ss2_above(const u8 *record) {
 }
 static void power_up(void *sprite, const void *vt);
 static int is_ssj4(int form);
+static void ssj4_pending(const u8 *record);
 void ss_use(u8 *record, void *sprite) {
     if (has_ss2_above(record)) {
-        if (is_ssj4(form_table[record[0x14] * 24 + 0x16])) power_up(sprite, ssj4_vt);   /* GT Vegeta's Super Saiyan 4: a red aura */
+        if (is_ssj4(form_table[record[0x14] * 24 + 0x16])) { ssj4_pending(record); power_up(sprite, ssj4_vt); }   /* GT Vegeta's Super Saiyan 4: a red aura */
         else SS3_Use(record, sprite);
     }
     else SS_Use(record, sprite);
@@ -1352,7 +1364,7 @@ static void power_up(void *sprite, const void *vt) {
     Sprite_SetBehaviour(sprite, state);
 }
 void ss3_use(u8 *record, void *sprite) {
-    if (ss4_above(record)) power_up(sprite, ssj4_vt);
+    if (ss4_above(record)) { ssj4_pending(record); power_up(sprite, ssj4_vt); }
     else SS3_Use(record, sprite);
 }
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
@@ -1367,6 +1379,57 @@ static int is_ssj4(int form) {   /* the Super Saiyan 4 forms (build.py: every fo
     for (p = ssj4_rows; *p != 255; p++) if (*p == form) return 1;
     return 0;
 }
+/* Super Saiyan 4's own ki bar. A transformed form spends and drains one pool: Super Saiyan's (record +0x1E, drawn yellow over the green EP
+   bar) or Super Saiyan 3's (+0x20, orange over that), and powers down when it runs dry. Super Saiyan 4 is Super Saiyan 3's class, so its
+   pool is +0x20 too; here it is drawn purple, and the orange ki the fighter had when he went Super Saiyan 4 (Kid Goku's Super Saiyan 3 bar)
+   is put aside (SK.rest) as a bar of its own. Only one drains at a time: the purple first, while the orange stays as it is; when the
+   purple runs out the orange takes over, then the form powers down. Either drains at half Super Saiyan 3's rate.
+   SK.pending: set on pressing for Super Saiyan 4; the first look at the record in that form takes it (Gogeta, already Super Saiyan 4: none). */
+struct ssj4ki { u16 rest, pending_rest; u8 pending, active, purple, tick; };
+#define SK (*(volatile struct ssj4ki *)0x0203FFB0)
+static void ssj4_track(const u8 *rec) {
+    int form = rec[0x14];
+    if (!is_ssj4(form)) { SK.active = 0; if (!(form_table[form * 24] & 3)) SK.pending = 0; return; }
+    if (!SK.active) { SK.active = 1; SK.purple = 1; SK.tick = 0; SK.rest = SK.pending ? SK.pending_rest : 0; SK.pending = 0; }
+}
+static void ssj4_pending(const u8 *record) { SK.pending_rest = *(const u16 *)(record + 0x20); SK.pending = 1; }
+/* The Super Saiyan 3 class's drain (0x0800E4C4) is about to take `need` (whole units, when its accumulator rolls over) from the pool;
+   returns what it takes. Super Saiyan 4: when the purple is down to its last, the orange put aside takes its place; then every other
+   unit is skipped, which halves the rate (a skipped unit takes nothing, so the empty-pool check only fires on a pool already empty). */
+int ssj4_refill(u8 *rec, int need) {
+    u16 *pool = (u16 *)(rec + 0x20);
+    if (rec != RECORDS + *(u8 *)0x03001068 * RECORD_SIZE) return need;
+    ssj4_track(rec);
+    if (!SK.active) return need;
+    if (SK.purple && *pool <= need) {
+        SK.purple = 0;
+        if (SK.rest) { *pool += SK.rest; SK.rest = 0; }
+    }
+    SK.tick ^= 1;
+    return SK.tick ? 0 : need;
+}
+void ssj4_drain(void);
+__asm__(".syntax unified\n.thumb\n.thumb_func\n.global ssj4_drain\nssj4_drain:\n"
+        "asrs r1, r1, #16\npush {r0}\nbl ssj4_refill\nadds r2, r0, #0\npop {r0}\n"
+        "adds r1, r0, #0\nadds r1, #32\nldrh r3, [r1]\ncmp r3, r2\nble 1f\nldr r3, =0x0800E513\nbx r3\n1:\nldr r3, =0x0800E525\nbx r3\n.ltorg\n");
+/* The HUD (0x0800B99C) has drawn the bars into buf (orange for the first +0x20 columns); before it goes to VRAM, Super Saiyan 4 paints
+   those columns purple and the orange left under it after them. 41 columns, three pixels each at the offsets in BAR_COLS. */
+extern const u8 ssj4_bar[0x500];
+#define BAR_COLS ((const u32 *)0x08071F40)
+#define ORANGE_BAR ((const u8 *)0x08713FD8)
+void ssj4_hud(const u8 *widget, u8 *buf) {
+    const u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE;
+    int max = *(const short *)(rec + 0x1C), np, no, c, k;
+    ssj4_track(rec);
+    if (SK.active && SK.purple && max > 0) {
+        np = *(const u16 *)(rec + 0x20) * 41 / max; no = SK.rest * 41 / max;
+        if (np > 41) np = 41;
+        if (no > 41) no = 41;
+        for (c = 0; c < np; c++) for (k = 0; k < 3; k++) { u32 o = BAR_COLS[c * 4 + k]; buf[o] = ssj4_bar[o]; }
+        for (; c < no; c++) for (k = 0; k < 3; k++) { u32 o = BAR_COLS[c * 4 + k]; buf[o] = ORANGE_BAR[o]; }
+    }
+    MemCopy((u8 *)0x06010000 + *(const u16 *)(widget + 12) * 32, buf, 0x500);
+}
 /* Against Super Saiyan's damage, Super Saiyan 2 hits 1.5x as hard and Super Saiyan 3 1.75x. hit[1] is the attack's damage scale (1024 = normal); team 2 is the player's side.
    Damage grows with the cube of the Strength stat, so scaling the stat itself would give about three times the damage.
    Super Saiyan 3 adds 15 to the stats where Super Saiyan adds 5: its attacks count from the Super Saiyan figure, and it keeps the extra Endurance and Speed. */
@@ -1376,8 +1439,8 @@ void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
     if ((hit[0] & 255) == 2) {
-        if (is_ssj4(form)) {                         /* Super Saiyan 4: twice Super Saiyan's damage (from Super Saiyan 3's figure where it is that class) */
-            hit[1] = scale * 2;
+        if (is_ssj4(form)) {                         /* Super Saiyan 4: 2.5x Super Saiyan's damage, Gogeta's 3x (from Super Saiyan 3's figure where it is that class) */
+            hit[1] = form == FORM_GOGETA_SSJ4 ? scale * 3 : scale * 2 + (scale >> 1);
             if ((form_table[form * 24] & 2) && strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
         }
         else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);

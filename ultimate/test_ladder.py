@@ -26,9 +26,11 @@ def mem(a, n=1):
         if 'bad pc' in l: bad[0] = True
         if l.startswith('mem %08x' % a): return [int(x, 16) for x in l.split(':')[1].split()]
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
-more = lambda n: mem(BENCH_FLAGS + (n >> 3 & ~3))[0] >> ((n & 31)) & 1
+FLAGS2 = 0x0203F1E2                                    # more flags 32-63: after the bench's 21 entries (outfit.c struct bench)
+more_at = lambda n: BENCH_FLAGS + n // 8 if n < 32 else FLAGS2 + (n - 32) // 8
+more = lambda n: mem(more_at(n) & ~3)[0] >> (8 * (more_at(n) & 3) + n % 8) & 1
 def more_poke(n, v):
-    a = BENCH_FLAGS + n // 8; old = mem(a & ~3)[0] >> (8 * (a & 3)) & 255
+    a = more_at(n); old = mem(a & ~3)[0] >> (8 * (a & 3)) & 255
     send('poke8 %08X %02X' % (a, old | 1 << n % 8 if v else old & ~(1 << n % 8) & 255))
 at = lambda: mem(AT)[0] & 0xFFFF
 zenie = lambda: mem(ZENIE)[0]
@@ -184,6 +186,36 @@ check('Majuub: beaten', beat(zone26.challenge_room('uub', 1)))
 check('Majuub: comes home', settle(HUB))
 strong(); talk(*zone26.HUB_AT); send('run 60', 'shot uub_won', 'tap A 60', 'run 30', 'shot uub_joins'); dismiss(1)
 check('Uub joins', more(zone26.MORE_UUB) == 1 and more(zone26.MORE_UUB_WON) == 0)
+
+# More, then Next: Trials II (after the first four Trials are paid) and the Dojo.
+NEXT = ['tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', *['tap DOWN 12'] * 3, 'tap A 150']
+hub_talk(); send(*NEXT, 'shot more2', 'tap A 150', 'shot no_trials2'); dismiss(1)
+check('Trials II: locked before the first four are paid', at() == HUB)
+send(flag_on(zone26.TRIAL_ALL)); mem(G)
+for k, t in enumerate(zone26.TRIALS2):
+    hub_talk(); send(*NEXT, 'tap A 150', 'run 60', 'tap A 150', 'shot trial2_menu', *['tap DOWN 12'] * k, 'tap A 200', 'run 200', 'shot trial2_%d' % k)
+    check('Trials II %d: into the room' % (k + 1), at() == zone26.challenge_room('trial2_%d' % k) << 8 | 26)
+    check('Trials II %d: %s plays' % (k + 1, t[1]), mem(G)[0] & 255 == t[0])
+    foe = mem(ENEMIES)[0]; check('Trials II %d: %s has %d HP' % (k + 1, t[4], zone26.TRIAL2_HP), foe and mem(foe + 0x28C)[0] >> 10 == zone26.TRIAL2_HP)
+    check('Trials II %d: beaten' % (k + 1), beat(zone26.challenge_room('trial2_%d' % k)))
+    check('Trials II %d: comes home' % (k + 1), settle(HUB))
+    z0 = zenie(); talk(*zone26.HUB_AT); send('run 60', 'shot trial2_paid%d' % k); dismiss(1)
+    check('Trials II %d: paid %d Zenie' % (k + 1, zone26.TRIAL2_PRIZE), more(zone26.MORE_T2_PAID + k) == 1 and zenie() - z0 == zone26.TRIAL2_PRIZE)
+talk(*zone26.HUB_AT); send('run 60', 'shot all2'); dismiss(1)
+check('Trials II: all four pay the Geromantium set', more(zone26.MORE_T2_ALL) == 1)
+DOJO = NEXT + ['tap DOWN 12', 'tap A 150', 'run 60', 'tap A 150', 'shot dojo_menu']
+n = 0
+for c, (cat, people) in enumerate(zone26.DOJO):
+    for i, (name, actor, lock) in enumerate(people):
+        hub_talk(); z0 = zenie(); send(*DOJO, *['tap DOWN 12'] * c, 'tap A 150', *['tap DOWN 12'] * i, 'tap A 200', 'run 200', 'shot dojo%d' % n)
+        if lock and lock[0] == 'flag' and not mem(G + 0x55 + lock[1] // 8)[0] >> (lock[1] % 8) & 1:
+            check('Dojo %s: locked until met' % name, at() == HUB); dismiss(1); n += 1; continue
+        check('Dojo %s: into the room' % name, at() == zone26.challenge_room('dojo%d' % n) << 8 | 26)
+        foe = mem(ENEMIES)[0]; check('Dojo %s: %d HP' % (name, zone26.DOJO_HP), foe and mem(foe + 0x28C)[0] >> 10 == zone26.DOJO_HP)
+        send('run 30', 'shot dojo%d_fight' % n)
+        check('Dojo %s: beaten' % name, beat(zone26.challenge_room('dojo%d' % n)))
+        check('Dojo %s: comes home and pays' % name, settle(HUB) and zenie() - z0 == zone26.DOJO_PRIZE)
+        n += 1
 
 # Race and museum.
 z0 = zenie(); send(flag_on(234)); mem(G)
