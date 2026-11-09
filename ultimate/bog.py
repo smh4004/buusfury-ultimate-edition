@@ -42,7 +42,7 @@ FOES = ((KAI, 152, 176, ((MORE_BOG_START, MORE_BOG_FIGHT), (MORE_BOG_LOST,))),
         (CAPSULE, 168, 232, ((MORE_BOG_LOST, MORE_BOG_FIGHT), (MORE_BOG_PARTY,))),
         (WEST_CITY, 400, 336, ((MORE_BOG_RITUAL, MORE_BOG_FIGHT), (MORE_BOG_GOD2, MORE_BOG_DONE))),
         (FOREST, 152, 208, ((MORE_BOG_GOD2, MORE_BOG_FIGHT), (MORE_BOG_GOD3, MORE_BOG_DONE))),
-        (DESERT, 240, 136, ((MORE_BOG_GOD3, MORE_BOG_FIGHT), (MORE_BOG_DONE,))))
+        (DESERT, 240, 176, ((MORE_BOG_GOD3, MORE_BOG_FIGHT), (MORE_BOG_DONE,))))
 ARRIVE = (KAI_AT, PARTY_AT, (4, 0x01, 1, 400, 392), (13, 0x01, 1, 152, 264), (11, 0x01, 1, 240, 232))
 ASIDE = (WEST_CITY, DESERT)                      # areas whose own people and enemies stand aside while a Beerus fight is on
 CHARS = {'king_kai': 161, 'bulma': 41, 'vegeta': 279, 'gohan': 123, 'videl': 287, 'goten': 166, 'trunks': 269}
