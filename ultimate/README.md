@@ -90,6 +90,12 @@ writable statics (they'd link into ROM); the build stops if one appears.
   mod could set its flags, so Gohan's outfits, and Super Saiyan 2 for Gohan, Trunks, Vegeta and the fusion, never came. `outfit.c
   story_sync` (in skills_sync) sets them all once the ending is seen, and earlier where the scene sets a story flag of its own
   (`build.py STORY_MARKS`). Checked on the owner's save: the flags come on, Super Saiyan 2 goes into free slots.
+- The guest slot shows on Switch Character only once someone has joined it (record +0 bit 0); the original game plays it without
+  joining, so an old save had Broly unlocked (flag 111) and no slot to pick him in. `story_sync` joins the first unlocked guest.
+- Battle of Gods had more flags 47-48, which are New Game+'s round count (`outfit.c NG_FLAG`): starting the quest would have made
+  enemies hit 1.5x, and 2.5x after King Kai's planet. It uses 49-57 now (58-63 are free).
+- Trials and Trials II had party slots 3 and 4 the wrong way round ("Vegeta vs Majin Buu" played as Trunks); `test_zone26.py` now
+  checks each trial's name against its slot.
 - The Skills tab says "Nothing to swap" instead of "SELECT: Swap" when the fighter knows nothing beyond what he holds (the owner took
   SELECT for broken: with that save only Goku and Vegeta had anything to swap).
 - Beam bodies (`build.py body_block`): the Kamehameha's body rows for levels 1-2 run on into level 3's (one 12-row block at 0x721188);
@@ -138,7 +144,7 @@ official warps to Capsule Corporation: `BFU_HUB_WARP="4, 20, 1, 192, 196"`).
   stand aside meanwhile (their own condition, a story flag or a short script, and flag 52 clear: `zone26.unless`).
 - Every scene is a step of the West City resident's event list (`build.py quest_npc` appends them); its first step sends talks at Capsule
   Corporation and on Grand Kai's Planet (`more_get(251)`: area << 8 | world) to the quest's dispatcher, which picks the scene by the story's
-  progress (more flags 47-55). Natives 0xF8-0xFF are all taken, so the quest asks `more_get` (251 area, 252 Goku playing, 253 the quest can
+  progress (more flags 49-57). Natives 0xF8-0xFF are all taken, so the quest asks `more_get` (251 area, 252 Goku playing, 253 the quest can
   start) instead of new natives.
 - Beerus's rows are copies of Kid Buu's (row 61): 250000 HP on King Kai's planet (2,000,000 broke Kid Buu's behaviour: likely an overflow in
   its health checks; he stopped attacking and the game crashed), 20000 at the party, 35000 / 40000 / 50000 for the god fight's legs; they

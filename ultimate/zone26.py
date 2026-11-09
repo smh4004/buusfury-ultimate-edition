@@ -182,7 +182,8 @@ TOUR_NAMES = (('Yamu', 'Spopovich', 'Idasa', 'Olibu', 'Ninja Boss', 'Knight Dest
 #   1128-1143 1128-1131 trials paid, 1132-1140 tournament picks, 1141 ordered tournament test, 1142-1143 spare
 TOUR_PICKS, TOUR_PICK, TOUR_GET = 1132, 0xF9, 0xFA    # flags 1132-1140 hold each round's opponent, 3 bits a round; natives tour_pick(round, place) and tour_get(round)
 TRIALS = ((0, 'Goku', 91, 224, 'Pikkon', 39, 'Titanium Breastplate'), (1, 'Gohan', 18, 73, 'Dabura', 70, 'Enhanced Energy Gloves'),
-          (3, 'Vegeta', 28, 43, 'Majin Buu', 108, 'Clean Boots'), (4, 'Trunks', 39, 123, 'Goten', 159, 'Clean Belt'))     # party slot, name, enemy row, character, opponent, equipment row, its name
+          (4, 'Vegeta', 28, 43, 'Majin Buu', 108, 'Clean Boots'), (3, 'Trunks', 39, 123, 'Goten', 159, 'Clean Belt'))     # party slot, name, enemy row, character, opponent, equipment row, its name
+# (party slots: 3 is Trunks, 4 Vegeta; Nov 9: the tables had them the other way round, so 'Vegeta vs Majin Buu' made Trunks the player)
 TRIAL_GEAR = 160                                   # all four: Geromantium Bandana, with the Senzu Beans below
 if os.environ.get('BFU_CLASH_TEST'): TRIALS = ((int(os.environ.get('BFU_CLASH_SLOT', 0)), 'Goku', 61, 47, 'Kid Buu', 39, 'Titanium Breastplate'),) + TRIALS[1:]     # test_clash.py fights the game's beam user
 TRIAL_HP, TRIAL_STATS, TRIAL_PRIZE, TRIAL_ITEM, TRIAL_ITEMS = 40000, (148, 65, 60, 65), 30000, 21, 10    # all four: ten Senzu Beans (item 21)
@@ -223,10 +224,10 @@ UUB_ROW, UUB_FIGHT = 61, (('uub', 60000, (155, 95, 100, 90)), ('majuub', 90000, 
 SPAR_EXP, SPAR_MIN_HP, SPAR_ROOM, SPAR_HOME = 4, 2000, (6, 9), (288, 500)
 # Trials II (More, then Next): the same four heroes against harder story foes, once the first four are paid. Party slot, name, enemy row, character, opponent, equipment, its name.
 TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115, 49, 'Super Buu', 74, 'Crystal Gauntlets'),
-           (3, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (4, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
+           (4, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (3, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
 TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 60000, (43, 76, 111)   # all four: Geromantium Kataginu, Gloves and Tabi, with ten Senzu Beans
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
-import bog                                          # Battle of Gods (more flags 47-55, its people and Beerus in the real areas: add_bog)
+import bog                                          # Battle of Gods (more flags 49-57, its people and Beerus in the real areas: add_bog)
 from bog import MORE_BOG_DONE
 MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
 # Time Chamber waves (Mr. Popo, Waves): a category's four partners in a row, no rest between, 1.5x their health. The first clear of each gives WAVE_POINTS stat points, later ones Zenie.

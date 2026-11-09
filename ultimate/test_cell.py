@@ -55,8 +55,10 @@ rooms = sorted({c[0] for c in zone26.cell_rows()})
 for k, room in enumerate(rooms):
     check('fight %d is in its room' % (k + 1), at() == (room << 8 | 26))
     send(*strong()); sheet('f%d_a' % k)
-    n = mem(COUNT)[0]
-    check('fight %d has %d fighter(s)' % (k + 1, sum(1 for c in zone26.cell_rows() if c[0] == room)), n == sum(1 for c in zone26.cell_rows() if c[0] == room))
+    # the fighters: enemies on this fight's health (the enemy list also holds what they summon: Semi-Perfect Cell has Super Buu's ghosts)
+    want = [c for c in zone26.cell_rows() if c[0] == room]; n = mem(COUNT)[0]
+    fighters = sum(1 for p_ in mem(ENEMIES, n) if p_ and mem(p_ + 0x28C)[0] >> 10 == want[0][2])
+    check('fight %d has %d fighter(s)' % (k + 1, len(want)), fighters == len(want))
     for direction in ('DOWN', 'LEFT', 'RIGHT', 'UP'):
         pl = mem(PLAYER)[0]; foe = mem(ENEMIES)[0]; x, y = mem(foe + 0x1A0, 2)
         send(*strong(), 'poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (70 << 8)), 'run 60')

@@ -234,6 +234,8 @@ for rnd, place in enumerate(wanted):
 check('winning a picked bracket brings you back to the board', at(out) == HUB)
 
 # Trials: each is one fight as a set hero. Back at the board it pays, and all four earn the rare prize.
+SLOT_NAMES = {0: 'Goku', 1: 'Gohan', 2: 'Goten', 3: 'Trunks', 4: 'Vegeta'}      # party slots (the save's records)
+check('each trial names the hero it plays (party slot)', all(SLOT_NAMES[t[0]] == t[1] for t in zone26.TRIALS + zone26.TRIALS2))
 trial = hub_talk(home + [flag_on(883)] + strong) + ['run 150', 'tap A 150', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'run 150', 'tap A 150', 'shot trials', 'tap B 120', 'run 60']
 tf = zone26.trial_first()
 for k, t in enumerate(zone26.TRIALS):

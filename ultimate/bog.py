@@ -15,13 +15,14 @@ After the ending, once Goku's Super Saiyan is mastered and he's the one playing,
      one carries the fight on to the next place without a rest. Win the last, and Whis brings everyone home to Capsule Corporation, where
      Beerus spares the Earth. Lose any leg, and it's back to the party to try that leg again.
 Every scene is a step of one event list: the West City resident's (build.py quest_npc), whose first step sends talks at Capsule
-Corporation and on Grand Kai's Planet here; the story's progress is more flags 47-55. Who stands where is the actors' spawn conditions
+Corporation and on Grand Kai's Planet here; the story's progress is more flags 49-57. Who stands where is the actors' spawn conditions
 (zone26.apply): the quest's people appear at each stage, Beerus as an enemy while a fight is on (MORE_BOG_FIGHT), and the people and
 enemies who live in West City and the desert stand aside meanwhile.
 Beerus is lib/beerus.py's (Kid Buu's frames, on Kid Buu's beam-firing enemy row 61); Whis is lib/whis.py's (Kibito's)."""
 
-MORE_BOG_START, MORE_BOG_LOST, MORE_BOG_PARTY, MORE_BOG_RITUAL, MORE_BOG_DONE, MORE_BOG_FIGHT, MORE_BOG_TOLD = 47, 48, 49, 50, 51, 52, 53
-MORE_BOG_GOD2, MORE_BOG_GOD3 = 54, 55            # the god fight has reached the forest / the desert
+MORE_BOG_START, MORE_BOG_LOST, MORE_BOG_PARTY, MORE_BOG_RITUAL, MORE_BOG_DONE, MORE_BOG_FIGHT, MORE_BOG_TOLD = 49, 50, 51, 52, 53, 54, 55
+# (more flags 47-48 are New Game+'s round count, outfit.c NG_FLAG: the quest had them as started and lost, so starting it made enemies hit harder)
+MORE_BOG_GOD2, MORE_BOG_GOD3 = 56, 57            # the god fight has reached the forest / the desert (58-63 are free)
 Q_AREA, Q_GOKU, Q_READY = 251, 252, 253          # more_get queries (outfit.c): this area (area << 8 | world), Goku playing, the quest can start
 KID_BUU_ROW = 61
 CAPSULE = (4, 0x14)                              # Capsule Corporation
