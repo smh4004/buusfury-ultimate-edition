@@ -495,6 +495,7 @@ static int wearing(const u8 *rec, int row) {
 }
 #define GEAR_TICK (*(volatile u8 *)0x0203FFC5)
 #define SHADES_TICK (*(volatile u8 *)0x0203FFC6)
+#define SSG_TICK (*(volatile u8 *)0x0203F268)          /* every other drain unit of Super Saiyan God is skipped */
 static int potara_skip(const u8 *rec) {        /* Potara Earrings: one drain unit in three passes free */
     if (!wearing(rec, GEAR_POTARA)) return 0;
     if (++GEAR_TICK >= 3) { GEAR_TICK = 0; return 1; }
@@ -1617,7 +1618,8 @@ static void power_up(void *sprite, const void *vt) {
 }
 static int can_step(u8 *record) { return IN_COMBAT && CanAfford(record, 10); }   /* a tier up, as retail Super Saiyan 3: a fight and 10 ki */
 static int can_start(u8 *record) { return can_step(record) && *(u32 *)(record + 4) == 0; }   /* from base, as retail Super Saiyan: no cool-down either */
-int ss_can(u8 *record) { return is_kaioken(record[0x14]) ? 0 : SS_Can(record); }
+static int is_ssg(int form);
+int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) ? 0 : SS_Can(record); }
 void ss_use(u8 *record, void *sprite) { XFORM = 0; SS_Use(record, sprite); }
 int ss2_can(u8 *record) {
     int form = record[0x14], f = flags_of(form);
@@ -1640,7 +1642,7 @@ static int ss3_direct(u8 *record) {
 }
 int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one and it is held */
     int form = record[0x14], d = ss3_direct(record);
-    if (is_kaioken(form) || is_ssj4(form)) return 0;
+    if (is_kaioken(form) || is_ssj4(form) || is_ssg(form)) return 0;
     if (d == -2) return 0;
     if (d >= 0) return SS3_Can(record);
     if ((flags_of(form) & 2) && up_of(form) != 255 && is_ssj4(up_of(form))) return 1;        /* Kid Goku's Super Saiyan 3: powers down */
@@ -1663,7 +1665,7 @@ void ss4_use(u8 *record, void *sprite) {
     else { ssj4_pending(record); power_up(sprite, ssj4_vt); }
 }
 /* Super Saiyan Blue: DBS Gogeta's from his Super Saiyan (its up); Goku's and Vegeta's from theirs through ssb_map (their up is Super Saiyan 2). */
-extern const u8 ssb_map[][2], kaioken_map[][2];
+extern const u8 ssb_map[][2], kaioken_map[][2], ssg_map[][2];
 static int mapped(const u8 (*m)[2], int form) {
     int i;
     for (i = 0; m[i][0] != 255; i++) if (m[i][0] == form) return m[i][1];
@@ -1715,6 +1717,25 @@ void kaioken_use(u8 *record, void *sprite) {
     XFORM = 0;
     if (is_kaioken(form)) kk_down(record, sprite);
     else power_to(record, sprite, mapped(kaioken_map, form), ssj4_vt);
+}
+/* Super Saiyan God (Nov 9): Goku, from a base form to its red-haired copy (ssg_map), with the red aura. Its row is Super Saiyan's class without
+   the +5 (taken off in combat_hook): 1.75x, and the pool drains at half Super Saiyan's rate (ss_tick). No other tier goes up from it; pressed
+   again it powers down to base. Learned after the Battle of Gods (more flag MORE_BOG_DONE) once Goku's Super Saiyan is mastered (skills_sync). */
+static int is_ssg(int form) {
+    int i;
+    for (i = 0; ssg_map[i][0] != 255; i++) if (ssg_map[i][1] == form) return 1;
+    return 0;
+}
+int ssg_can(u8 *record) {
+    int form = record[0x14];
+    if (is_ssg(form)) return 1;
+    return mapped(ssg_map, form) != 255 && !(flags_of(form) & 3) && can_start(record);
+}
+void ssg_use(u8 *record, void *sprite) {
+    int form = record[0x14];
+    XFORM = 0;
+    if (is_ssg(form)) SS_Use(record, sprite);
+    else power_to(record, sprite, mapped(ssg_map, form), ssj4_vt);
 }
 /* Skills beyond the six a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
    loadout can hold; record +0x22 is a mask over it of the ones they know. Equipped skills sit in the record as always (+0x0D, levels
@@ -1814,6 +1835,7 @@ void skills_sync(int c) {
         learn(c, KAIOKEN_SKILL, 1);
         learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
         learn(c, SSB_SKILL, post && mastery_level(0, 22) == 2);
+        learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && more_flag(MORE_BOG_DONE));
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
     }
     if (c == 4) {
@@ -1918,6 +1940,7 @@ int ss_tick(u8 *rec) {
         else if (*hp > cost + 1) *hp -= cost;
         else *(u16 *)(rec + 0x1E) = 0;
     }
+    if (is_ssg(rec[0x14]) && (SSG_TICK ^= 1)) return 1;          /* Super Saiyan God drains at half the rate */
     if (potara_skip(rec)) return 1;
     return mastery_skip(rec);
 }
@@ -2074,6 +2097,10 @@ void combat_hook(void *defender, int *hit) {
             hit[1] = scale + (scale >> 2) * (1 + mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL));
             if (!(flags_of(form_table[form * 24 + 0x17]) & 1) && strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
             /* (Super Saiyan Kaioken, down to Super Saiyan, keeps Super Saiyan's +5: 1.75x a Super Saiyan's hit) */
+        }
+        else if (is_ssg(form)) {                     /* Super Saiyan God: 1.75x, without Super Saiyan's +5 */
+            hit[1] = scale + (scale >> 1) + (scale >> 2);
+            if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
         }
         else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {

@@ -226,6 +226,7 @@ TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115
            (3, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (4, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
 TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 60000, (43, 76, 111)   # all four: Geromantium Kataginu, Gloves and Tabi, with ten Senzu Beans
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
+MORE_BOG_START, MORE_BOG_LOST, MORE_BOG_PARTY, MORE_BOG_RITUAL, MORE_BOG_DONE = 47, 48, 49, 50, 51     # Battle of Gods: King Kai called, lost to Beerus, the party, the ritual, Beerus beaten (Super Saiyan God learned)
 MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
 # Time Chamber waves (Mr. Popo, Waves): a category's four partners in a row, no rest between, 1.5x their health. The first clear of each gives WAVE_POINTS stat points, later ones Zenie.
 WAVE_HP, WAVE_POINTS, WAVE_ZENIE = (3, 2), 3, 30000

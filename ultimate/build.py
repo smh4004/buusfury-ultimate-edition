@@ -56,6 +56,7 @@ SS2_SKILL, SS4_SKILL, KAIOKEN_SKILL = 35, 36, 37                  # Super Saiyan
 GALICK_SKILL, TENX_SKILL, FINAL_SHINE_SKILL, DRAGON4_SKILL = 38, 39, 40, 41     # Kamehameha's code violet / red, Final Flash's green, Dragon Fist's red
 SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
 MAX_POWER_SKILL = 45             # Master Roshi's Max Power (Nov 9)
+SSG_SKILL = 46                   # Super Saiyan God (Nov 9): Goku, from base, after the Battle of Gods ritual with Super Saiyan mastered
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
 # picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
 GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH = 162, 163, 164, 165, 166
@@ -67,12 +68,16 @@ GEAR = ((GEAR_POTARA, 'Potara Earrings', "The Supreme Kai's earrings. Every tran
 GEAR_TABLE, GEAR_COUNT = 0x6F82EC, 162
 GEAR_REFS = (0x2BFC, 0x453C, 0x4814, 0xD528, 0x13E28, 0x16FBC, 0x1D400, 0x1D5F0, 0x1D968, 0x1DC74, 0x1DF88, 0x1FB4C, 0x2BD44, 0x31844, 0x31C3C, 0x321B8, 0x325AC)
 ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
+SSG_NAME_UI = ROSHI_NAME_UI + 2  # 'Super Saiyan God'
 # Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
 KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
            'goku_ss': (3, 0, 109), 'goku_ss_b': (4, 0, 110), 'kid_goku_ssj': ('kid_goku_ssj', 0, 'kid_goku_ssj'),      # Super Saiyan Kaioken (Kaioken fully mastered)
            'krillin': ('krillin', 8, 'krillin'), 'tien': ('tien', 8, 'tien_player'), 'yamcha': ('yamcha', 8, 'yamcha_player'),
            'videl': ('videl', 8, 'videl_player'), 'hercule': ('hercule', 8, 'hercule_player')}
 SS_KAIOKEN = ('goku_ss', 'goku_ss_b', 'kid_goku_ssj')     # their rows go after Blue's, so the forms that were already there keep their numbers
+# Super Saiyan God: each of Goku's base looks -> (its form, owner, the actor its red-haired copy is made from). Rows after Super Saiyan Kaioken's.
+SSG_LOOKS = {'goku_ssg': (0, 0, 106), 'goku_b_ssg': (1, 0, 107), 'goku_halo_ssg': (2, 0, 108)}
+SSG_HAIR = ((120, 32, 64), (200, 32, 64))         # his hair: edge and fill (crimson, from colours the game has)
 # Super Saiyan Blue for Goku and Vegeta (post-game mastery): each Super Saiyan form -> its Blue, a Super Saiyan 3 class copy whose hair is blue.
 SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
@@ -90,7 +95,26 @@ def kaioken_rows(clean):
     for n, (ss, row, owner, _, base) in SSB_LOOKS.items():
         portraits = list(clean[FORMS + FORM_SIZE * (ss if isinstance(ss, int) else 28) + 0x10:][:6])
         rows.append({'id': n, 'copy': row, 'actor': n, 'owner': owner, 'name': 1057, 'portrait': portraits, 'up': 255, 'down': base})
-    return rows + [kk(n, *KAIOKEN[n][:2]) for n in SS_KAIOKEN]
+    rows += [kk(n, *KAIOKEN[n][:2]) for n in SS_KAIOKEN]
+    # Super Saiyan God: the base row's copy with the red-haired actor, Super Saiyan's class (its drain, halved in outfit.c), back down to base
+    return rows + [{'id': n, 'copy': base, 'actor': n, 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base, 'name': SSG_NAME_UI}
+                   for n, (base, owner, _) in SSG_LOOKS.items()]
+
+
+def ssg_hair(one):
+    """Goku's black hair -> Super Saiyan God's crimson. His hair is the only big black patch on him (eyes and brows are a few pixels each):
+    every black area of 12 pixels or more, its edge darker."""
+    from scipy import ndimage
+    edge, fill = one(np.array(SSG_HAIR[0])), one(np.array(SSG_HAIR[1]))
+    def fn(img):
+        black = img == 1
+        lab, n = ndimage.label(black, np.ones((3, 3)))
+        sizes = ndimage.sum(black, lab, range(1, n + 1))
+        hair = np.isin(lab, [k + 1 for k, v in enumerate(sizes) if v >= 12])
+        inner = ndimage.binary_erosion(hair, np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]))
+        out = img.copy(); out[hair] = edge; out[inner] = fill
+        return out
+    return fn
 
 
 def ssb_hair(one):
@@ -122,7 +146,7 @@ def kaioken_remap(pal, one):
 # The skill book (outfit.c): per party character, the skills the loadout can hold beyond the six slots (record +0x13 is not a seventh: it is the equipment flags byte). 21 is the story's locked Super Saiyan.
 SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21), 1: (7, 20, 35, 6, 17, 18, 26, 21), 2: (7, 20, 16, 8, 12, 21),
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21), 2: (7, 20, 16, 8, 12, 21),
               3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 # A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,
@@ -1206,6 +1230,9 @@ def add_actors(rom, clean):
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
+    god = ssg_hair(one)
+    for n, (_, _, src) in SSG_LOOKS.items():
+        cfg[n] = {'tint_of': src, 'tint': god, 'high': True}
     cfg['roshi_player'] = {'roshi_of': 'krillin', 'head_of': 177, 'chin': [12, 11], 'high': True}     # Master Roshi: Krillin's frames, Roshi's head and clothes (lib/roshi.py)
     # Beerus (Battle of Gods, post-game): every frame of Kid Buu (actor 38, the boss's own 19 slots) with Beerus's head, collar and clothes
     # (lib/beerus.py). Slot 17 is Kid Buu's death by dissolving (likely only the ending plays it): Beerus's is a hit, then the knockdown.
@@ -1240,6 +1267,11 @@ def powerup_frames(rom, ids, at):
         set10(n + '_kaioken', [frame(r, 10, 0)] + [frame(r, 10, 1)] * 9 + [frame(r, 0, 0)])
     # Goku's form 1 (a 16-slot figure, likely only for scenes) has no slot 10 at all: his Kaioken copy borrows the gi's power-up
     struct.pack_into('<I', rom, rec_of('goku_b_kaioken') + 0x54 + 40, u(rec_of('goku_kaioken') + 0x54 + 40))
+    for n in ('goku_ssg', 'goku_halo_ssg'):                       # Super Saiyan God: the crouch, the shout (red hair), his stance
+        r = rec_of(n)
+        if u(u(r + 0x54 + 40) - ROM_BASE) != 11: sys.exit('%s: slot 10 is not an 11-frame power-up' % n)
+        set10(n, [frame(r, 10, 0)] + [frame(r, 10, 1)] * 9 + [frame(r, 0, 0)])
+    struct.pack_into('<I', rom, rec_of('goku_b_ssg') + 0x54 + 40, u(rec_of('goku_ssg') + 0x54 + 40))
     for n in ('goku_ss_kaioken', 'goku_ss_b_kaioken', 'goku_ssb', 'goku_ssb_b'):
         r = rec_of(n)
         if u(u(r + 0x54 + 40) - ROM_BASE) != 11: sys.exit('%s: slot 10 is not an 11-frame power-up' % n)
@@ -1371,11 +1403,12 @@ def add_outfits(rom, clean, at, art):
     c += 'const u8 skill_book[8][16] = {%s};\n' % ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (16 - len(SKILL_BOOK[k]))) for k in range(8))
     c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
     c += 'const u8 kaioken_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base if isinstance(base, int) else fm[base], fm[n + '_kaioken']) for n, (base, _, _) in KAIOKEN.items())
+    c += 'const u8 ssg_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base, fm[n]) for n, (base, _, _) in SSG_LOOKS.items())
     c += 'const u8 ssb_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (fm[a] if isinstance(a, str) else a, fm[b]) for a, b in SSB_FORMS if b in fm)
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1824,6 +1857,8 @@ def add_eraser(rom, clean, sym, at, art):
     kk_red = shifted(0 / 360)
     rows[KAIOKEN_SKILL] = tier_row(20, [iconlib.recolour(i, kk_red) for i in ss_icons], 'kaioken_can', 'kaioken_use',
         ('Kaioken', 'Press B for the Kaioken: hits 1.25x as hard, up to 1.75x as you master it, but it wears on your health. Not with Super Saiyan.'))
+    rows[SSG_SKILL] = tier_row(20, [iconlib.recolour(i, shifted(340 / 360)) for i in ss_icons], 'ssg_can', 'ssg_use',
+        ('Super Saiyan God', 'Press the B Button to become a Super Saiyan God: attacks hit 1.75x as hard and its ki drains slowly. From base form. Press it again to change back.'))
     ssb_row = bytearray(clean[SKILL_ROWS + 24 * 22:SKILL_ROWS + 24 * 22 + 24])
     struct.pack_into('<II', ssb_row, 4, *[put_art(iconlib.recolour(i, ssb_blue)) for i in ss_icons])
     struct.pack_into('<HHII', ssb_row, 12, 1057, 1051, sym['ssb_can'] | 1, sym['ssb_use'] | 1)
@@ -1840,6 +1875,8 @@ def add_eraser(rom, clean, sym, at, art):
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Pan', 'Uub', 'Majuub', 'Brapan')]
     if ERASER_UI + len(strings) != ROSHI_NAME_UI: sys.exit('Roshi names moved')
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Master Roshi', 'Max Power Roshi')]
+    if ERASER_UI + len(strings) != SSG_NAME_UI: sys.exit('Super Saiyan God name moved')
+    strings.append(put('Super Saiyan God'.encode('utf-16-le') + b'\0\0'))
     row = bytearray(clean[SKILL_ROWS + 24 * 20:SKILL_ROWS + 24 * 21])          # Majuub: Super Saiyan's row, its own name and use
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['majuub_use'] | 1)
