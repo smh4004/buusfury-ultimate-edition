@@ -242,6 +242,12 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             if kept > h.get('kept_max', 0): sys.exit('%s: %d frames could not be matched (allowed %d)' % (name, kept, h.get('kept_max', 0)))
             ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
+        if 'blue_hair' in a:                               # a Super Saiyan figure with blue hair (blue_hair_actor): its base and Super Saiyan built first
+            h = a['blue_hair']; at_ = lambda x: (table[x] if isinstance(x, int) else table[ids[x]]) - BASE
+            rec, made = blue_hair_actor(ins, rom, at_(h['base']), at_(h['ss']), {'shared': set(h['shared'])}, {int(k): v for k, v in h['to'].items()})
+            print('%s: %d frames with blue hair' % (name, made))
+            ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            continue
         if 'same_as' in a:                                 # another actor id for the same record (Super Saiyan 2 and Full Power: their lightning
             src = a['same_as']                             # is the crackle drawn around the fighter, outfit.c crackle, not part of the frames)
             ids[name] = len(table); table.append(table[src] if isinstance(src, int) else table[ids[src]])
@@ -675,6 +681,55 @@ def hairswap_actor(ins, rom, base_at, ref_at, ss_at, slot_map=None, idle_slots=(
             out.append(put_frame(fp, img)); made += 1
         struct.pack_into('<I', rec, 0x54 + 4 * s, ins.put(struct.pack('<I', len(ss) // 4) + struct.pack('<%dI' % len(out), *out)))
     return rec, made, kept
+
+
+def blue_hair_actor(ins, rom, base_at, ss_at, gold, to):
+    """A Super Saiyan figure with its hair turned blue, frame for frame (Nov 9, the owner: SSB Gogeta's sheet frames were a noisy blob with
+    a glow round the hair, "recolor SSJ GOGETA ... just remove the halo"). `gold` are the Super Saiyan hair's colours; a pixel is hair when
+    it is one of them where the base figure (same slot and frame, laid on the same grid by the pieces' offsets) is black hair or empty, or
+    when it is one of the colours only the hair uses (`to`'s keys minus the shared ones are all hair). to: {gold index: blue index}.
+    Returns (record, frames recoloured)."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    def anim(rec_at, s):
+        n = u(rec_at) & 0xFF
+        ap = u(rec_at + 0x54 + 4 * s) if s < n else 0
+        if not ap: return None
+        k = u(ap - BASE); return [u(ap - BASE + 4 + 4 * i) for i in range(4 * k)]
+    def one_piece(fp): return fp and u(fp - BASE) == 1
+    def origin(fp): return struct.unpack_from('<bb', rom, fp - BASE + 4)
+    def put_frame(fp, img):
+        o = fp - BASE; body = bytearray(rom[o:o + 4 + 16])
+        h, w = img.shape
+        data = np.ascontiguousarray(img, np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+        struct.pack_into('<I', body, 4 + 12, ins.put(struct.pack('<II', 0, len(data)) + data))
+        return ins.put(bytes(body))
+    only_hair = [k for k in to if k not in gold['shared']]
+    lut = np.arange(256, dtype=np.uint8)
+    for k, v in to.items(): lut[k] = v
+    n = u(ss_at) & 0xFF; rec = bytearray(rom[ss_at:ss_at + 0x54 + 4 * n])
+    done, made = {}, 0
+    for s in range(n):
+        ss, base = anim(ss_at, s), anim(base_at, s)
+        if not ss: continue
+        out = []
+        for i, fp in enumerate(ss):
+            if not one_piece(fp): out.append(fp); continue
+            bp = base[i] if base and i < len(base) and one_piece(base[i]) else None
+            key = (fp, bp)
+            if key not in done:
+                a = frame_image(rom, fp)
+                b = np.zeros_like(a)
+                if bp:
+                    bi = frame_image(rom, bp); (ax, ay), (bx, by) = origin(fp), origin(bp)
+                    dx, dy = bx - ax, by - ay
+                    y0, x0 = max(0, dy), max(0, dx); y1, x1 = min(a.shape[0], dy + bi.shape[0]), min(a.shape[1], dx + bi.shape[1])
+                    if y1 > y0 and x1 > x0: b[y0:y1, x0:x1] = bi[y0 - dy:y1 - dy, x0 - dx:x1 - dx]
+                hair = np.isin(a, only_hair) | (np.isin(a, list(gold['shared'])) & np.isin(b, [0, 1]))
+                img = a.copy(); img[hair] = lut[a[hair]]
+                done[key] = put_frame(fp, img); made += 1
+            out.append(done[key])
+        struct.pack_into('<I', rec, 0x54 + 4 * s, ins.put(struct.pack('<I', len(ss) // 4) + struct.pack('<%dI' % len(out), *out)))
+    return rec, made
 
 
 def proto_actor(ins, P, i):

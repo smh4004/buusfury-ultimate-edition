@@ -1784,7 +1784,7 @@ void ssb_use(u8 *record, void *sprite) {
     int form = record[0x14];
     XFORM = 0;
     if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) power_down(record, sprite);
-    else if (form == FORM_GOGETA_DBS_SS) power_up(sprite, ssb_vt);
+    else if (form == FORM_GOGETA_DBS_SS) power_to(record, sprite, FORM_GOGETA_SSB_FORM, ssb_vt);    /* on his Blue figure: his Super Saiyan's power-up showed gold hair in the blue aura */
     else power_to(record, sprite, mapped(ssb_map, form), ssb_vt);
 }
 /* Kaioken (Goku and the humans): from a base form to its red copy (kaioken_map), a Super Saiyan class form without the +5, as the build

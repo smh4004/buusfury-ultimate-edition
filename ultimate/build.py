@@ -91,6 +91,7 @@ SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 've
 SSB_FORMS = tuple((v[0], k) for k, v in SSB_LOOKS.items())
 # The blue: Super Saiyan's hair ramp (BF indices) -> DBS Gogeta's Blue tones (gogeta.py's sheet, flattened), lightest as his lightest
 SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86, 246, 246), 29: (200, 248, 248), 2: (200, 248, 248)}
+GOGETA_BLUE = {25: (24, 128, 240), 242: (69, 199, 246), 28: (86, 246, 246)}     # his Super Saiyan hair's dark, mid and light gold -> Blue's (SSB_HAIR's tones)
 KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outlines stay)
 
 
@@ -1294,9 +1295,14 @@ def add_actors(rom, clean):
     cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True}
     one = indexer(usable, pal); lengths = player_anim_lengths(clean)
     cfg['broly_fp']['grow'] = lengths
-    for actor, form in (('gogeta_dbs', 'base'), ('gogeta_dbs_ss', 'ssj'), ('gogeta_ssb', 'ssb')):
+    for actor, form in (('gogeta_dbs', 'base'), ('gogeta_dbs_ss', 'ssj')):
         gogeta.write_frames(clean_dir, form, one)
         cfg[actor] = {'template': 93, 'slots': gogeta.slots(form), 'stretch': True, 'grow': lengths}
+    # Super Saiyan Blue Gogeta (Nov 9, the owner: the sheet's Blue frames were a noisy blob with a glow round the hair: "recolor SSJ GOGETA
+    # if you have to just remove the halo"): his Super Saiyan's frames, the gold hair in Blue's tones. 242 is also his vest's gold, so it
+    # is hair only where his base figure has black hair or nothing (sprites.blue_hair_actor).
+    cfg['gogeta_ssb'] = {'blue_hair': {'base': 'gogeta_dbs', 'ss': 'gogeta_dbs_ss', 'shared': [242],
+                                       'to': {k: one(np.array(v)) for k, v in GOGETA_BLUE.items()}}, 'high': True}
     for name in ('piccolo', 'android17', 'android18', 'krillin', 'future_trunks', 'future_trunks_ss', 'videl_player', 'kid_buu_player', 'majin_buu_player', 'super_janemba_player', 'tien_player', 'yamcha_player', 'pikkon_player', 'hercule_player'):
         cfg[name]['grow'] = lengths
     for a in cfg.values():      # slot 18 is the pose held while firing a skill: LoG2's own firing pose when it has one, else its ki pose
