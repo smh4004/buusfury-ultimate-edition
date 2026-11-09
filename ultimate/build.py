@@ -82,9 +82,9 @@ SS_KAIOKEN = ('goku_ss', 'goku_ss_b', 'kid_goku_ssj')     # their rows go after 
 # Super Saiyan God: each of Goku's base looks -> (its form, owner, the actor its red-haired copy is made from). Rows after Super Saiyan Kaioken's.
 SSG_LOOKS = {'goku_ssg': (0, 0, 106), 'goku_b_ssg': (1, 0, 107), 'goku_halo_ssg': (2, 0, 108)}
 SSG_HAIR = ((120, 32, 64), (200, 32, 64))         # his hair: edge and fill (crimson, from colours the game has)
-# Full Power Mystic: Gohan's orange-gi form -> (its form, owner, the actor its copy with white lightning is made from). Rows after Super Saiyan God's.
+# Full Power Mystic: Gohan's orange-gi form -> (its form, owner, its figure: the orange gi's). Rows after Super Saiyan God's.
 FP_LOOKS = {'gohan_mystic_fp': (13, 1, 101)}
-FP_BOLTS = ((176, 200, 248), (248, 248, 248))     # the lightning: a cool white edge and a white core (Max Power's aura is the same white)
+FP_BOLTS = ((176, 200, 248), (248, 248, 248))     # the crackle's lightning: a cool white fade and a white core (Max Power's aura is the same white)
 # Super Saiyan Blue for Goku and Vegeta (post-game mastery): each Super Saiyan form -> its Blue, a Super Saiyan 3 class copy whose hair is blue.
 SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
@@ -95,35 +95,33 @@ KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outl
 
 
 def crackle_frames(seed, glow, core):
-    """One bolt of the crackle (outfit.c crackle) as four 32x32 frames of colour indices: it strikes (the top half), stands with a branch,
-    jumps a pixel or two, then breaks up in the glow's colour. A 1-pixel core with a glow either side; a short zigzag about the frame's middle."""
+    """One bolt of the crackle (outfit.c crackle) as four 32x32 frames of colour indices: it strikes (the top half), stands with a little
+    branch, jumps a pixel, then breaks up in the fade colour. A one-pixel core with a one-pixel edge on one side (Nov 9, the owner: "a bit
+    too much lightning and too thick"), a short zigzag about the frame's middle."""
     import random
     rng = random.Random(seed)
-    def path(x, y, n, spread):
+    def path(x, y, n):
         pts = [(x, y)]
         for _ in range(n):
-            dx, dy = rng.choice((-2, -1, 1, 2)), rng.choice((2, 3))
+            dx, dy = rng.choice((-2, -1, 1, 2)), rng.choice((2, 2, 3))
             for _ in range(dy): y += 1; pts.append((x, y))
             for _ in range(abs(dx)):
                 x = max(3, min(28, x + (1 if dx > 0 else -1))); pts.append((x, y))
         return [(a, b) for a, b in pts if b < 31]
-    main = path(rng.randint(13, 18), 8, 5, 2)                 # about 14 px tall, in the middle of the frame (the spark's origin)
+    main = path(rng.randint(14, 17), 9, 5)                   # about 12 px tall
     k = len(main) // 2
-    branch = path(main[k][0], main[k][1], 2, 2)
+    branch = path(main[k][0], main[k][1], 1)
     jit = [(min(28, max(3, x + (1 if (y // 4) % 2 else -1))), y) for x, y in main]
-    def draw(*lines, glow_only=False, broken=False):
+    def draw(*lines, colour=core, broken=False):
         img = np.zeros((32, 32), np.uint8)
+        for line in lines:                                   # a one-pixel edge in the fade colour on one side only
+            for x, y in line:
+                if not (broken and (y // 2) % 2) and img[y, x + 1] == 0: img[y, x + 1] = glow
         for line in lines:
-            for i, (x, y) in enumerate(line):
-                if broken and (y // 3) % 2: continue
-                for gx in (x - 1, x + 1):
-                    if img[y, gx] == 0: img[y, gx] = glow
-        for line in lines:
-            for i, (x, y) in enumerate(line):
-                if broken and (y // 3) % 2: continue
-                img[y, x] = glow if glow_only else core
+            for x, y in line:
+                if not (broken and (y // 2) % 2): img[y, x] = colour
         return img
-    return [draw(main[:len(main) * 9 // 20]), draw(main, branch), draw(jit, branch[:len(branch) // 2]), draw(jit, glow_only=True, broken=True)]
+    return [draw(main[:len(main) // 2]), draw(main, branch), draw(jit), draw(jit, colour=glow, broken=True)]
 
 
 def kaioken_rows(clean):
@@ -1289,9 +1287,8 @@ def add_actors(rom, clean):
             a.setdefault('log2_overrides', {}).setdefault('18', 18 if 0x08800000 <= has < 0x09000000 else 5)
     cfg['android13_player'] = {'template': 93, 'slots': ANDROID13_SLOTS, 'stretch': True, 'grow': lengths, 'reserve': 4096}    # the boss's small record can't carry a playable form
     cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths}
-    bright = (one(np.array((96, 248, 248))), one(np.array((200, 248, 248))))     # cyan: Super Saiyan 2's lightning (glow, core)
     for name, source in (('goku_ss2', 109), ('goku_ss2_b', 110), ('gohan_ss2', 104), ('gohan_green_ss2', 105), ('vegeta_ss2', 273), ('vegeta_ss2_b', 274), ('vegeta_armor_ss2', 'vegeta_armor_ss'), ('gohan_armor_ss2', 'gohan_armor_ss2_art'), ('trunks_ss2', 261), ('trunks_armor_ss2', 'trunks_armor_ss'), ('vegito_ss2', 276)):
-        cfg[name] = {'bolts_of': source, 'bolt_colours': bright, 'high': True}     # (above 16 MB: the widened frames take more room)
+        cfg[name] = {'same_as': source}
     cfg['android17']['reserve'] = 2048                  # the same as Super 17's: a change of size on transforming re-allocates OBJ memory and scrambled other sprites
     cfg['super17'] = {**cfg['android17'], 'size_scale': [1.12, 1.1], 'reserve': 2048}     # slightly taller and bulkier, as in Gero's Legacy
     cfg['android13_absorb'] = {'template': 152, 'slots': {'0': 'a13_absorb!front', '1': 'a13_absorb!front'}}     # a cutscene figure: only an idle animation plays by itself, as in Gero's Legacy
@@ -1306,7 +1303,7 @@ def add_actors(rom, clean):
     cfg['goku_black'] = {'template': goku_black.SOURCE['black'], 'raw_frames': {str(k): v for k, v in looks['black'].items()}}
     cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg.update(gt.actors(clean, pal, lengths))      # GT: Black Star Odyssey's fighters (bso_import.py; BFU_BSO points at the owner's sheet)
-    cfg['gohan_gt_ss2'] = {'bolts_of': 'gohan_gt_ssj', 'bolt_colours': bright, 'high': True}     # GT Gohan's Super Saiyan 2: his Super Saiyan with the lightning
+    cfg['gohan_gt_ss2'] = {'same_as': 'gohan_gt_ssj'}     # GT Gohan's Super Saiyan 2: his Super Saiyan's figure, with the crackle (outfit.c)
     hair = ssb_hair(one)
     for n, (_, _, _, src, _) in SSB_LOOKS.items():
         cfg[n] = {'tint_of': src, 'tint': hair, 'high': True}
@@ -1326,10 +1323,10 @@ def add_actors(rom, clean):
     # changed clothes as he powered up. His own frames (actor 101) with the school Super Saiyan's gold hair: the pixels where actor 104
     # differs from the school base (98). Slot 20 (the spin attack) is the orange gi's slot 19; slot 11 (powering down) has no base frames.
     cfg['gohan_orange_ss'] = {'hairswap': {'base': 101, 'ref': 98, 'ss': 104, 'slots': {'20': [20, 19]}, 'idle_slots': [11]}, 'high': True}
-    cfg['gohan_orange_ss2'] = {'bolts_of': 'gohan_orange_ss', 'bolt_colours': bright, 'high': True}
-    # Full Power Mystic: the orange gi's own frames (actor 101) with white lightning on them; its power-up is the orange gi's (_powerup)
+    cfg['gohan_orange_ss2'] = {'same_as': 'gohan_orange_ss'}
+    # Full Power Mystic: the orange gi's own figure (actor 101) under its own id; its lightning is the crackle (outfit.c), its power-up the orange gi's (_powerup)
     for n, (_, _, src) in FP_LOOKS.items():
-        cfg[n] = {'bolts_of': src, 'bolt_colours': tuple(one(np.array(c)) for c in FP_BOLTS), 'high': True}
+        cfg[n] = {'same_as': src}
     cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, powerup_frames(rom, ids, end)

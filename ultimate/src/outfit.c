@@ -2146,11 +2146,12 @@ void fp_use(u8 *record, void *sprite) {
     else power_to(record, sprite, mapped(fp_map, form), maxp_vt);
 }
 /* The crackle (Nov 9, the owner: "make the SSJ2 and Mystic forms lightnings more visible and more present", "make the lightning move with
-   the SSJ or mystic aura"): besides the bolts on the figure's own frames (lib/sprites.py bolted_actor), a fighter in a Super Saiyan 2 form or
-   Full Power (or powering up into it) crackles: every 7 to 14 frames a short bolt strikes beside his head or chest, on either side, and
-   breaks up (four 32x32 frames over about 11 frames, build.py crackle_frames: cyan for Super Saiyan 2, white for Full Power), drawn as the
-   hit sparks are (NewSpark on the actor list, gone after its last frame), so about one is out at a time. Timed by the frame counter (the
-   hook can run more than once a frame) and placed by a hash of it, so the game's random numbers are left alone. */
+   the SSJ or mystic aura", then "a bit too much lightning and too thick, also make the entire thing animated ... all or nothing"): the
+   lightning of a Super Saiyan 2 form or Full Power (or powering up into it) is all here, none on the figure's frames: every 7 to 13 frames a
+   thin bolt strikes beside his head or shoulders, on either side, and breaks up (four 32x32 frames over about 11 frames, build.py
+   crackle_frames: cyan for Super Saiyan 2, white for Full Power), drawn as the hit sparks are (NewSpark on the actor list, gone after its
+   last frame), so one or two are out at a time. Timed by the frame counter (the hook can run more than once a frame) and placed by a hash
+   of it, so the game's random numbers are left alone. */
 const u32 bolt_ss2[36] = {1}, bolt_fp[36] = {1};      /* three bolts x four frames x (origin, attributes, tiles): build.py fills them */
 #define BOLT_NEXT (*(volatile u32 *)0x0203F26C)
 static u32 bolt_hash(void) { u32 x = FRAMES * 0x9E3779B1u; x ^= x >> 15; x *= 0x85EBCA77u; x ^= x >> 13; return x; }
@@ -2164,10 +2165,10 @@ static void crackle(void) {
     if (is_ss2(form)) set = bolt_ss2; else if (is_fp(form)) set = bolt_fp; else return;
     if ((int)(FRAMES - BOLT_NEXT) < 0 && BOLT_NEXT - FRAMES < 60) return;
     h = bolt_hash();
-    BOLT_NEXT = FRAMES + 7 + h % 8;
+    BOLT_NEXT = FRAMES + 7 + h % 7;
     SpriteBox(box, me); VecOp(v, box, box + 2);
-    dx = 7 + (h >> 8) % 6;
-    pos[0] = (v[0] >> 1) + (h >> 12 & 1 ? dx : -dx); pos[1] = (v[1] >> 1) - 6 - (int)((h >> 16) % 10);
+    dx = 5 + (h >> 8) % 6;
+    pos[0] = (v[0] >> 1) + (h >> 12 & 1 ? dx : -dx); pos[1] = (v[1] >> 1) - 10 - (int)((h >> 16) % 10);
     { void *spark = NewSpark(0, pos, set + 12 * ((h >> 20) % 3), 4, 0x6000, 0x400, 0x38); if (spark) ListAdd(ACTORS, spark); }
 }
 void majuub_use(u8 *record, void *sprite) {

@@ -81,7 +81,7 @@ check('Kid Goku: Super Saiyan, 3, 4, then back to base', fs[1] == F['kid_goku_ss
 seq, bad = play('vegeta', [7, SS, SS4], F['vegeta_gt'], (SS, SS4, SS4))
 fs = [f for f, _, _ in seq]
 check('GT Vegeta: Super Saiyan, then 4, then back', fs[0] == F['vegeta_gt_ssj'] and fs[1] == F['vegeta_gt_ssj4'] and fs[2] == F['vegeta_gt'] and not bad)
-# GT Gohan: Super Saiyan, then 2 (the build's lightning copy)
+# GT Gohan: Super Saiyan, then 2 (his Super Saiyan's figure with the crackle)
 seq, bad = play('gohan', [7, SS, SS2, SS3], F['gohan_gt'], (SS, SS2, SS2))
 fs = [f for f, _, _ in seq]
 check('GT Gohan: Super Saiyan, then 2, then back', fs[0] == F['gohan_gt_ssj'] and fs[1] == F['gohan_gt_ss2'] and fs[2] == F['gohan_gt'] and not bad)

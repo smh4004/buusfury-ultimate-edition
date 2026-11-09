@@ -48,16 +48,17 @@ its own form, powers down. Super Saiyan 2 also follows Super Saiyan in Super Sai
 swapped for SS1"): once the story opens Super Saiyan 2, Super Saiyan pressed in Super Saiyan goes up to it (Super Saiyan 3 then goes up from
 there), and pressed in Super Saiyan 2 powers down; Super Saiyan 2 is known but takes no slot (`ss_to_ss2`, `skills_sync`). No
 Super Saiyan during Kaioken, and no Kaioken in Super Saiyan until Kaioken is fully mastered. Full Power (Nov 9): Mystic Gohan only, from
-his orange gi (form 13) and none of his other forms, learned with the orange gi (outfit flag 860): his frames with white lightning
-(`build.py FP_LOOKS`, a bolted copy of actor 101), Max Power's white aura, 1.75x without Super Saiyan's +5, half Super Saiyan's drain, back
+his orange gi (form 13) and none of his other forms, learned with the orange gi (outfit flag 860): his own figure with white lightning
+crackling around him (`build.py FP_LOOKS`), Max Power's white aura, 1.75x without Super Saiyan's +5, half Super Saiyan's drain, back
 to the orange gi; no Super Saiyan from it (`fp_can`, `test_fp.py`). Orange-gi Gohan's Super Saiyan and 2 (forms 58, 79) are his own
 frames with the school Super Saiyan's gold hair (`lib/sprites.py hairswap_actor`: the pixels where actor 104 differs from 98, laid over 101;
 the power-down's 32x32 frames on the idle's grid); before, he changed into the school uniform as he powered up. Icons: `lib/icons.py` (Super Saiyan 3's icon with a cyan 2 or a purple 4, the Z in red or
 blue). GT Gohan's Super Saiyan 2 and the Blue hair (`ssb_hair`, Super Saiyan Gogeta's blues) are recolours. Super Saiyan 2's and Full
-Power's lightning (Nov 9, the owner: "more visible and more present", "move with the aura"): tall zigzag bolts with a glow on every frame of
-the figure (`lib/sprites.py bolted_actor`; the 16x32 idle and walk frames become 32x32 so they aren't clipped), and a crackle that keeps
-moving whatever the figure does: a short bolt strikes beside his head or chest every 7-14 frames and breaks up (`outfit.c crackle`, frames
-from `build.py crackle_frames`, drawn as hit sparks), cyan for Super Saiyan 2, white for Full Power.
+Power's lightning (Nov 9, the owner: "more visible and more present", "move with the aura", then "a bit too much lightning and too thick,
+also make the entire thing animated ... all or nothing"): none of it is on the figure's frames (the Super Saiyan 2 forms and Full Power use
+their source figure under their own actor id, `same_as`); all of it is the crackle, a thin bolt (one pixel and a one-pixel edge) that
+strikes beside his head or shoulders every 7-13 frames and breaks up over about 11 (`outfit.c crackle`, frames from `build.py
+crackle_frames`, drawn as hit sparks), cyan for Super Saiyan 2, white for Full Power; `test_fp.py` counts the strikes.
 Kaioken (Goku from the start, Krillin, Tien, Yamcha, Videl, Hercule): 1.25x, 1.5x and 1.75x by its mastery level, costing health as it goes.
 Fully mastered (level 3) it changes (`outfit.c` `kk_track`, `kk_hud`, `combat_hook`): no health cost; it brings a cyan bar of its own over the
 health bar, half the fighter's health (`build.py` `kk_bar`), which pays the cost as it goes and takes the hits instead of health, with no

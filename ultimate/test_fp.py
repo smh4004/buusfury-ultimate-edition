@@ -2,9 +2,9 @@
 """Full Power (Nov 9, the owner: "add a full power Mystic form for Mystic Gohan only don't allow any of his other forms to use it"), in the
 Bomber fight of tools/harness/enemy_test.txt (build `--debug --enemy` first).
   python3 ultimate/test_fp.py [rom] [work dir]
-Gohan learns it with the orange gi (outfit flag build.py MYSTIC_FLAG). It powers up from the orange gi (form 13) to its copy with white
-lightning (build.py FP_LOOKS) on that figure, hits 1.75x as hard, drains at half Super Saiyan's rate, and pressed again goes back to the
-orange gi. No Super Saiyan from it, and none of his other forms has it (test_tiers.py)."""
+Gohan learns it with the orange gi (outfit flag build.py MYSTIC_FLAG). It powers up from the orange gi (form 13) to its own form (build.py
+FP_LOOKS: the orange gi's figure) with white lightning crackling around him (outfit.c crackle), hits 1.75x as hard, drains at half Super
+Saiyan's rate, and pressed again goes back to the orange gi. No Super Saiyan from it, and none of his other forms has it (test_tiers.py)."""
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
@@ -83,15 +83,24 @@ d_fp, f_fp = drain('drain_fp', [7, 15, FP])
 print('   pool drained in 450 frames: %d as a Super Saiyan (form %d), %d at Full Power (form %d)' % (d_ss, f_ss, d_fp, f_fp))
 check('it drains at about half Super Saiyan\'s rate', f_ss == forms['gohan_orange_ss'] and f_fp == FPF and d_ss > 6 and 0.35 < d_fp / d_ss < 0.65)
 
-# 5. The figure: the orange gi's frames with white lightning added, nothing taken away
-import sprites
-def frame0(rec):                                   # the idle frame, front view (a player's frame is one piece)
-    a = u(rec + 0x54) - 0x08000000
-    return sprites.frame_image(rom, u(a + 4))
-img, src = frame0(figure(FPF) - 0x08000000), frame0(figure(ORANGE) - 0x08000000)
-added = int(((img != src) & (src == 0)).sum()); changed = int(((img != src) & (src != 0)).sum())
-print('   lightning pixels %d, body pixels changed %d' % (added, changed))
-check('the orange gi with lightning on it', img.shape == src.shape and added > 4 and changed < added)
+# 5. The lightning is all animated (Nov 9, the owner: "make the entire thing animated ... all or nothing"): the figure is the orange gi's own
+# frames, and the crackle (outfit.c crackle) strikes a bolt every 7-13 frames in Full Power and Super Saiyan 2, never in a base form.
+# Each strike moves its next time on (BOLT_NEXT): the distinct values seen over 120 frames count the strikes.
+check('Full Power\'s figure is the orange gi\'s frames', figure(FPF) != figure(ORANGE) and u(figure(FPF) - 0x08000000 + 0x54) == u(figure(ORANGE) - 0x08000000 + 0x54))
+BOLT_NEXT = 0x0203F26C
+def strikes(name, skills, form, seq):
+    L = T.setup(skills, form, (0,)) + T.AWAY + ['run 2']
+    for k in seq:
+        L += ['poke8 %08X %02X' % (R + 0x15, k)] + T.FULL + SS_FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in T.AWAY + ['run 30']]
+    L += [v for _ in range(24) for v in T.AWAY + ['run 5', 'mem %08X 1' % BOLT_NEXT]] + ['mem %08X 1' % (R + 0x14), 'shot %s' % name]
+    o = T.run(L, name)
+    return len(set(w[0] for w in words(o, BOLT_NEXT))), words(o, R + 0x14)[-1][0] & 255
+n_fp, f1 = strikes('crackle_fp', [7, SS, FP], ORANGE, (2,))
+n_ss2, f2 = strikes('crackle_ss2', [7, SS, 15], 0, (1, 1))
+n_base, f3 = strikes('crackle_base', [7, SS, FP], ORANGE, ())
+print('   strikes in 120 frames: Full Power %d (form %d), Super Saiyan 2 %d (form %d), the orange gi %d (form %d)' % (n_fp, f1, n_ss2, f2, n_base, f3))
+check('the crackle strikes in Full Power and Super Saiyan 2, about every 10 frames', f1 == FPF and f2 in (forms['goku_ss2'], forms['goku_ss2_b']) and 8 <= n_fp <= 20 and 8 <= n_ss2 <= 20)
+check('and never in a base form', f3 == ORANGE and n_base <= 1)
 print('screens in', T.D)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')
