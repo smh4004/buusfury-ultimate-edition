@@ -1832,9 +1832,21 @@ static void learn(int c, int skill, int ok) {
     set_known(c, skill, 1);
     if (rec[0x0C] < MAX_HELD) equip(c, rec, rec[0x0C], skill);
 }
+/* A save from the original game (Nov 9: the owner's 100% Buu's Fury save) went through the story scenes that unlock outfits and Super Saiyan 2
+   (outfits.json "unlocks", build.py) before the mod could set its flags there. Once the ending is seen they are all past; a few scenes also
+   set a story flag of their own (STORY_MARKS: the unlock's flag, the scene's), which tells it earlier. */
+static const u16 story_unlocks[] = STORY_UNLOCKS, story_marks[][2] = STORY_MARKS;
+static void story_sync(int post) {
+    int i;
+    for (i = 0; i < (int)(sizeof story_unlocks / sizeof *story_unlocks); i++)
+        if (post) FLAG_BYTE(story_unlocks[i]) |= 1 << (story_unlocks[i] & 7);
+    for (i = 0; i < (int)(sizeof story_marks / sizeof *story_marks); i++)
+        if (GetFlag(G_FLAGS, story_marks[i][1])) FLAG_BYTE(story_marks[i][0]) |= 1 << (story_marks[i][0] & 7);
+}
 void skills_sync(int c) {
     u8 *rec;
     int i, post = GetFlag(G_FLAGS, 149), gt = more_flag(MORE_GT_FLAG);
+    story_sync(post);
     if (c > 7) return;
     rec = rec_of(c);
     for (i = 0; i < rec[0x0C]; i++) {
@@ -1856,7 +1868,13 @@ void skills_sync(int c) {
         learn(c, SSB_SKILL, post && mastery_level(4, 35) == 2);
     }
 }
-/* the Skills tab (vtable 0x0804B024): R swaps the chosen skill for the next one the fighter knows but isn't holding */
+static int can_swap(int c) {                          /* does he know a skill he isn't holding? */
+    u8 *rec = rec_of(c);
+    int b;
+    for (b = 0; b < 16; b++) if (skill_book[c][b] != 255 && KNOWN(rec) >> b & 1 && slot_of(rec, skill_book[c][b]) < 0) return 1;
+    return 0;
+}
+/* the Skills tab (vtable 0x0804B024): SELECT swaps the chosen skill for the next one the fighter knows but isn't holding */
 void skills_swap(int c, int at) {
     u8 *rec = rec_of(c);
     int i, b0, cur;
@@ -1889,8 +1907,9 @@ int skilltab_setup(u8 *obj, int a, int b, int d) {
     skills_sync(c);
     *(int *)(obj + 0x118) = c <= 8 ? rec_of(c)[0x0C] : *(int *)(obj + 0x118);
     r = SkillTab_Setup(obj, a, b, d);
-    if (c <= 7)                                          /* the hint, beside Select and Cancel (the game's buttons have no SELECT icon) */
-        AddWidget(obj, NewText(0, obj, 0x84, 0x90, (const u16 *)L"SELECT: Swap", 5, 0, (void *)FONT));
+    if (c <= 7)                                          /* the hint, beside Select and Cancel (the game's buttons have no SELECT icon); with nothing
+                                                            learned beyond what he holds, it says so (Nov 9: the owner took SELECT for broken) */
+        AddWidget(obj, NewText(0, obj, 0x84, 0x90, can_swap(c) ? (const u16 *)L"SELECT: Swap" : (const u16 *)L"Nothing to swap", 5, 0, (void *)FONT));
     return r;
 }
 /* sub_0801C312 ends a power-up by moving the record to its form's up; xform_hook (at 0x0801C35C) lets XFORM choose instead. */
@@ -2085,12 +2104,34 @@ void ssj4_hud(const u8 *widget, u8 *buf) {
    Super Saiyan 3 adds 15 to the stats where Super Saiyan adds 5: its attacks count from the Super Saiyan figure, and it keeps the extra Endurance and Speed. */
 int mastery_level(int c, int skill);
 int ng_cycle(void);
+/* Post-game bosses (Nov 9, the owner, after a level 200 Super Saiyan Gogeta beat Super 13 easily and took almost no damage: "want post game
+   bosses to be a bit more of a challenge"). They were tuned for a level 99 fighter, and the stats move damage steeply both ways (damage grows
+   like (s + 100) * s^2 with the attacking stat, docs/modding.md, and Endurance cuts it as hard): at level 200, stats about 180, a fighter hit
+   Super 13 three times as hard and took a fifth of his damage. Against an enemy on a row the mod added (every row past the game's STATS_ROWS,
+   and Super 13's PHASE1_ROW and BOSS_ROW), a stat above BOSS_REF counts a quarter of what it is above: the player's Strength and Power on his
+   hits (after his form's changes; the form's multiplier stays), his Endurance on the boss's; and the boss's hits grow with the fighter's health
+   past BOSS_HP. Levelling still helps, a little. Measured in a rig (Super 13's row, stats 180 vs 100): hits on him a third, his hits on a
+   10176-health fighter about 6% each. */
+#define STATS_TABLE (*(const u8 * const *)(0x08000000 + STATS_REF))
+#define BOSS_REF 110
+#define BOSS_HP 4000            /* a fighter with more health than this takes that much more from a post-game boss (at most 3x): a hit stays a hit */
+static int postgame_foe(const u8 *e) {
+    const u8 *row, *t = STATS_TABLE;
+    int i;
+    if (!e || e[0x1D0] == 1) return 0;                    /* team 1: the player's side */
+    row = *(const u8 * const *)(e + 0x224);
+    if (row < t || row >= t + 28 * 1024 || (row - t) % 28) return 0;
+    i = (row - t) / 28;
+    return i >= STATS_ROWS || i == PHASE1_ROW || i == BOSS_ROW;
+}
+static u16 boss_stat(int s) { return s > BOSS_REF ? BOSS_REF + (s - BOSS_REF) / 4 : s; }
 void combat_orig(void *defender, int *hit);
 __asm__(".syntax unified\n.thumb\n.thumb_func\ncombat_orig:\npush {r4, r5, r6, r7, lr}\nadds r6, r0, #0\nadds r4, r1, #0\nadds r1, #8\nldr r3, =0x0800E9E1\nbx r3\n.ltorg\n");
 void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
     int mine = hit[3] && *((u8 *)hit[3] + 0x1D0) == 1;    /* the attacker (hit[3], the owner of a blast) is on the player's side (team 1). hit[0] is the direction */
+    u16 *guard = 0, endurance = 0;                        /* the defender's Endurance while a post-game boss hits him */
     if (hit[3] && !mine && *((u8 *)defender + 0x1D0) == 1) {      /* New Game+: enemies hit half again as hard for each time round */
         int k = ng_cycle();
         if (k) hit[1] = scale + (scale >> 1) * k;
@@ -2121,7 +2162,14 @@ void combat_hook(void *defender, int *hit) {
         }
     }
     if (mine && dragon4_live) hit[1] += hit[1] >> 2;      /* Super Saiyan 4's Super Dragon Fist: 1.25x */
+    if (mine && postgame_foe(defender)) { stats[0] = boss_stat(stats[0]); stats[1] = boss_stat(stats[1]); }      /* a post-game boss (above) */
+    else if (hit[3] && !mine && postgame_foe((const u8 *)hit[3]) && *((u8 *)defender + 0x1D0) == 1) {
+        int top = *(const short *)(RECORDS + *(u8 *)0x03001068 * RECORD_SIZE + 0x18);
+        guard = (u16 *)((u8 *)defender + 0x1B0) + 2; endurance = *guard; *guard = boss_stat(endurance);
+        if (top > BOSS_HP) hit[1] = hit[1] * (top < 3 * BOSS_HP ? top : 3 * BOSS_HP) / BOSS_HP;     /* and in step with his health */
+    }
     combat_orig(defender, hit);
+    if (guard) *guard = endurance;
     if (defender == PLAYER_OBJ && KK_ON && KK_GUARD && is_kaioken(form) && hit[6] > 0) {     /* hit[6]: the damage (1/1024ths); 0 means no damage and no stagger */
         int dmg = (hit[6] + 0x3FF) >> 10;
         if (dmg < KK_GUARD) { KK_GUARD -= dmg; hit[6] = 0; }

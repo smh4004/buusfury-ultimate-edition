@@ -56,6 +56,7 @@ SS2_SKILL, SS4_SKILL, KAIOKEN_SKILL = 35, 36, 37                  # Super Saiyan
 GALICK_SKILL, TENX_SKILL, FINAL_SHINE_SKILL, DRAGON4_SKILL = 38, 39, 40, 41     # Kamehameha's code violet / red, Final Flash's green, Dragon Fist's red
 SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
 MAX_POWER_SKILL = 45             # Master Roshi's Max Power (Nov 9)
+STORY_MARKS = ((858, 38), (860, 132), (864, 120))     # outfits.json unlocks whose scene also sets a story flag: (unlock flag, scene's flag; outfit.c story_sync)
 SSG_SKILL = 46                   # Super Saiyan God (Nov 9): Goku, from base, after the Battle of Gods ritual with Super Saiyan mastered
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
 # picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
@@ -99,6 +100,23 @@ def kaioken_rows(clean):
     # Super Saiyan God: the base row's copy with the red-haired actor, Super Saiyan's class (its drain, halved in outfit.c), back down to base
     return rows + [{'id': n, 'copy': base, 'actor': n, 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base, 'name': SSG_NAME_UI}
                    for n, (base, owner, _) in SSG_LOOKS.items()]
+
+
+# The beam's body rows (the Kamehameha's, and every beam built on it): levels 1-2 point at 0x721188 and level 3 at 0x7211F4, nine rows on.
+# The engine's shimmer for levels 1-2 runs on past their nine rows into level 3's three (rows 9-11), so it is one 12-row block. Copying nine
+# rows per level put the next copy (the beam's head pieces) in rows 9-11: the Galick Gun drew a row of round heads along its body every
+# other frame (Nov 9, the owner: "galick gun sprite is messed up"; the Special Beam Cannon and Black's Kamehameha had it too).
+BEAM_BODY = (0x721188, 12)
+
+
+def body_block(frames):
+    """frames(rom offset, rows) -> its recoloured copy; -> body pointer -> the same rows in one copy of the whole block."""
+    at = frames(BEAM_BODY[0], BEAM_BODY[1])
+    def body_at(body):
+        o = body - ROM_BASE - BEAM_BODY[0]
+        if not 0 <= o < 12 * BEAM_BODY[1] or o % 12: sys.exit('beam body rows moved: %X' % body)
+        return at + o
+    return body_at
 
 
 def ssg_hair(one):
@@ -1434,7 +1452,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1671,9 +1689,10 @@ def add_eraser(rom, clean, sym, at, art):
         struct.pack_into('<I', record, 12 * (facing * 16 + 6) + 8, struct.unpack_from('<I', record, 12 * (facing * 16 + 5) + 8)[0])
     beam_art = put(bytes(record))
     shape, table = {}, sym['beam_params'] - ROM_BASE
+    body_at = body_block(frames)
     for i in range(3):
         a, strength, body, head = struct.unpack_from('<4I', clean, BEAM_PARAMS + 16 * i)
-        shape.setdefault(body, frames(body - ROM_BASE, 9))
+        shape.setdefault(body, body_at(body))
         struct.pack_into('<4I', rom, table + 16 * i, a, strength, shape[body], beam_art)
     vt = sym['beam_vt'] - ROM_BASE
     for k in range(9):
@@ -1772,9 +1791,10 @@ def add_eraser(rom, clean, sym, at, art):
                 struct.pack_into('<I', out, k + 8, copies[tiles])
             return put(bytes(out))
         shape, table = {}, sym[form + '_params'] - ROM_BASE
+        body_at = body_block(frames)
         for i in range(3):
             a, strength, body, head = struct.unpack_from('<4I', clean, BEAM_PARAMS + 16 * i)
-            shape.setdefault(body, frames(body - ROM_BASE, 9)); shape.setdefault(head, frames(head - ROM_BASE, 64))
+            shape.setdefault(body, body_at(body)); shape.setdefault(head, frames(head - ROM_BASE, 64))
             struct.pack_into('<4I', rom, table + 16 * i, a, strength, shape[body], shape[head])
         if form == 'black': icon_map = remap
     vt = sym['black_kame_vt'] - ROM_BASE
@@ -1802,9 +1822,10 @@ def add_eraser(rom, clean, sym, at, art):
                 struct.pack_into('<I', out, j + 8, copies[tiles])
             return put(bytes(out))
         shape, table = {}, sym['kv_params'] - ROM_BASE + 48 * k
+        body_at = body_block(frames)
         for i in range(3):
             a, strength, body, head = struct.unpack_from('<4I', clean, BEAM_PARAMS + 16 * i)
-            shape.setdefault(body, frames(body - ROM_BASE, 9)); shape.setdefault(head, frames(head - ROM_BASE, 64))
+            shape.setdefault(body, body_at(body)); shape.setdefault(head, frames(head - ROM_BASE, 64))
             struct.pack_into('<4I', rom, table + 16 * i, min(int((a >> 16) * power), 0xFFFF) << 16 | a & 0xFFFF, strength, shape[body], shape[head])   # +0's top half: the damage (41, 164, 328 by level)
         vt = sym['kv_vt'] - ROM_BASE + 36 * k
         for j in range(9):
@@ -2043,6 +2064,22 @@ def add_portraits(rom, clean, at):
     return cur
 
 
+# The press-fast meters (native 0xC6: pulling the Z-Sword, pushing the Spirit Bomb at the end of the story and at Super 13's; sub_080301B8): each
+# press of A, B or the +Control Pad adds 10 towards 85, and each frame without one keeps 31/32 of it (rounded down: at least 1 lost a frame), so
+# only 12 or more presses a second ever fill it (Nov 9, the owner: "impossible to fill up even when spamming the A button as fast as humanly
+# possible"). Now a press adds 16 and a frame without one keeps 127/128 (1 a frame below 128): about 5 presses a second fill it in 3 seconds,
+# 7 in about 1 (measured in the emulator: test_zone26.py presses it 6 times a second). (address, old, new) Thumb instructions.
+MASH_PATCHES = ((0x301CA, 0x330A, 0x3310),          # adds r3, #10 -> #16
+                (0x301E6, 0x014B, 0x01CB),          # lsls r3, r1, #5 -> #7
+                (0x301EA, 0x1149, 0x11C9))          # asrs r1, r1, #5 -> #7 (with the subs between: x * 127 / 128)
+
+
+def mash_retune(rom):
+    for at, old, new in MASH_PATCHES:
+        if struct.unpack_from('<H', rom, at)[0] != old: sys.exit('the press-fast meter moved: %X' % at)
+        struct.pack_into('<H', rom, at, new)
+
+
 def thumb_bl(at, to):
     d = (to - (at + 4)) >> 1
     return struct.pack('<HH', 0xF000 | (d >> 11 & 0x7FF), 0xF800 | (d & 0x7FF))
@@ -2115,6 +2152,7 @@ def main():
     free, actors_end = add_outfits(rom, clean, (free + 3) & ~3, actors_end)
     sys.path.insert(0, 'ultimate')
     import zone26
+    mash_retune(rom)
     zone_end, zone_info = zone26.apply(rom, clean, PROTO, LOG2, actors_end, actors, debug and '--zone' in sys.argv, symbol('gUnknown_08785580'), symbol('gUnknown_08796114'), symbol('gUnknown_08786E68'))
     print('zone 26 tiles:', zone_info)
     actors_end = add_portraits(rom, clean, zone_end)      # 4 KB each: they live with the art, past the code area

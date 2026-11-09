@@ -85,6 +85,24 @@ Variables added since Nov 9 live in work RAM from 0x0203F250 (the Kaioken bar, t
 when used: `heap_init` is left alone, because even a few more stores there made the game drop a frame in fifteen. `outfit.c` can't have
 writable statics (they'd link into ROM); the build stops if one appears.
 
+## Fixes from the owner's play (Nov 9, with a 100% save from the original game)
+- Saves from the original game: the story scenes that unlock outfits and Super Saiyan 2 (outfits.json "unlocks") had passed before the
+  mod could set its flags, so Gohan's outfits, and Super Saiyan 2 for Gohan, Trunks, Vegeta and the fusion, never came. `outfit.c
+  story_sync` (in skills_sync) sets them all once the ending is seen, and earlier where the scene sets a story flag of its own
+  (`build.py STORY_MARKS`). Checked on the owner's save: the flags come on, Super Saiyan 2 goes into free slots.
+- The Skills tab says "Nothing to swap" instead of "SELECT: Swap" when the fighter knows nothing beyond what he holds (the owner took
+  SELECT for broken: with that save only Goku and Vegeta had anything to swap).
+- Beam bodies (`build.py body_block`): the Kamehameha's body rows for levels 1-2 run on into level 3's (one 12-row block at 0x721188);
+  copying nine rows per level put the beam's head pieces in rows 9-11, so the Galick Gun, Special Beam Cannon, Black's Kamehameha,
+  10x and Super Kamehameha drew a row of round heads along the beam every other frame ("galick gun sprite is messed up").
+- The press-fast meter (native 0xC6: the Z-Sword, both Spirit Bomb pushes): +16 a press and 127/128 kept a frame, where it was +10 and
+  31/32 (at least 1 a frame), which needed 12+ presses a second. Now about 5 a second fill it in 3 seconds, 6 in 2 (measured in the
+  emulator, reading the meter at 0x0804D5BC objects); `test_zone26.py` presses it 6 times a second.
+- Post-game bosses (`outfit.c postgame_foe`): every enemy on a row the mod added, and Super 13's, counts the player's stats above 110 at a
+  quarter (his Strength and Power on his hits, his Endurance on the boss's), and its hits grow with the fighter's health past 4000 (at most
+  3x). In a Super 13 rig with stats 180 (a level 200 fighter): his hits on Super 13 a third, Super 13's about 6.7% of the fighter's health a
+  hit (it was about 1.5%). The owner: "want post game bosses to be a bit more of a challenge". Below 110 and 4000 nothing changes.
+
 ## Beerus (Nov 9, for the Battle of Gods post-game)
 Buu's Fury has no Beerus, so `lib/beerus.py` makes every frame from BF Kid Buu's (actor 38): the same 15 x 31 build as the owner's front sprite
 (`art/beerus_reference.jpg`), a bare torso, baggy trousers, wristbands, and the boss's 19 slots, so a fight on Kid Buu's enemy row plays all

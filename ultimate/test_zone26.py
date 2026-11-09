@@ -74,7 +74,7 @@ out = run(phase); check('beating Android 13 starts his change', at(out) == (16 <
 two = phase + ['shot change_say', 'tap A 60', 'tap A 60', 'tap A 60', 'run 300', 'keys UP', 'run 60', 'keys', 'run 120', 'shot phase2', 'mem 0300197C 1']
 out = run(two); check('walking up to him starts phase two', at(out) == (17 << 8 | 26))
 hp2 = boss(two, 75000)[0]; check('Super 13 has 75000 HP', hp2 is not None)
-end = kill(two, 75000) + ['poke8 03001577 7F'] + ['tap A 30'] * 16 + ['shot struggle'] + ['keys A', 'run 1', 'keys', 'run 1'] * 300
+end = kill(two, 75000) + ['poke8 03001577 7F'] + ['tap A 30'] * 16 + ['shot struggle'] + ['keys A', 'run 5', 'keys', 'run 5'] * 60      # A 6 times a second: a person can (build.py MASH_PATCHES)
 end += ['shot bomb', 'run 500', 'shot home_after', 'mem 0300197C 1', 'tap A 40', 'keys LEFT', 'run 10', 'keys', 'dump g 03001068 8a8']
 out = run(end); g = open(d + '/g.bin', 'rb').read(); flag = lambda n: g[0x55 + n // 8] >> (n % 8) & 1; g_flag_off = g[0x55 + 149 // 8] & ~(1 << 149 % 8)
 check('no bad jumps through the whole fight', 'bad pc' not in out)
