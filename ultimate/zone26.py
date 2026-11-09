@@ -202,6 +202,7 @@ BUILDING = (0, 92)
 MORE_FLAG, MORE_GET, MORE_PUT = 2000, 0xFD, 0xF0    # flags past the story's, kept with the bench (32 of them): an outfit's flag from 2000 up, and natives more_get(n), more_put(n, value)
 MORE_YAMCHA, MORE_TIEN, MORE_PIKKON, MORE_HERCULE = 0, 1, 2, 3
 MORE_TIER, MORE_RACE, MORE_MUSEUM, MORE_RANK_NEW, MORE_HARD, MORE_HARD_PAID, MORE_ENDLESS_NEW, MORE_HERC_WON = 4, 5, 6, 7, 13, 14, 15, 24
+MORE_ROSHI = 31                                     # Master Roshi joined (Kame House, after the ending)
 MORE_LEDGIC_WON, MORE_GT, MORE_UUB_WON, MORE_UUB = 27, 28, 29, 30    # Ledgic beaten, not yet told; GT looks and Pan; Uub beaten, not yet told; Uub joined
 MORE_BLACK, MORE_BLACK_WON = 25, 26                  # Goku Black: joined; Rose beaten, not yet told    # 8-10 best rank, 11-12 last rank, 16-23 best Endless run (see ladder in outfit.c)
 LADDER = 0xDC                                       # native ladder(op): 0 start Endless, gives the first room; 1 is it on; 2 a win: pays, gives the next room; 3 it ended; 4 this run's wins; 5 best run; 6 rank(hp, max); 7 last rank; 8 best rank (1 C, 2 B, 3 A, 4 S)

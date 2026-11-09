@@ -55,6 +55,8 @@ MAJUUB_SKILL = 34                # Uub becomes Majuub: Super Saiyan's mechanics,
 SS2_SKILL, SS4_SKILL, KAIOKEN_SKILL = 35, 36, 37                  # Super Saiyan 2 and 4 (Super Saiyan 3's icon with a 2 / a purple 4), Kaioken (a red Z)
 GALICK_SKILL, TENX_SKILL, FINAL_SHINE_SKILL, DRAGON4_SKILL = 38, 39, 40, 41     # Kamehameha's code violet / red, Final Flash's green, Dragon Fist's red
 SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
+MAX_POWER_SKILL = 45             # Master Roshi's Max Power (Nov 9)
+ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
 # Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
 KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
            'krillin': ('krillin', 8, 'krillin'), 'tien': ('tien', 8, 'tien_player'), 'yamcha': ('yamcha', 8, 'yamcha_player'),
@@ -168,6 +170,7 @@ POPO_NPC = 'assets/scripts/gUnknown_08786E68.evt'   # Mr. Popo on the Lookout: a
 HUB_NPC = 'assets/scripts/gUnknown_08783D30.evt'    # a Hercule City resident: post-game, the tournament official's Challenge Board
 TOUR_NPC = 'assets/scripts/gUnknown_08785590.evt'   # the West City resident to the west
 QUEST_NPC = 'assets/scripts/gUnknown_08785580.evt'   # the West City resident outside the Z-Mart
+ROSHI_NPC = 'assets/scripts/gUnknown_08786C38.evt'   # Master Roshi on his island (5:1): after the ending he joins (Nov 9)
 
 
 UI_EDITS = {1051: 'Press the B Button to transform into a Super Saiyan Blue. You must already be a Super Saiyan to use this technique.', 1052: 'Android 13', 1054: 'DBS Gogeta', 1055: 'SSB Gogeta', 1056: 'Super 13', 1057: 'Super Saiyan Blue'}
@@ -569,6 +572,29 @@ def popo_npc(src):
     first += '\n    call flag(149)\n    jz L9\n    push %d\n    end\nL9:' % number['hello']
     line, rest = old.split('\n', 1)
     return head + 'step 1 code' + line + first + '\n' + rest + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
+
+
+def roshi_npc(src):
+    """Master Roshi, Kame House (5:1). The story's line stays as it was; after the ending he asks to come along, and joins the guest slot."""
+    import zone26
+    if 'step 1 code' not in src or '    push 4\n' not in src or 'step 3 code' not in src: sys.exit("Roshi's script changed")
+    more = lambda n: '    pushn %d\n    call 0x%X\n' % (n, zone26.MORE_GET)
+    put = lambda n, v: '    pushn %d, %d\n    call 0x%X\n' % (n, v, zone26.MORE_PUT)
+    steps = [('ask', 'say 0x61 "Heh heh! You\'ve gotten strong. Mind if this old man tags along? I\'ve still got a trick or two!"\n'),
+             ('join', 'code\n' + put(zone26.MORE_ROSHI, 1) + '    push {joined}\n    end\n'),
+             ('joined', 'say 0x00 "Master Roshi joined you! Choose him in Switch Character."\n'),
+             ('joined_end', 'code\n    push {END}\n    end\n'),
+             ('ready', 'say 0x61 "Ready when you are! Just don\'t tell Chi-Chi I\'m out fighting!"\n'),
+             ('ready_end', 'code\n    push {END}\n    end\n')]
+    for _, t in steps:
+        for m in re.finditer(r'say 0x\w+ "([^"]*)"', t):
+            n = len(m.group(1)); assert n < 100 and not 64 <= n <= 67, m.group(1)
+    number = {n: k + 3 for k, (n, _) in enumerate(steps)}; number['END'] = len(steps) + 3      # counted from 0; the first three are his story steps
+    post = '    call flag(149)\n    jz R9\n' + more(zone26.MORE_ROSHI) + '    jz R8\n    push %d\n    end\nR8:\n    push %d\n    end\nR9:\n    push %d\n' % (number['ready'], number['ask'], number['END'])
+    out = src.replace('L1:\n    push 4\n', 'L1:\n' + post, 1)
+    if not out.rstrip().endswith('    call set_flag(42)\n    end'): sys.exit("Roshi's script changed")
+    out = out.rstrip()[:-len('end')] + 'push %d\n    end\n' % number['END']        # the story line's last step stops there, not in the new ones
+    return out + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
 
 
 def hub_npc(src):
@@ -1134,6 +1160,7 @@ def add_actors(rom, clean):
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
+    cfg['roshi_player'] = {'roshi_of': 'krillin', 'head_of': 177, 'chin': [12, 11], 'high': True}     # Master Roshi: Krillin's frames, Roshi's head and clothes (lib/roshi.py)
     cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, end
@@ -1217,8 +1244,8 @@ def bench_groups(guests):
         key = o.get('bench', o['form'])
         if key not in shared: shared[key] = max(out) + 1
         out.append(shared[key])
-    if max(out) >= BENCH_GROUPS:
-        sys.exit('more guests than the save has room for (%d)' % BENCH_GROUPS)
+    if max(out) >= BENCH_GROUPS - 1:          # the last group holds the transformations' mastery (outfit.c MASTERY)
+        sys.exit('more guests than the save has room for (%d)' % (BENCH_GROUPS - 1))
     src = open('ultimate/src/outfit.c').read(); body = src[src.index('static void guest_sync'):]; body = body[:body.index('u8 *r =')]
     for name, count in re.findall(r'(\w+)\[\] = \{(\d+),', body):
         if int(count) > 5:
@@ -1247,7 +1274,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1511,7 +1538,12 @@ def add_eraser(rom, clean, sym, at, art):
     rows[ROSE_SKILL] = bytes(row)
     red = shifted(4 / 360)                      # Super Saiyan 4's aura: Super Saiyan's, red
     ssb_blue = shifted(200 / 360)               # Super Saiyan Blue's
-    for who, tint in (('rose', pink), ('ssj4', red), ('ssb', ssb_blue)):
+    def whitened(v):                            # Max Power's aura: Super Saiyan's, white with a cool edge
+        if v == 0: return 0
+        c = pal[v].astype(int); g = int(c.mean())
+        return one(np.array((min(255, g + 70), min(255, g + 80), min(255, g + 100))))
+    white = bytes(whitened(v) for v in range(256))
+    for who, tint in (('rose', pink), ('ssj4', red), ('ssb', ssb_blue), ('maxp', white)):
         for name, at_, count in ((who + '_aura_field', 0x752D28, 3), (who + '_aura_other', 0x7520D4, 7)):
             out = bytearray(clean[at_:at_ + 12 * count])
             for k in range(0, 12 * count, 12):
@@ -1615,6 +1647,14 @@ def add_eraser(rom, clean, sym, at, art):
     rom[sym['red_dragon'] - ROM_BASE:sym['red_dragon'] - ROM_BASE + 0xC0] = tinted_frames(ROM_BASE + DRAGON_ROWS, 16, *DRAGON_ART, red, cache)
     behaviour('dragon4_vt', DRAGON_VT, {2: 'dragon4_update', 3: 'dragon4_end'})
     rows[DRAGON4_SKILL] = move_row(5, red, 'Dragon Fist', 'Super Saiyan 4 only. Hold the B Button to make a giant red dragon of energy; steer its head with the +Control Pad and release to bite. 1.25x as strong.', 'ssj4_dragon_can', 'dragon4_use')
+    # Solar Flare (Tien, Krillin): Big Bang's starburst (row 4's icon) bleached towards white; the flash and stun are outfit.c's.
+    def paled(v):
+        if v == 0: return 0
+        c = pal[v].astype(int)
+        return one(c + ((255 - c) * 0.6).astype(int))
+    pale = bytes(paled(v) for v in range(256))
+    rows[SOLAR_FLARE_SKILL] = move_row(4, pale, 'Solar Flare', 'Press the B Button to flash a blinding light: every ordinary enemy on screen is stunned for a few seconds. Bosses are not fooled.', 'solar_can', 'solar_use')
+    rows[SOLAR_FLARE_SKILL][0] = 0xFF
     # The transformations' own rows (Nov 9). Super Saiyan 2 and 4: Super Saiyan 3's icon with a 2 (cyan as its 3) or a purple 4. Kaioken: Super
     # Saiyan's Z in red. Super Saiyan Blue: the Z in blue (its name and text are UI 1057 and 1051, UI_EDITS).
     ss3_icons = [clean[p - ROM_BASE:p - ROM_BASE + 0x200] for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 22 + 4)]
@@ -1646,10 +1686,18 @@ def add_eraser(rom, clean, sym, at, art):
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Goku Black', 'Super Saiyan Rose')]
     if ERASER_UI + len(strings) != GT_NAME_UI: sys.exit('GT names moved')
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Pan', 'Uub', 'Majuub', 'Brapan')]
+    if ERASER_UI + len(strings) != ROSHI_NAME_UI: sys.exit('Roshi names moved')
+    strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Master Roshi', 'Max Power Roshi')]
     row = bytearray(clean[SKILL_ROWS + 24 * 20:SKILL_ROWS + 24 * 21])          # Majuub: Super Saiyan's row, its own name and use
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['majuub_use'] | 1)
     rows[MAJUUB_SKILL] = bytes(row)
+    row = bytearray(clean[SKILL_ROWS + 24 * 20:SKILL_ROWS + 24 * 21])          # Max Power: Super Saiyan's row, its Z in white, its own name and use
+    row[0] = 0xFF
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], white)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
+    struct.pack_into('<I', row, 12, new_text('Max Power', 'Press the B Button to bulk up to full power: attacks hit 1.5x as hard. It drains like Super Saiyan. Press it again to calm down.'))
+    struct.pack_into('<I', row, 20, sym['maxp_use'] | 1)
+    rows[MAX_POWER_SKILL] = row
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Majuub', 'Press the B Button to draw on Majin Buu\'s power and become Majuub: attacks hit 1.5x as hard.  Press it again to change back.')]
     base_new = ERASER_UI + len(strings)          # the Nov 9 moves' names and descriptions, after everything with a fixed id
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in new_strings]
@@ -1812,6 +1860,8 @@ def main():
         open(HUB_NPC, 'w').write(hub_npc(saved[HUB_NPC]))
         saved.setdefault(POPO_NPC, open(POPO_NPC).read())
         open(POPO_NPC, 'w').write(popo_npc(saved[POPO_NPC]))
+        saved.setdefault(ROSHI_NPC, open(ROSHI_NPC).read())
+        open(ROSHI_NPC, 'w').write(roshi_npc(saved[ROSHI_NPC]))
         saved.setdefault(DEATH_SCRIPT, open(DEATH_SCRIPT).read())
         open(DEATH_SCRIPT, 'w').write(death_script(saved[DEATH_SCRIPT]))
         if debug:
@@ -1840,6 +1890,9 @@ def main():
     struct.pack_into('<4H', rom, npc - 8, 320, 360, 320, 360)
     struct.pack_into('<4H', rom, symbol('gUnknown_080783CC') - ROM_BASE - 8, 96, 328, 96, 328)      # and so does the tournament's
     struct.pack_into('<4H', rom, symbol('gUnknown_08078EA0') - ROM_BASE + 8, 288, 472, 288, 472)   # and Mr. Popo: he opens the Time Chamber
+    roshi_box = symbol('gUnknown_08078D20') - ROM_BASE - 8                                          # and Master Roshi on his island: he joins after the ending
+    if struct.unpack_from('<4H', rom, roshi_box) != (288, 360, 440, 448): sys.exit("Roshi's wander box moved")
+    struct.pack_into('<4H', rom, roshi_box, 392, 376, 392, 376)
     if debug:
         at = (free + 3) & ~3
         code = save_stub(at)

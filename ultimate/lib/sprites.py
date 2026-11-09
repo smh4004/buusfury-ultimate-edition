@@ -238,6 +238,16 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             src = a['bolts_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
             rec = bolted_actor(ins, rom, src - BASE, a['bolt_colours']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
+        if 'roshi_of' in a:                                # Master Roshi: Krillin's frames (built first) with Roshi's head and clothes (lib/roshi.py)
+            import roshi, headswap
+            src = table[ids[a['roshi_of']]]; srec = src - BASE
+            stand = struct.unpack_from('<I', rom, srec + 0x54)[0] - BASE
+            kst = {v: frame_image(rom, struct.unpack_from('<I', rom, stand + 4 + 4 * v)[0]) for v in (0, 1, 2)}
+            rst = {v: headswap.bf_stand(rom, ACTOR_LIST, a['head_of'], v) for v in (0, 1, 2)}
+            conv = roshi.Roshi(kst, rst, a['chin'][0], a['chin'][1])
+            rec = viewed_actor(ins, rom, srec, conv.apply); ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            print('%s: heads placed %d, missed %d, clothes %d' % (name, conv.hits, conv.misses, conv.dressed))
+            continue
         if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
             src = a['tint_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
             rec = tinted_actor(ins, rom, src - BASE, a['tint']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
@@ -501,6 +511,50 @@ def tinted_actor(ins, rom, rec_at, remap):
             anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
         struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
     return rec
+
+
+def viewed_actor(ins, rom, rec_at, fn):
+    """A copy of an actor with every frame's piece through fn(image, view): view 0 front, 1 back, 2 side (the mirrored side shares the
+    side's tiles). Master Roshi's frames from Krillin's (lib/roshi.py). Tiles are stored raw."""
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    n = u(rec_at) & 0xFF; rec = bytearray(rom[rec_at:rec_at + 0x54 + 4 * n])
+    done, frames, anims = {}, {}, {}
+    def tile(tp, w, h, view):
+        if (tp, view) not in done:
+            o = tp - BASE; t, size = u(o), u(o + 4)
+            raw = rom[o + 8:o + 8 + size] if t == 0 else bytes(decompress_stream(rom, o + 8, size)[0])
+            img = np.frombuffer(bytes(raw[:w * h]), np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+            data = np.asarray(fn(img, view), np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+            done[tp, view] = ins.put(struct.pack('<II', 0, len(data)) + data)
+        return done[tp, view]
+    def frame(fp, view):
+        if (fp, view) not in frames:
+            o = fp - BASE; k = u(o); body = bytearray(rom[o:o + 4 + 16 * k])
+            for j in range(k):
+                w, h = body[4 + 16 * j + 2], body[4 + 16 * j + 3]
+                struct.pack_into('<I', body, 4 + 16 * j + 12, tile(u(o + 4 + 16 * j + 12), w, h, view))
+            frames[fp, view] = ins.put(bytes(body))
+        return frames[fp, view]
+    for s in range(n):
+        ap = u(rec_at + 0x54 + 4 * s)
+        if not ap: continue
+        if ap not in anims:
+            o = ap - BASE; k = u(o)
+            ptrs = [frame(u(o + 4 + 4 * j), min(j % 4, 2)) if u(o + 4 + 4 * j) else 0 for j in range(4 * k)]
+            anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
+        struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
+    return rec
+
+
+def frame_image(rom, fp):
+    """The single piece of a BF-format frame as an index image."""
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    o = fp - BASE; w, h = rom[o + 6], rom[o + 7]; tp = u(o + 16) - BASE
+    t, size = u(tp), u(tp + 4)
+    raw = rom[tp + 8:tp + 8 + size] if t == 0 else bytes(decompress_stream(rom, tp + 8, size)[0])
+    return np.frombuffer(bytes(raw[:w * h]), np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
 
 
 def bolted_actor(ins, rom, rec_at, colours):

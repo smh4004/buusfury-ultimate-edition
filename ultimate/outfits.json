@@ -210,6 +210,12 @@
     "also": "majuub",
     "name": "Uub",
     "flag": 2030
+   },
+   {
+    "form": "roshi",
+    "also": "roshi_max",
+    "flag": 2031,
+    "name": "Master Roshi"
    }
   ],
   "7": [

@@ -105,7 +105,7 @@ o = run(rom, pc, d); p = open(d + '/p.bin', 'rb').read(); r8 = p[0x4F8 + 8 * REC
 check('Piccolo can be chosen and has Energy Blast, Masenko and Special Beam Cannon', p[0] == 8 and r8[0x14] == forms['piccolo'] and list(r8[0x0C:0x10]) == [3, 7, 17, 26])
 check('Piccolo attacks and uses all three skills with no bad jumps', 'bad pc' not in o)
 # The Super 13 reward also brings Future Trunks, Android 17 and 18, Krillin and Videl to the guest slot, each with their own moves.
-for name_, downs_, want_ in (('Future Trunks', 4, [4, 7, 20, 4, 11]), ('Android 18', 6, [4, 7, 27, 28, 29]), ('Krillin', 7, [3, 7, 15, 28]), ('Videl', 8, [1, 7]), ('Majin Buu', 9, [2, 7, 8]), ('Super Janemba', 10, [2, 7, 8]), ('Kid Buu', 11, [2, 7, 8])):
+for name_, downs_, want_ in (('Future Trunks', 4, [4, 7, 20, 4, 11]), ('Android 18', 6, [4, 7, 27, 28, 29]), ('Krillin', 7, [5, 7, 15, 28, 42, 37]), ('Videl', 8, [2, 7, 37]), ('Majin Buu', 9, [2, 7, 8]), ('Super Janemba', 10, [2, 7, 8]), ('Kid Buu', 11, [2, 7, 8]), ('Master Roshi', 24, [4, 7, 8, 15, 45])):
     gl = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * 5 + ['tap DOWN 40'] * downs_ + ['tap A 200', 'run 60', 'dump p 03001068 8a8', 'keys RIGHT', 'run 8', 'keys', 'tap A 12', 'tap A 12', 'tap A 12', 'keys A', 'run 60', 'keys', 'run 60']
     for i_ in range(want_[0]):
         gl += ['poke8 %08X %02X' % (R + 0x15, i_), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'run 2', 'keys B', 'run 60', 'keys', 'run 200', 'mem %08X 1' % (R + 0x14), 'shot %s%d' % (name_.replace(' ', ''), i_)]

@@ -34,12 +34,13 @@ extern const u8 form_table[];
 /* The guest slot has one skill list but different fighters, so the list follows the outfit. A story form (Hercule, say) leaves it alone. */
 static void guest_sync(void) {
     static const u8 broly[] = {3, 7, 8, ERASER_SKILL}, thirteen[] = {5, 7, 8, BOMBER_SKILL, WAVE_SKILL, SUPER13_SKILL}, piccolo[] = {3, 7, 17, BEAM_SKILL},
-        fighter[] = {2, 7, 8}, a17[] = {5, 7, 8, BLITZ_SKILL, WAVE_SKILL, SUPER17_SKILL}, a18[] = {4, 7, BLITZ_SKILL, DISC_SKILL, WAVE_SKILL}, krillin[] = {3, 7, 15, DISC_SKILL}, videl[] = {1, 7},
-        tien[] = {3, 7, 15, BLITZ_SKILL}, yamcha[] = {2, 7, 15}, pikkon[] = {3, 7, 8, WAVE_SKILL}, hercule[] = {1, 7},
+        fighter[] = {2, 7, 8}, a17[] = {5, 7, 8, BLITZ_SKILL, WAVE_SKILL, SUPER17_SKILL}, a18[] = {4, 7, BLITZ_SKILL, DISC_SKILL, WAVE_SKILL}, krillin[] = {5, 7, 15, DISC_SKILL, SOLAR_SKILL, KAIOKEN_SKILL}, videl[] = {2, 7, KAIOKEN_SKILL},
+        tien[] = {5, 7, 15, BLITZ_SKILL, SOLAR_SKILL, KAIOKEN_SKILL}, yamcha[] = {3, 7, 15, KAIOKEN_SKILL}, pikkon[] = {3, 7, 8, WAVE_SKILL}, hercule[] = {2, 7, KAIOKEN_SKILL},
         black[] = {4, 7, 14, BLACK_KAME_SKILL, ROSE_SKILL},     /* Goku Black: ki blasts, Instant Transmission, the Black Kamehameha, Rose. Energy Punch and Energy Sword play animation slots Goku's figure fills with other moves */
         trunks[] = {4, 7, 20, 4, 11},            /* Future Trunks: the same moves as Trunks */
         pan[] = {3, 7, 8, 20}, pan_plain[] = {2, 7, 8},  /* Pan: ki blasts and her rush; Super Saiyan in the two looks that have it. Brapan (the Bulma-Pan fusion) fights as Pan */
-        uub[] = {4, 7, 8, 15, MAJUUB_SKILL};     /* Uub: ki blasts, rush, Kamehameha, Majuub */
+        uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
+        roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL};    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
     const u8 *list;
@@ -59,6 +60,7 @@ static void guest_sync(void) {
     else if (form >= FORM_PAN && form < FORM_PAN + 4) list = pan;          /* pan, pan_ssj, pan_nobandana, pan_ssj_spiky */
     else if (form >= FORM_PAN + 4 && form <= FORM_PAN_LAST) list = pan_plain;
     else if (form == FORM_UUB || form == FORM_MAJUUB) list = uub;
+    else if (form == FORM_ROSHI || form == FORM_ROSHI_MAX) list = roshi;
     else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU || form == FORM_JANEMBA) list = fighter;
     else return;
     r[0x0C] = list[0];
@@ -1092,8 +1094,72 @@ void spirit_destroyed(void) {
 }     /* a new area clears every effect, this one included */
 
 /* Non-zero while Goku is busy with the bomb: the state's normal update is skipped so he stands still. */
+/* Solar Flare (Tien, Krillin; Nov 9). The white flash of the Super Saiyan power-up above, from the same effect slot, while the fighter
+   holds a pose; every ordinary enemy on screen is stunned. The stun is the game's own (state 1 of the enemy state table 0x0870F514,
+   which Burning Attack's hit pushes: the dizzy pose with a 120-frame timer), pushed through the enemy's vtable (+0x6C, sub_0800AA9C)
+   and its timer (the state's second part, {0x080497D4, frames}) set longer. Bosses (actor record byte 3 bit 4, likely) shrug it off. */
+#define SOLAR_COST 40
+#define CanAfford ((int (*)(u8 *, int))0x080134B9)
+#define IN_COMBAT (*(volatile u32 *)0x03001988)
+#define SOLAR_STUN 150
+#define SOLAR_POSE_FRAMES 30
+#define SOLAR_POSE (*(volatile u8 *)0x0203FFC4)
+#define ENEMY_COUNT (*(volatile int *)0x03001BB0)
+#define ENEMY_LIST ((u8 **)0x03001BB4)
+#define VIEW ((volatile int *)0x030019BC)
+#define STUN_DESC 0x0870F51C
+static int stunned(u8 *e) {
+    int depth = *(int *)(e + 0x23C);
+    return depth >= 1 && depth <= 5 && *(u32 *)(e + 0x240 + 8 * (depth - 1) + 4) == STUN_DESC;
+}
+static void stun(u8 *e, int frames) {
+    int depth;
+    u32 *top, *timer;
+    if (!stunned(e)) {
+        depth = *(int *)(e + 0x23C);
+        if (depth < 1 || depth >= 5) return;
+        CALL_V(e, 0x6C)(e, 1);
+        if (!stunned(e)) return;
+    }
+    depth = *(int *)(e + 0x23C);
+    top = *(u32 **)(e + 0x240 + 8 * (depth - 1));
+    if (!top || top[2] < 2) return;
+    timer = (u32 *)top[4];
+    if (timer && timer[1] < (u32)frames) timer[1] = frames;
+}
+static int boss(u8 *e) {
+    u8 *actor = *(u8 **)(e + 0x58);
+    return actor && (actor[3] & 0x10);
+}
+int solar_can(u8 *record) { return IN_COMBAT && !SB.phase && !SOLAR_POSE && CanAfford(record, SOLAR_COST); }
+void solar_use(u8 *record, void *player) {
+    int i, n = ENEMY_COUNT, x, y;
+    Spend(record, SOLAR_COST);
+    SB.phase = FLASH_PHASE; SB.frame = 0; *BOMB_OLD = BLDCNT;
+    SB.old3 = (void *)EFFECTS[3];
+    SB.ticker[0] = (u32)spirit_vt;
+    EFFECTS[3] = (u32)SB.ticker;
+    SOLAR_POSE = SOLAR_POSE_FRAMES;
+    PlaySound((void *)0x03003E5C, (u8 *)SOUND_HIT + 0x288, 0x40, 0);
+    if (n > 32) n = 32;
+    for (i = 0; i < n; i++) {
+        u8 *e = ENEMY_LIST[i];
+        if (!e || *(int *)(e + 0x28C) <= 0 || !*(u8 *)(e + 0x1CC) || *(u8 *)(e + 0x1D0) != 0 || boss(e)) continue;
+        x = *(int *)(e + 0x1A0) >> 8; y = *(int *)(e + 0x1A4) >> 8;
+        if (x < VIEW[0] - 16 || x > VIEW[2] + 16 || y < VIEW[1] - 16 || y > VIEW[3] + 32) continue;
+        stun(e, SOLAR_STUN);
+    }
+}
+static int solar_tick(void *player) {
+    if (!SOLAR_POSE) return 0;
+    if (--SOLAR_POSE == 0) { slot_pose(player, 0); return 0; }
+    if (has_slot(player, 13)) slot_pose(player, 13); else slot_pose(player, SLOT_ARMS_UP);
+    return 1;
+}
+
 static int spirit_tick(void *player)
 {
+    if (solar_tick(player)) return 1;
     if (SB.phase == 1) { slot_pose(player, SLOT_ARMS_UP); return 1; }     /* the arms-up pose of the Kid Buu fight */
     if (SB.phase == 2) {
         if (SB.frame <= WINDUP_FRAMES) { slot_pose(player, SLOT_ARMS_UP); return 1; }
@@ -1740,6 +1806,15 @@ static int mastery_train(u8 *rec, int every) {        /* -> 1 to skip this drain
 static int mastery_skip(u8 *rec) { return mastery_train(rec, 10); }
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
 extern const int absorb_vt[14];
+/* Master Roshi's Max Power (Nov 9): Super Saiyan's power-up with a white aura, then hits 1.5x on Super Saiyan's ki bar. Buu's Fury has no
+   bulked-up Roshi, so he keeps his own frames (the owner: "if the sprites exist if not just use the ones that do exist"). */
+const u32 maxp_aura_field[9] = {1}, maxp_aura_other[21] = {1};
+const int maxp_vt[14] = {1};
+void maxp_start(u32 *state, void *sprite) { tinted_start(state, sprite, maxp_aura_field, maxp_aura_other); }
+void maxp_use(u8 *record, void *sprite) {
+    if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, maxp_vt);
+    else SS_Use(record, sprite);
+}
 void majuub_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
     else SS_Use(record, sprite);
@@ -1821,7 +1896,7 @@ void combat_hook(void *defender, int *hit) {
             hit[1] = scale * 2;
             if (strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
         }
-        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE || is_kaioken(form)) hit[1] = scale + (scale >> 1);
+        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE || is_kaioken(form)) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             stats[0] = strength - 10; stats[1] = power - 10;

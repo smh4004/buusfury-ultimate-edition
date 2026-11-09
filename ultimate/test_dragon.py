@@ -24,6 +24,12 @@ for k, (world, area, x, y) in enumerate(zone26.BALLS):
     check('ball %d is found' % (k + 1), got == 1 and 'bad pc' not in out)
     paste('ball%d_a' % k); paste('ball%d_c' % k)
 W.save(d + '/balls.png')
+# Master Roshi on his island (land 5) joins once the story is over: his question, the join, then his line for later.
+l = fly(*LAND[5]) + ['mem 0300197C 1']; pl = ptr(l)
+talk = l + move(pl, 392, 398) + ['run 40', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 60', 'run 60', 'shot roshi_ask', 'tap A 40', 'run 60', 'shot roshi_joined', 'tap A 40', 'run 60', 'mem 0203F00C 1', 'tap A 40', 'run 60', 'shot roshi_ready', 'tap A 40', 'run 60']
+out = run(talk)
+bench = [int(x.split(':')[1].split()[0], 16) for x in out.splitlines() if x.startswith('mem 0203f00c')]
+check('Master Roshi joins at Kame House after the ending', bench and bench[-1] >> 31 & 1 and 'bad pc' not in out)
 # Summon: hold all seven, land at the Lookout, talk to Mr. Popo.
 pokes = ['poke8 %08X 01' % (ITEMS + k) for k in range(7)]
 look = fly(648, 1076) + pokes + ['mem 0300197C 1']

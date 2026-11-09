@@ -731,6 +731,26 @@
    "portrait": "gt:gohan_ssj",
    "up": 255,
    "down": "gohan_gt_noglasses"
+  },
+  {
+   "id": "roshi",
+   "copy": 48,
+   "actor": "roshi_player",
+   "owner": 8,
+   "name": 1582,
+   "flags": 16,
+   "up": "roshi_max",
+   "portrait": 97
+  },
+  {
+   "id": "roshi_max",
+   "copy": 48,
+   "actor": "roshi_player",
+   "owner": 8,
+   "name": 1583,
+   "flags": 81,
+   "down": "roshi",
+   "portrait": 97
   }
  ],
  "edit": {
