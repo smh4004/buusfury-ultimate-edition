@@ -537,9 +537,57 @@ static u16 *quick_wheel(u16 *keys) {
     return (u16 *)wheel_keys;
 }
 void kk_track(void);
+/* Zone 26's snow arena (Android 13, Super 13, the Boss Rush: the rooms in ARENA_ROOMS, bit n = area 26:n, all one map). Two nooks between
+   the rocks above the open snowfield are floor too, but on the rocks' layer: a boss who backed into one (Super 13 retreats from a fighter
+   below him) was drawn behind the rocks, half see-through, his shadow left below, and no hit reached him; his walk stayed pressed against
+   the rocks (Nov 9, the owner: "can't even damage and he's stuck walking up", "couldn't even see it"; reproduced in the emulator: from
+   (209, 96) no punch landed for 30 seconds). The open field is x 32-288, y 112-248 (floor mask), so foes stay in x ARENA_X0-ARENA_X1 and
+   below y ARENA_Y0; the change and the finish (scenes) are not in the list. */
+#define ARENA_X0 48
+#define ARENA_X1 272
+#define ARENA_Y0 120
+/* The cause of both (same day): an enemy's stats row also picks its behaviour (row +8: its first state in the enemy state table
+   0x0870F514), and Super 13 and Android 13 run Dabura's (row 18). Near 60% health Dabura's state 0x7B walks to the point (192, 80) of
+   his own story room (a move-to action, vtable 0x08049A3C, made by sub_0802E104: +0x1C, +0x20 the target), waits 180 frames, then goes
+   on; nothing touches him meanwhile. In another room that point can be inside the rocks, so he never got there. Every fight the mod set up
+   (postgame_foe: Super 13, the Boss Rush, tournament, trials, spars, Battle of Gods) borrows a story boss's behaviour in a room that isn't
+   his, so a fixed point of that room means nothing: such a move ends where the foe stands. The state stack: depth at +0x23C, entries of
+   {instance, state} from +0x240; a sequence's instance (vtable 0x0804AAF4) holds its step count at +8 and its steps from +0xC. */
+#define MOVE_TO_VT 0x08049A3C
+#define SEQUENCE_VT 0x0804AAF4
+#define IN_EWRAM(p) ((u32)(p) >= 0x02000000 && (u32)(p) < 0x02040000)
+static int postgame_foe(const u8 *e);
+static void no_story_walk(u8 *e) {
+    int depth = *(int *)(e + 0x23C);
+    u32 *seq, k, n;
+    if (depth < 1 || depth > 5) return;
+    seq = *(u32 **)(e + 0x240 + 8 * (depth - 1));
+    if (!IN_EWRAM(seq) || seq[0] != SEQUENCE_VT) return;
+    n = seq[2] < 8 ? seq[2] : 8;
+    for (k = 0; k < n; k++) {
+        u32 *step = (u32 *)seq[3 + k];
+        if (IN_EWRAM(step) && step[0] == MOVE_TO_VT) { step[7] = *(u32 *)(e + 0x1A0); step[8] = *(u32 *)(e + 0x1A4); }
+    }
+}
+static void arena_keep(void) {
+    u16 at = *(volatile u16 *)0x0300197C;
+    int i, n = *(volatile int *)0x03001BB0, arena = (at & 0xFF) == 26 && (at >> 8) < 32 && ((ARENA_ROOMS >> (at >> 8)) & 1);
+    for (i = 0; i < n && i < 32; i++) {
+        u8 *e = ((u8 **)0x03001BB4)[i];
+        int *x, *y;
+        if (!IN_EWRAM(e) || e[0x1D0] == 1) continue;      /* team 1: the player's side */
+        if (postgame_foe(e)) no_story_walk(e);
+        if (!arena) continue;
+        x = (int *)(e + 0x1A0); y = (int *)(e + 0x1A4);
+        if (*y < ARENA_Y0 << 8) *y = ARENA_Y0 << 8;
+        if (*x < ARENA_X0 << 8) *x = ARENA_X0 << 8;
+        else if (*x > ARENA_X1 << 8) *x = ARENA_X1 << 8;
+    }
+}
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
     kk_track();
+    arena_keep();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
     /* Battle of Gods: Beerus fights Vegeta at the party, on Capsule Corporation's own grounds, which has no fighting (area record +8

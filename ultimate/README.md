@@ -110,6 +110,16 @@ writable statics (they'd link into ROM); the build stops if one appears.
   quarter (his Strength and Power on his hits, his Endurance on the boss's), and its hits grow with the fighter's health past 4000 (at most
   3x). In a Super 13 rig with stats 180 (a level 200 fighter): his hits on Super 13 a third, Super 13's about 6.7% of the fighter's health a
   hit (it was about 1.5%). The owner: "want post game bosses to be a bit more of a challenge". Below 110 and 4000 nothing changes.
+- Super 13 got stuck and couldn't be hurt (the owner, on the Nov 9 build: "can't even damage and he's stuck walking up", "his ability
+  looks fucked ... couldn't even see it"). An enemy's stats row also picks its behaviour (row +8: its first state in the enemy state
+  table 0x0870F514), and Super 13 and Android 13 run Dabura's (row 18). Near 60% health Dabura's mid-fight scene (states 0x78-0x7F)
+  walks to (192, 80) of his own story room, which in the snow arena is inside the rocks: Super 13 backed into a nook between them, was
+  drawn behind them, and no punch landed (reproduced: none for 30 seconds from any side). `outfit.c arena_keep` (every frame) keeps foes
+  of the snow arena's fight rooms (`zone26.arena_rooms`: Android 13, Super 13, the Boss Rush) on the open snowfield (x 48-272, y 120 and
+  down), and `no_story_walk` ends any such walk where the foe stands, for every fight the mod set up (`postgame_foe`): they all borrow a
+  story boss's behaviour in a room that isn't his. Skipping the scene instead left him untouchable for good (its last states end the
+  spell its first one casts), so it still plays: he fades, rises off the top of the screen while it flashes white, and hits from out of
+  sight for about five seconds. `test_super13.py` fights him by hand (no teleports) for about 100 seconds.
 - Battle of Gods' Beerus runs on those rules too. His Strength sets his big hits: at 115-120 three floored that fighter (2400-2600 each,
   measured by poking his object's stats, +0x1B0, in an enemy rig). The god fight's legs are 85/90/95 now: about 880, 1040 and 1220 a hit
   (12/14/16%, measured the same way): the hardest fights in the game, above Super 13, as the owner wants Beerus to be the strongest

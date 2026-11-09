@@ -293,6 +293,14 @@ def boss_stats(W, rom, stats):
     row(BOSS_ROW, 96175, 75000, (160, 70, 115, 105), 96, 886, 18)
 
 
+def arena_rooms():
+    """The snow arena's fight rooms as a bit mask (bit n = area 26:n): Android 13 (15), Super 13 (17) and the Boss Rush; not the change (16)
+    or the finish (18), which are scenes. outfit.c arena_keep keeps their foes on the open snowfield."""
+    rooms = [15, 17] + list(range(RUSH_FIRST, RUSH_FIRST + len(RUSH)))
+    if max(rooms) > 31: sys.exit('arena rooms past 31: widen ARENA_ROOMS')
+    return sum(1 << r for r in rooms)
+
+
 def tour_first():
     return RUSH_FIRST + len(RUSH)
 
