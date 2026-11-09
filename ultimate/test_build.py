@@ -123,7 +123,7 @@ at_ = list(h1[0x0D:0x0D + h1[0x0C]]).index(26) if 26 in h1[0x0D:0x0D + h1[0x0C]]
 check('debug: Gohan has Special Beam Cannon', 26 in h1[0x0D:0x0D + h1[0x0C]])
 o = run(rom, gh + ['poke8 %08X %02X' % (R1 + 0x15, at_), 'poke8 %08X FF' % (R1 + 0x1A), 'poke8 %08X 00' % (R1 + 0x1B), 'keys RIGHT', 'run 8', 'keys', 'run 3', 'keys B', 'run 60', 'shot gohan_beam', 'keys', 'run 200'], d)
 check('Gohan fires Special Beam Cannon in his armor', 'bad pc' not in o)
-# Super Saiyan 2: pressing Super Saiyan again goes up to it. Goku goes on to Super Saiyan 3 from there; back down from the top. VRAM stays intact (slot 10 on Super Saiyan actors).
+# Super Saiyan 2 is its own skill (Nov 9), from Super Saiyan. Goku goes on to Super Saiyan 3 from there; back down from the top. VRAM stays intact (slot 10 on Super Saiyan actors).
 def chain(c, rights, form, skills, presses, lock=None):
     R_ = 0x03001560 + c * REC
     L = ['guardon 0x09000000'] + route + (['poke8 %08X %02X' % (R_ + 0x14, form)] if form is not None else []) + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * rights + ['tap A 200', 'run 60', 'poke8 %08X %02X' % (R_ + 0x0C, len(skills))]
@@ -133,24 +133,24 @@ def chain(c, rights, form, skills, presses, lock=None):
         L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 00' % (R_ + 0x1B), 'run 1', 'tap B 240', 'mem %08X 1' % (R_ + 0x14)]
     o_ = run(rom, L, d)
     return 'bad pc' not in o_, [int(l.split(':')[1].split()[0], 16) & 255 for l in o_.splitlines() if l.startswith('mem %08x' % (R_ + 0x14))]
-ok_, got_ = chain(0, 0, None, [7, 20, 22], [1, 1, 2, 2])
+ok_, got_ = chain(0, 0, None, [7, 20, 35, 22], [1, 2, 3])
 check('Goku: Super Saiyan, Super Saiyan 2, Super Saiyan 3', ok_ and got_[:3] == [4, forms['goku_ss2_b'], 6])
-ok_, got_ = chain(4, 3, None, [7, 20], [1, 1, 1])
-check('Vegeta: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [28, forms['vegeta_ss2']])
-ok_, got_ = chain(1, 1, forms['gohan_armor'], [7, 20], [1, 1, 1])
+ok_, got_ = chain(4, 3, None, [7, 20, 35], [1, 2, 2])
+check('Vegeta: Super Saiyan, Super Saiyan 2, back', ok_ and got_[:3] == [28, forms['vegeta_ss2'], 26])
+ok_, got_ = chain(1, 1, forms['gohan_armor'], [7, 20, 35], [1, 2])
 check('Gohan in armor: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [forms['gohan_armor_ss'], forms['gohan_armor_ss2']])
-ok_, got_ = chain(3, 2, None, [7, 20], [1, 1, 1])
+ok_, got_ = chain(3, 2, None, [7, 20, 35], [1, 2])
 check('Trunks: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [22, forms['trunks_ss2']])
-ok_, got_ = chain(3, 2, forms['trunks_armor'], [7, 20], [1, 1, 1])
+ok_, got_ = chain(3, 2, forms['trunks_armor'], [7, 20, 35], [1, 2])
 check('Trunks in armor: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [forms['trunks_armor_ss'], forms['trunks_armor_ss2']])
-ok_, got_ = chain(6, 4, 39, [7, 20], [1, 1, 1])
+ok_, got_ = chain(6, 4, 39, [7, 20, 35], [1, 2])
 check('Vegito: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [40, forms['vegito_ss2']])
-# Before the story reaches it, pressing Super Saiyan again turns back as in the retail game.
-ok_, got_ = chain(4, 3, None, [7, 20], [1, 1, 1], lock=868)
-check('locked: Vegeta goes Super Saiyan, then back', ok_ and got_[:2] == [28, 26])
-ok_, got_ = chain(0, 0, None, [7, 20], [1, 1, 1], lock=864)
-check('locked: Goku goes Super Saiyan, then back', ok_ and got_[:2] == [4, 2])
-ok_, got_ = chain(0, 0, None, [7, 20, 22], [1, 1], lock=864)
+# Before the story reaches it, Super Saiyan 2 does nothing; Super Saiyan pressed again turns back as in the retail game.
+ok_, got_ = chain(4, 3, None, [7, 20, 35], [1, 2, 1], lock=868)
+check('locked: Vegeta goes Super Saiyan, no further, then back', ok_ and got_[:3] == [28, 28, 26])
+ok_, got_ = chain(0, 0, None, [7, 20, 35], [1, 2, 1], lock=864)
+check('locked: Goku goes Super Saiyan, no further, then back', ok_ and got_[:3] == [4, 4, 2])
+ok_, got_ = chain(0, 0, None, [7, 20, 22, 35], [1, 3], lock=864)
 check('a save with Super Saiyan 3 already has Super Saiyan 2', ok_ and got_[:2] == [4, forms['goku_ss2_b']])
 # The story turns each one on at its own scene: read the scripts back out of the release ROM.
 sys.path[:0] = ['tools/scripts']
@@ -242,7 +242,7 @@ check('charged: stronger than the normal hit before it', hp[1] - hp[2] > hp[0] -
 # Super Saiyan 2 hits 1.5x as hard as Super Saiyan, punches and ki. The Bomber waits out of reach during the transformations (it blows itself up near the player). The first press after the walk-in does nothing in this scene.
 def dmg(presses, blast, wait, form=None, swap=None):
     R_ = 0x03001560; away = ['poke %s %x' % (ENEMY_X, x + (120 << 8)), 'poke %s %x' % (ENEMY_Y, y)]
-    L = base + ['poke8 %08X 03' % (R_ + 0x0C), 'poke8 %08X 07' % (R_ + 0x0D), 'poke8 %08X 14' % (R_ + 0x0E), 'poke8 %08X 16' % (R_ + 0x0F), 'run %d' % wait]
+    L = base + ['poke8 %08X 05' % (R_ + 0x0C)] + ['poke8 %08X %02X' % (R_ + 0x0D + i_, v_) for i_, v_ in enumerate((7, 20, 22, 35, 36))] + ['run %d' % wait]     # slots: 1 SS, 2 SS3, 3 SS2, 4 SS4
     if form is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, form)]           # another look of Goku's (GT Kid Goku) before the presses
     for p_ in presses:
         L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 03' % (R_ + 0x1B), 'keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in away + ['run 30']]
@@ -256,23 +256,23 @@ def dmg(presses, blast, wait, form=None, swap=None):
     o_ = run(erom, L + ['mem %s 1' % ENEMY_HP, 'mem %08X 1' % (R_ + 0x14)], d)
     return 9000 - int(re.findall(r'mem %s: ([0-9a-f]+)' % ENEMY_HP, o_)[-1], 16) / 1024, int(re.findall(r'mem %08x: ([0-9a-f]+)' % (R_ + 0x14), o_)[-1], 16) & 255
 for kind, blast_ in (('punch', 0), ('ki blast', 1)):
-    a_ = [dmg([1, 1], blast_, w_) for w_ in (1, 4, 7)]; b_ = [dmg([1, 1, 1], blast_, w_) for w_ in (1, 4, 7)]
+    a_ = [dmg([1, 1], blast_, w_) for w_ in (1, 4, 7)]; b_ = [dmg([1, 1, 3], blast_, w_) for w_ in (1, 4, 7)]
     print(kind, 'Super Saiyan', a_, 'Super Saiyan 2', b_)
-    c_ = [dmg([1, 1, 1, 2], blast_, w_) for w_ in (1, 4, 7)]
+    c_ = [dmg([1, 1, 3, 2], blast_, w_) for w_ in (1, 4, 7)]
     print(kind, 'Super Saiyan 3', c_)
     lo, hi, top = min(v for v, _ in a_), min(v for v, _ in b_), min(v for v, _ in c_)
     check('Super Saiyan 2 %s is about 1.5x Super Saiyan' % kind, all(f_ == 4 for _, f_ in a_) and all(f_ == forms['goku_ss2_b'] for _, f_ in b_) and lo > 0 and 1.3 < hi / lo < 1.7)
     check('Super Saiyan 3 %s is about 1.75x Super Saiyan' % kind, all(f_ == 6 for _, f_ in c_) and lo > 0 and (1.55 < top / lo < 1.95 or 1.55 < top / lo / 1.5 < 1.95))   # a critical hit is 1.5x again
     # GT Kid Goku: Super Saiyan, then Super Saiyan 3 pressed twice is Super Saiyan 4, 2.5x Super Saiyan's damage
-    k1 = [dmg([1, 1], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]; k4 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]
+    k1 = [dmg([1, 1], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]; k4 = [dmg([1, 1, 2, 4], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]
     print(kind, 'Kid Super Saiyan', k1, 'Kid Super Saiyan 4', k4)
     lo_, s4 = min(v for v, _ in k1), min(v for v, _ in k4)
     check('Kid Goku Super Saiyan 4 %s is about 2.5x his Super Saiyan' % kind, all(f_ == forms['kid_goku_ssj'] for _, f_ in k1) and all(f_ == forms['kid_goku_ssj4'] for _, f_ in k4) and lo_ > 0 and (2.25 < s4 / lo_ < 2.75 or 2.25 < s4 / lo_ / 1.5 < 2.75))
     # Gogeta's Super Saiyan 4 hits 3x as hard as his form would without the boost. The scale goes by the form, so on one loaded actor (Kid
     # Goku's Super Saiyan 4, with his strikes and stats) the form is set to Gogeta's, then to plain Kid Goku's (no boost, and neither is
     # Super Saiyan 3's class, so the stats are the same): the ratio is the boost alone. His own moves are test_gt's.
-    g4 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku'], forms['gogeta_ssj4']) for w_ in (1, 4, 7)]
-    g1 = [dmg([1, 1, 2, 2], blast_, w_, forms['kid_goku'], forms['kid_goku']) for w_ in (1, 4, 7)]
+    g4 = [dmg([1, 1, 2, 4], blast_, w_, forms['kid_goku'], forms['gogeta_ssj4']) for w_ in (1, 4, 7)]
+    g1 = [dmg([1, 1, 2, 4], blast_, w_, forms['kid_goku'], forms['kid_goku']) for w_ in (1, 4, 7)]
     print(kind, 'Gogeta Super Saiyan 4', g4, 'unboosted', g1)
     check('Gogeta Super Saiyan 4 %s is 3x unboosted' % kind, all(f_ == forms['gogeta_ssj4'] for _, f_ in g4) and min(v for v, _ in g1) > 0 and any(2.7 < a[0] / b[0] < 3.3 for a, b in zip(g4, g1)))
 for name, rights in (('Goku', 0), ('Gohan', 1), ('Trunks', 2), ('Vegeta', 3), ('Vegito', 4), ('Broly', 5)):

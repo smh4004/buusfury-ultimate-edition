@@ -23,8 +23,8 @@ def check(name, ok):
     if not ok: fails.append(name)
 
 def play(name, form, presses, after):
-    """presses: skill slots pressed in turn (1 = Super Saiyan, 2 = Super Saiyan 3); after: script lines once they're done."""
-    L = base + ['guardon 0x09000000', 'poke8 %08X 03' % (R + 0x0C), 'poke8 %08X 07' % (R + 0x0D), 'poke8 %08X 14' % (R + 0x0E), 'poke8 %08X 16' % (R + 0x0F), 'run 4']
+    """presses: skill slots pressed in turn (1 = Super Saiyan, 2 = Super Saiyan 3, 3 = Super Saiyan 4); after: script lines once they're done."""
+    L = base + ['guardon 0x09000000', 'poke8 %08X 04' % (R + 0x0C), 'poke8 %08X 07' % (R + 0x0D), 'poke8 %08X 14' % (R + 0x0E), 'poke8 %08X 16' % (R + 0x0F), 'poke8 %08X 24' % (R + 0x10), 'run 4']
     L += ['poke8 %08X %02X' % (R + 0x14, form)]
     for k, p in enumerate(presses):
         L += ['poke8 %08X %02X' % (R + 0x15, p), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 240']
@@ -38,7 +38,7 @@ def play(name, form, presses, after):
 
 def bar(shot):
     """Counts of purple, orange and yellow pixels in the HUD's EP bar, left to right: (purple, orange, yellow, order)."""
-    im = np.array(Image.open('%s/%s.png' % (D, shot)).convert('RGB'))[8:26, 8:100]
+    im = np.array(Image.open("%s/%s.png" % (D, shot)).convert("RGB"))[8:26, 44:100]     # the bars, not the skill icon (Super Saiyan 4's has a purple 4)
     px = [tuple(p) for p in im.reshape(-1, 3)]
     n = lambda s: sum(p in s for p in px)
     cols = lambda s: [x for x in range(im.shape[1]) if any(tuple(im[y, x]) in s for y in range(im.shape[0]))]
@@ -52,7 +52,7 @@ ss3, bad0 = play('kid_ss3', forms['kid_goku'], [1, 1, 2], ['poke %08X 0000003C' 
 p, o, y, cols = bar('ss3')
 rate3 = ss3[-2][1] - ss3[-1][1]
 check('Kid Goku Super Saiyan 3: an orange bar, no purple', ss3[-1][0] == forms['kid_goku_ssj3'] and o > 20 and p == 0)
-seq, bad = play('kid_ss4', forms['kid_goku'], [1, 1, 2], ['poke %08X 0000003C' % (R + 0x20), 'run 4', 'poke8 %08X 02' % (R + 0x15), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 230'] + after)
+seq, bad = play('kid_ss4', forms['kid_goku'], [1, 1, 2], ['poke %08X 0000003C' % (R + 0x20), 'run 4', 'poke8 %08X 03' % (R + 0x15), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 230'] + after)
 rest = play.rest
 print('   Kid Goku Super Saiyan 4 (form, pool, orange put aside) every 90 frames:', [a + (b,) for a, b in zip(seq, rest)])
 fs = [f for f, _ in seq]
@@ -75,7 +75,7 @@ if up:
     check('then the bar is orange, with no purple', pa == 0 and oa > 20)
 check('Super Saiyan 4 powers down once the orange is gone too', fs[-1] == forms['kid_goku'] and bar('k29')[0] == 0)
 # GT Vegeta: Super Saiyan, then Super Saiyan 4 (the first press goes while the new look loads, as in test_build)
-seq, bad = play('vegeta', forms['vegeta_gt'], [1, 1], step(1, 'v_ss') + ['poke8 %08X 01' % (R + 0x15), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 260'] + step(1, 'v_ss4'))
+seq, bad = play('vegeta', forms['vegeta_gt'], [1, 1], step(1, 'v_ss') + ['poke8 %08X 03' % (R + 0x15), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 260'] + step(1, 'v_ss4'))
 print('   GT Vegeta (form, pool):', seq)
 p, o, y, _ = bar('v_ss')
 check('GT Vegeta Super Saiyan: a yellow bar, no purple', seq[0][0] == forms['vegeta_gt_ssj'] and y > 20 and p == 0)

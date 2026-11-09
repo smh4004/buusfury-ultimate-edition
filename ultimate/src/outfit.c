@@ -335,6 +335,7 @@ void heap_init(void) {
     volatile u32 *vars = (volatile u32 *)0x0203FF20;
     int i;
     for (i = 0; i < 24; i++) vars[i] = 0;
+    for (i = 0; i < 8; i++) ((volatile u32 *)0x0203FFB0)[i] = 0;     /* Super Saiyan 4's ki bar state, the red Dragon Fist, and the rest to 0x0203FFCF */
     BENCH.magic = 0;
     CL.active = 0; CL.cool = 0; CL.surge = 0; CL.p_at = 0; CL.e_at = 0;
     *(u32 *)0x0203F300 = 0;                /* no bomb sprite */
@@ -477,8 +478,10 @@ void beam_update(u8 *b, int arg) {
 }
 
 /* The player's keys: during a clash, and as the winning beam surges on, the fire button counts as held, so mashing it doesn't let the beam go. */
+void skills_sync(int c);
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
+    if ((FRAMES & 63) == 0) skills_sync(*(u8 *)0x03001068);       /* what play has earned (outfit.c: the skill book) */
     if (CL.active && CL.p_at + 2 < FRAMES) CL.active = 0;
     if (!CL.active && FRAMES >= CL.surge) return keys;
     CL.shadow[0] = keys[0]; CL.shadow[1] = keys[1] | 2; CL.shadow[2] = 0; CL.shadow[3] = keys[3]; CL.shadow[4] = keys[4]; CL.shadow[5] = keys[5];
@@ -993,6 +996,9 @@ const int rose_vt[14] = {1};
 /* Super Saiyan 4 (Kid Goku's, GT Vegeta's): the same power-up with the aura red */
 const u32 ssj4_aura_field[9] = {1}, ssj4_aura_other[21] = {1};
 const int ssj4_vt[14] = {1};
+/* Super Saiyan Blue: the same power-up with the aura blue */
+const u32 ssb_aura_field[9] = {1}, ssb_aura_other[21] = {1};
+const int ssb_vt[14] = {1};
 #define SpriteBox ((void (*)(int *, void *))0x0800FDFB)
 #define VecOp ((void (*)(int *, const int *, const int *))0x08052FB5)
 #define AURA_MODE (*(volatile u8 *)0x03002BB0)
@@ -1015,6 +1021,7 @@ static void tinted_start(u32 *state, void *sprite, const u32 *aura_field, const 
 }
 void rose_start(u32 *state, void *sprite) { tinted_start(state, sprite, rose_aura_field, rose_aura_other); }
 void ssj4_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssj4_aura_field, ssj4_aura_other); }
+void ssb_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssb_aura_field, ssb_aura_other); }
 void rose_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) {
         u32 *state = Alloc(0x10);
@@ -1160,7 +1167,7 @@ void trailer_slot(int *sp) {
 #define REC(c) (RECORDS + (c) * RECORD_SIZE)
 #define R16(r, o) (*(u16 *)((r) + (o)))
 #define EXP(r) (*(u32 *)((r) + 0x24))
-static const u8 gogeta_skills[] = {5, 7, 3, 5, 20, 21};     /* count, his own three, Super Saiyan, Super Saiyan Blue */
+static const u8 gogeta_skills[] = {5, 7, 3, 5, 20, SSB_SKILL};     /* count, his own three, Super Saiyan, Super Saiyan Blue */
 static int scale(int v, int pct) { v = v * pct / 100; return v > 255 ? 255 : v; }
 void party_join(int *sp) {
     int n = *sp, form = sp[n], c = sp[n - 1], i;
@@ -1273,6 +1280,108 @@ void black_kame_use(u8 *record, void *sprite) {
     Sprite_SetBehaviour(sprite, b);
 }
 
+/* More beams on the Kamehameha's code, each with its own frames and strength (build.py KAME_VARIANTS): Vegeta's Galick Gun (violet) and
+   Super Saiyan 4's 10x Kamehameha (red). The behaviour is 0x10 bytes as the retail one; +12 is the skill level. */
+#define KV_COUNT 3
+const u32 kv_params[KV_COUNT][12] = {{1}};
+const int kv_vt[KV_COUNT][9] = {{1}};
+static void kv_begin(u32 *self, void *player, const u32 *params) {
+    u32 *beam;
+    Kamehameha_Start(self, player);
+    beam = (u32 *)self[2];
+    if (beam) {
+        const u32 *mine = &params[self[3] * 4];
+        beam[0x40 / 4] = (u32)mine;
+        beam[0x44 / 4] = beam[0x48 / 4] = beam[0x4C / 4] = mine[2];
+        MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (void *)((u32 *)mine[2])[2], 0x40);
+    }
+}
+static void kv_use(u8 *record, void *sprite, const int *vt) {
+    int level = record[record[0x15] * 2 + 0x2E];
+    u32 *b = Alloc(0x10);
+    if (b) { b[0] = (u32)vt; b[1] = 0; b[3] = level; }
+    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetBehaviour(sprite, b);
+}
+void galick_start(u32 *self, void *player) { kv_begin(self, player, kv_params[0]); }
+void galick_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[0]); }
+void tenx_start(u32 *self, void *player) { kv_begin(self, player, kv_params[1]); }
+void tenx_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[1]); }
+void superkame_start(u32 *self, void *player) { kv_begin(self, player, kv_params[2]); }
+void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]); }
+/* Goku's Kamehameha counts its uses at its top level towards the Super Kamehameha (skills_sync) */
+static int derived_level(int c, int skill);
+#define MASTERY_BYTES ((u8 *)BENCH.e[GROUPS - 1].gear)
+void kame_use(u8 *record, void *sprite) {
+    if (record == RECORDS && derived_level(0, 15) == 2 && MASTERY_BYTES[21] < 255) MASTERY_BYTES[21]++;
+    ((void (*)(u8 *, void *))0x0801A35B)(record, sprite);
+}
+static int is_ssj4(int form);
+/* Final Shine: Final Flash's code (behaviour 0x0804D9D4) firing a green beam. Its update (0x0801B4EC) makes the beam on its 24th frame
+   (0x08036FA2, which reads the level's row of 0x0876174C: frames, 8, damage); ours then points the beam at our rows and redraws it.
+   The behaviour is allocated 0x14 bytes so +0x10 can mark the switch done. */
+const u32 shine_params[9] = {1};
+const int shine_vt[9] = {1};
+#define FinalFlash_Update ((void (*)(u32 *, int *))0x0801B4ED)
+#define Beam_Frame ((void (*)(u32 *))0x08036F6D)
+void shine_update(u32 *self, int *player) {
+    u32 *beam;
+    FinalFlash_Update(self, player);
+    beam = (u32 *)self[1];
+    if (beam && !self[4]) {
+        const u32 *mine = &shine_params[self[3] * 3];
+        beam[0x10] = (u32)mine; beam[0xF] = mine[0] + beam[0xE] * 0x18;
+        Beam_Frame(beam);
+        self[4] = 1;
+    }
+}
+void shine_use(u8 *record, void *sprite) {
+    u32 *b = Alloc(0x14);
+    if (b) { b[0] = (u32)shine_vt; b[1] = b[2] = b[4] = 0; b[3] = record[record[0x15] * 2 + 0x2E]; }
+    Sprite_SetFacing(sprite, 0x13);
+    Sprite_SetBehaviour(sprite, b);
+}
+#define FlashCan ((int (*)(u8 *))0x0801A0AB)
+int ssj4_flash_can(u8 *record) { return is_ssj4(record[0x14]) && FlashCan(record); }       /* Final Shine: Super Saiyan 4 only */
+/* Super Saiyan 4's Dragon Fist: Dragon Fist's code (behaviour 0x0804D9B0) with a red dragon, hitting 1.25x as hard. Its update
+   (0x0801ABBE) makes the dragon on its 16th frame (0x08038AD8: a head and five segments chained through +0x48, each showing its rows of
+   0x0877AD10 through +0x5C and +0x18); ours moves each segment onto the red rows. +0x10 marks it done (0x14 bytes allocated). */
+const u32 red_dragon[48] = {1};
+const int dragon4_vt[9] = {1};
+#define dragon4_live (*(u32 *volatile *)0x0203FFB8)      /* the red Dragon Fist in play, for combat_hook (after SK) */
+#define DragonFist_Update ((void (*)(u32 *, int *))0x0801ABBF)
+#define DragonFist_End ((void (*)(u32 *))0x0801AB97)
+#define DragonFist_Can ((int (*)(u8 *))0x08019E9F)
+#define Segment_Refresh ((void (*)(u32 *))0x08019B4F)
+#define DRAGON_ROWS 0x0877AD10
+#define DRAGON4_COST 45
+#define CanAfford ((int (*)(u8 *, int))0x080134B9)
+void dragon4_update(u32 *self, int *player) {
+    u32 *seg;
+    DragonFist_Update(self, player);
+    if (self[1] && !self[4]) {
+        for (seg = (u32 *)self[1]; seg; seg = (u32 *)seg[0x12]) {
+            if (seg[0x17] >= DRAGON_ROWS && seg[0x17] < DRAGON_ROWS + 0xC0) seg[0x17] = (u32)red_dragon + (seg[0x17] - DRAGON_ROWS);
+            if (seg[6] >= DRAGON_ROWS && seg[6] < DRAGON_ROWS + 0xC0) seg[6] = (u32)red_dragon + (seg[6] - DRAGON_ROWS);
+            Segment_Refresh(seg);
+        }
+        self[4] = 1;
+    }
+    dragon4_live = self;
+}
+void dragon4_end(u32 *self) { if (dragon4_live == self) dragon4_live = 0; DragonFist_End(self); }
+void dragon4_use(u8 *record, void *sprite) {
+    u32 *b = Alloc(0x14);
+    if (b) { b[0] = (u32)dragon4_vt; b[1] = b[2] = b[3] = b[4] = 0; }
+    Spend(record, DRAGON4_COST);         /* from the form's own pool: Super Saiyan 4's holds 90, where retail's 300 comes from the EP bar */
+    Sprite_SetFacing(sprite, 0x13);
+    Sprite_SetBehaviour(sprite, b);
+}
+int ssj4_dragon_can(u8 *record) { return is_ssj4(record[0x14]) && CanAfford(record, DRAGON4_COST); }
+#define KameCan ((int (*)(u8 *))0x0801A335)
+static int is_ssj4(int form);
+int ssj4_kame_can(u8 *record) { return is_ssj4(record[0x14]) && KameCan(record); }     /* 10x Kamehameha: Super Saiyan 4 only */
+
 /* Full Power Energy Wave, for the androids: the Electric Kamehameha's code with green frames, as in Gero's Legacy. Gohan keeps the original. */
 #define Wave_Start ((void (*)(u32 *, void *))0x0801ADA9)
 const u32 wave_params[12] = {1};
@@ -1332,30 +1441,33 @@ static int ss2_open(const u8 *record, int owner) {
     for (i = 0; i < record[0x0C]; i++) if (record[0x0D + i] == 22) return 1;
     return 0;
 }
-static int has_ss2_above(const u8 *record) {
-    const u8 *row = form_table + record[0x14] * 24;
-    return (row[0] & 1) && row[0x16] != 255 && is_ss2(row[0x16]) && ss2_open(record, row[0x0C]);
-}
 static void power_up(void *sprite, const void *vt);
 static int is_ssj4(int form);
 static void ssj4_pending(const u8 *record);
-void ss_use(u8 *record, void *sprite) {
-    if (has_ss2_above(record)) {
-        if (is_ssj4(form_table[record[0x14] * 24 + 0x16])) { ssj4_pending(record); power_up(sprite, ssj4_vt); }   /* GT Vegeta's Super Saiyan 4: a red aura */
-        else SS3_Use(record, sprite);
-    }
-    else SS_Use(record, sprite);
+static int is_kaioken(int form);
+/* Each tier is its own skill (Nov 9): Super Saiyan (20) powers up from base and back down from any Super Saiyan class form; Super Saiyan 2
+   (SS2_SKILL), 3 (22), 4 (SS4_SKILL) and Blue (SSB_SKILL) each go up from the tier below, and pressed in their own form power down.
+   None of them works in Kaioken, and Kaioken works only in a base form. A form's up (row +0x16) is the tier above it; Kaioken and Goku's
+   and Vegeta's Super Saiyan Blue aren't up anywhere, so their skills ask sub_0801C312 for their form through XFORM (xform_target). */
+#define IN_COMBAT (*(volatile u32 *)0x03001988)
+#define XFORM (*(volatile u8 *)0x0203FFBC)            /* form + 1 the next power-up ends in, or 0 */
+#define XFORM_FROM (*(volatile u8 *)0x0203FFBD)       /* the form it was pressed in */
+#define XFORM_AT (*(volatile u16 *)0x0203FFBE)        /* and when (frame counter's low half) */
+#define FRAMES (*(volatile u32 *)0x03000F94)
+static int flags_of(int form) { return form_table[form * 24]; }
+static int up_of(int form) { return form_table[form * 24 + 0x16]; }
+static void power_down(u8 *record, void *sprite) {             /* the retail way out of the form's class */
+    if (flags_of(record[0x14]) & 2) SS3_Use(record, sprite); else SS_Use(record, sprite);
 }
-/* GT: a Super Saiyan 3 form with a form above it (Kid Goku's) goes on to Super Saiyan 4 when Super Saiyan 3 is pressed again, for the same
-   ki as Super Saiyan 3; Super Saiyan 4 powers down. SS3_Can lets any Super Saiyan 3 form use the skill for free, since it only ever powered down. */
-#define CanAfford ((int (*)(u8 *, int))0x080134B9)
-static int ss4_above(const u8 *record) {
-    const u8 *row = form_table + record[0x14] * 24;
-    return (row[0] & 2) && row[0x16] != 255;
+static void power_to(u8 *record, void *sprite, int form, const void *vt) {
+    XFORM = form + 1; XFORM_FROM = record[0x14]; XFORM_AT = FRAMES;
+    power_up(sprite, vt);
 }
-int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2, not from Super Saiyan */
-    if (ss4_above(record)) return *(u32 *)(*(u32 *)(0x0871DA98 + 0x14) + 0x0C) ? CanAfford(record, 10) : 0;
-    return has_ss2_above(record) ? 0 : SS3_Can(record);
+int xform_target(int up, u8 *record) {                          /* sub_0801C312's new form */
+    int t = XFORM;
+    XFORM = 0;
+    if (t && record[0x14] == XFORM_FROM && (u16)(FRAMES - XFORM_AT) < 600) return t - 1;
+    return up;
 }
 static void power_up(void *sprite, const void *vt) {
     u32 *state = Alloc(0x10);
@@ -1363,10 +1475,269 @@ static void power_up(void *sprite, const void *vt) {
     Sprite_SetFacing(sprite, 10);
     Sprite_SetBehaviour(sprite, state);
 }
-void ss3_use(u8 *record, void *sprite) {
-    if (ss4_above(record)) { ssj4_pending(record); power_up(sprite, ssj4_vt); }
-    else SS3_Use(record, sprite);
+static int can_step(u8 *record) { return IN_COMBAT && CanAfford(record, 10); }   /* a tier up, as retail Super Saiyan 3: a fight and 10 ki */
+static int can_start(u8 *record) { return can_step(record) && *(u32 *)(record + 4) == 0; }   /* from base, as retail Super Saiyan: no cool-down either */
+int ss_can(u8 *record) { return is_kaioken(record[0x14]) ? 0 : SS_Can(record); }
+void ss_use(u8 *record, void *sprite) { XFORM = 0; SS_Use(record, sprite); }
+int ss2_can(u8 *record) {
+    int form = record[0x14], f = flags_of(form);
+    if (is_ss2(form)) return 1;
+    return (f & 1) && !(f & 2) && !is_kaioken(form) && up_of(form) != 255 && is_ss2(up_of(form)) && ss2_open(record, form_table[form * 24 + 0x0C]) && can_step(record);
 }
+void ss2_use(u8 *record, void *sprite) {
+    XFORM = 0;
+    if (is_ss2(record[0x14])) power_down(record, sprite); else SS3_Use(record, sprite);
+}
+int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one, not from Super Saiyan */
+    int form = record[0x14];
+    if (is_kaioken(form) || is_ssj4(form)) return 0;
+    if ((flags_of(form) & 1) && up_of(form) != 255 && is_ss2(up_of(form))) return 0;
+    if ((flags_of(form) & 2) && up_of(form) != 255 && is_ssj4(up_of(form))) return 1;        /* Kid Goku's Super Saiyan 3: powers down */
+    return SS3_Can(record);
+}
+void ss3_use(u8 *record, void *sprite) { XFORM = 0; SS3_Use(record, sprite); }
+int ss4_can(u8 *record) {      /* from the form below Super Saiyan 4 (Kid Goku's Super Saiyan 3, GT Vegeta's Super Saiyan) */
+    int form = record[0x14];
+    if (is_ssj4(form)) return form != FORM_GOGETA_SSJ4;
+    return (flags_of(form) & 3) && up_of(form) != 255 && is_ssj4(up_of(form)) && can_step(record);
+}
+void ss4_use(u8 *record, void *sprite) {
+    XFORM = 0;
+    if (is_ssj4(record[0x14])) power_down(record, sprite);
+    else { ssj4_pending(record); power_up(sprite, ssj4_vt); }
+}
+/* Super Saiyan Blue: DBS Gogeta's from his Super Saiyan (its up); Goku's and Vegeta's from theirs through ssb_map (their up is Super Saiyan 2). */
+extern const u8 ssb_map[][2], kaioken_map[][2];
+static int mapped(const u8 (*m)[2], int form) {
+    int i;
+    for (i = 0; m[i][0] != 255; i++) if (m[i][0] == form) return m[i][1];
+    return 255;
+}
+static int is_ssb(int form) {
+    int i;
+    for (i = 0; ssb_map[i][0] != 255; i++) if (ssb_map[i][1] == form) return 1;
+    return 0;
+}
+#define FORM_GOGETA_SSB_FORM (form_table[FORM_GOGETA_DBS_SS * 24 + 0x16])
+int ssb_can(u8 *record) {
+    int form = record[0x14];
+    if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) return 1;
+    if (form == FORM_GOGETA_DBS_SS) return can_step(record);
+    return (flags_of(form) & 1) && mapped(ssb_map, form) != 255 && can_step(record);
+}
+void ssb_use(u8 *record, void *sprite) {
+    int form = record[0x14];
+    XFORM = 0;
+    if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) power_down(record, sprite);
+    else if (form == FORM_GOGETA_DBS_SS) power_up(sprite, ssb_vt);
+    else power_to(record, sprite, mapped(ssb_map, form), ssb_vt);
+}
+/* Kaioken (Goku and the humans): from a base form to its red copy (kaioken_map), a Super Saiyan class form without the +5, as the build
+   makes its row, with the red aura. Its bar drains as Super Saiyan's does and it costs health as it goes (ss_tick); hits are 1.5x. */
+static int is_kaioken(int form) {
+    int i;
+    for (i = 0; kaioken_map[i][0] != 255; i++) if (kaioken_map[i][1] == form) return 1;
+    return 0;
+}
+int kaioken_can(u8 *record) {
+    int form = record[0x14];
+    if (is_kaioken(form)) return 1;
+    return !(flags_of(form) & 3) && mapped(kaioken_map, form) != 255 && can_start(record);
+}
+void kaioken_use(u8 *record, void *sprite) {
+    int form = record[0x14];
+    XFORM = 0;
+    if (is_kaioken(form)) SS_Use(record, sprite);
+    else power_to(record, sprite, mapped(kaioken_map, form), ssj4_vt);
+}
+/* Skills beyond the seven a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
+   loadout can hold; record +0x22 is a mask over it of the ones they know. Equipped skills sit in the record as always (+0x0D, levels
+   +0x2E). The story's natives add (0xA4), remove (0xA5) and replace (0xA6) skills: ours do the same on the record and keep the book's
+   mask in step, so a skill swapped out still learns, locks and unlocks. A skill learned with no free slot waits in the book; the
+   pause menu's Skills tab swaps one in with SELECT. Skills earned by play (Kaioken, Galick Gun, each tier, the post-game moves, mastery)
+   are learned by skills_sync. Retail moves' levels come with the character's level (the level-up script, 0x0877C9E8), so a move swapped
+   back in takes the level that gives; a transformation's level is its mastery (mastery bytes in the bench's last group). */
+extern const u8 skill_book[8][16], level_steps[][4];
+static int ss2_open(const u8 *record, int owner);
+#define KNOWN(rec) (*(u16 *)((rec) + 0x22))
+#define GetLevel ((int (*)(u8 *))0x080135D3)
+#define G_FLAGS ((void *)0x03001068)
+#define MASTERY ((u8 *)BENCH.e[GROUPS - 1].gear)           /* 22 bytes: one per (character, tier) in mastery_slot order, then Goku's Kamehameha count */
+static u8 *rec_of(int c) { return RECORDS + c * RECORD_SIZE; }
+static int book_at(int c, int skill) {
+    int i;
+    if (c > 7) return -1;
+    for (i = 0; i < 16; i++) if (skill_book[c][i] == skill) return i;
+    return -1;
+}
+static int slot_of(const u8 *rec, int skill) {
+    int i;
+    for (i = 0; i < rec[0x0C]; i++) if (rec[0x0D + i] == skill) return i;
+    return -1;
+}
+static int knows(int c, int skill) { int b = book_at(c, skill); return b >= 0 && KNOWN(rec_of(c)) >> b & 1; }
+static void set_known(int c, int skill, int on) {
+    int b = book_at(c, skill);
+    if (b < 0) return;
+    if (on) KNOWN(rec_of(c)) |= 1 << b; else KNOWN(rec_of(c)) &= ~(1 << b);
+}
+/* the tiers whose level is mastery, and where each character's byte is */
+static const u8 tier_skill[6] = {20, 35, 22, 36, 44, 37};      /* SS, SS2, SS3, SS4, Blue, Kaioken */
+static const signed char mastery_slot[8][6] = {{0, 1, 2, 3, 4, 5}, {6, 7, -1, -1, -1, -1}, {8, -1, -1, -1, -1, -1}, {9, 10, -1, -1, -1, -1},
+                                      {11, 12, -1, 13, 14, -1}, {15, -1, 16, -1, -1, -1}, {17, 18, -1, -1, -1, -1}, {19, -1, -1, -1, 20, -1}};
+#define KAME_COUNT (MASTERY[21])
+static int tier_of(int skill) { int i; for (i = 0; i < 6; i++) if (tier_skill[i] == skill) return i; return -1; }
+int mastery_level(int c, int skill) {          /* 0, 1, 2: shown as Level 1-3 */
+    int t = tier_of(skill), m;
+    if (t < 0 || c > 7 || (m = mastery_slot[c][t]) < 0) return 0;
+    return MASTERY[m] >= MASTERY_L3 ? 2 : MASTERY[m] >= MASTERY_L2 ? 1 : 0;
+}
+static int derived_level(int c, int skill) {    /* a move's level from the character's level, as the level-up script grants it */
+    int lv = GetLevel(rec_of(c)), i;
+    if (tier_of(skill) >= 0) return mastery_level(c, skill);
+    for (i = 0; level_steps[i][0] != 255; i++)
+        if (level_steps[i][0] == c && level_steps[i][1] == skill) return (lv >= level_steps[i][3]) + (lv >= level_steps[i][2] || level_steps[i][2] == 0);
+    return 0;
+}
+static void equip(int c, u8 *rec, int at, int skill) {     /* put a skill in slot `at` (at == count: a new slot) with its level */
+    int lv = derived_level(c, skill);
+    rec[0x0D + at] = skill; rec[0x2E + 2 * at] = lv; rec[0x2F + 2 * at] = lv;
+    if (at == rec[0x0C]) rec[0x0C]++;
+}
+/* the natives */
+void skill_add(int *sp) {
+    int n = *sp, skill = sp[n], c = sp[n - 1];
+    u8 *rec = rec_of(c);
+    *sp = n - 2;
+    set_known(c, skill, 1);
+    if (slot_of(rec, skill) < 0 && rec[0x0C] < 7) equip(c, rec, rec[0x0C], skill);
+}
+void skill_remove(int *sp) {
+    int n = *sp, skill = sp[n], c = sp[n - 1];
+    *sp = n - 2;
+    set_known(c, skill, 0);
+    ((void (*)(u8 *, int))0x08013ABB)(rec_of(c), skill);
+}
+void skill_replace(int *sp) {
+    int n = *sp, to = sp[n], from = sp[n - 1], c = sp[n - 2];
+    *sp = n - 3;
+    if (knows(c, from) || book_at(c, from) < 0) { set_known(c, from, 0); set_known(c, to, 1); }
+    ((void (*)(u8 *, int, int))0x08013B13)(rec_of(c), from, to);
+}
+/* what play has earned: run for the fighter in control now and then, and for a character as the Skills tab opens */
+static void learn(int c, int skill, int ok) {
+    u8 *rec = rec_of(c);
+    if (!ok || knows(c, skill) || slot_of(rec, skill) >= 0) { if (ok && slot_of(rec, skill) >= 0) set_known(c, skill, 1); return; }
+    set_known(c, skill, 1);
+    if (rec[0x0C] < 7) equip(c, rec, rec[0x0C], skill);
+}
+void skills_sync(int c) {
+    u8 *rec;
+    int i, post = GetFlag(G_FLAGS, 149), gt = more_flag(MORE_GT_FLAG);
+    if (c > 7) return;
+    rec = rec_of(c);
+    for (i = 0; i < rec[0x0C]; i++) {
+        if (c == 7 && rec[0x0D + i] == 21) rec[0x0D + i] = SSB_SKILL;          /* Gogeta's Super Saiyan Blue, from before it had its own row */
+        set_known(c, rec[0x0D + i], 1);
+        if (tier_of(rec[0x0D + i]) >= 0) rec[0x2E + 2 * i] = rec[0x2F + 2 * i] = mastery_level(c, rec[0x0D + i]);
+    }
+    if (book_at(c, 35) >= 0) learn(c, 35, (knows(c, 20) || slot_of(rec, 20) >= 0) && ss2_open(rec, c));
+    if (c == 0) {
+        learn(c, KAIOKEN_SKILL, 1);
+        learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
+        learn(c, SSB_SKILL, post && mastery_level(0, 22) == 2);
+        learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
+    }
+    if (c == 4) {
+        learn(c, GALICK_SKILL, 1);
+        learn(c, 36, gt); learn(c, FINAL_SHINE_SKILL, gt);
+        learn(c, SSB_SKILL, post && mastery_level(4, 35) == 2);
+    }
+}
+/* the Skills tab (vtable 0x0804B024): R swaps the chosen skill for the next one the fighter knows but isn't holding */
+void skills_swap(int c, int at) {
+    u8 *rec = rec_of(c);
+    int i, b0, cur;
+    if (c > 7 || at < 0 || at >= rec[0x0C]) return;
+    cur = rec[0x0D + at]; b0 = book_at(c, cur);
+    for (i = 1; i <= 16; i++) {
+        int b = ((b0 < 0 ? -1 : b0) + i) & 15, s = skill_book[c][b];
+        if (s == 255 || !(KNOWN(rec) >> b & 1) || slot_of(rec, s) >= 0) continue;
+        set_known(c, cur, 1);
+        equip(c, rec, at, s);
+        return;
+    }
+}
+/* The Skills tab: SELECT swaps (slot 10, keys: L and R change tabs there); opening it learns what play has earned (slot 1, setup). */
+#define KEYS_NEW (*(volatile u16 *)0x03003304)
+#define SkillTab_Keys ((int (*)(u8 *))0x080175FD)
+#define SkillTab_Setup ((int (*)(u8 *, int, int, int))0x080171A9)
+int skilltab_keys(u8 *obj) {
+    if (KEYS_NEW & 0x4) {
+        int c = *(int *)(obj + 0x114);
+        skills_swap(c, *(int *)(obj + 0x120));
+        PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
+        *(int *)(obj + 0x118) = rec_of(c)[0x0C];
+        *(int *)(obj + 0x110) = 0;
+    }
+    return SkillTab_Keys(obj);
+}
+int skilltab_setup(u8 *obj, int a, int b, int d) {
+    int c = *(int *)(obj + 0x114), r;
+    skills_sync(c);
+    *(int *)(obj + 0x118) = c <= 8 ? rec_of(c)[0x0C] : *(int *)(obj + 0x118);
+    r = SkillTab_Setup(obj, a, b, d);
+    if (c <= 7)                                          /* the hint, beside Select and Cancel (the game's buttons have no SELECT icon) */
+        AddWidget(obj, NewText(0, obj, 0x84, 0x90, (const u16 *)L"SELECT: Swap", 5, 0, (void *)FONT));
+    return r;
+}
+/* sub_0801C312 ends a power-up by moving the record to its form's up; xform_hook (at 0x0801C35C) lets XFORM choose instead. */
+void xform_hook(void);
+__asm__(".syntax unified\n.thumb\n.thumb_func\n.global xform_hook\nxform_hook:\n"
+        "ldrb r0, [r7, #22]\nadds r1, r4, #0\nbl xform_target\nstrb r0, [r4, #20]\nlsls r3, r0, #1\nadds r0, r3, r0\nldr r3, =0x0801C365\nbx r3\n.ltorg\n");
+/* Super Saiyan's drain (sub_0800E3E6) is about to take a unit from the pool (+0x1E): ss_tick sees it first. It returns 1 to skip the unit
+   (a mastered form drains slower); in Kaioken it costs health too, and when health runs short the pool empties so the game powers down. */
+static int mastery_skip(u8 *rec);
+int ss_tick(u8 *rec) {
+    if (rec != RECORDS + *(u8 *)0x03001068 * RECORD_SIZE) return 0;
+    if (is_kaioken(rec[0x14])) {
+        short *hp = (short *)(rec + 0x16), cost = *(short *)(rec + 0x18) / 150;
+        if (cost < 1) cost = 1;
+        if (*hp > cost + 1) *hp -= cost;
+        else *(u16 *)(rec + 0x1E) = 0;
+    }
+    return mastery_skip(rec);
+}
+void ss_drain_hook(void);
+__asm__(".syntax unified\n.thumb\n.thumb_func\n.global ss_drain_hook\nss_drain_hook:\n"
+        "push {r0}\nbl ss_tick\nadds r3, r0, #0\npop {r0}\nadds r1, r0, #0\nadds r1, #30\nldrh r2, [r1]\n"
+        "cmp r3, #0\nbne 1f\ncmp r2, #0\nldr r3, =0x0800E435\nbx r3\n1:\nldr r3, =0x0800E467\nbx r3\n.ltorg\n");
+/* Mastery: each drain unit in a tier's form trains it (one point per MASTERY_EVERY units: about every 3 seconds in either class); at
+   MASTERY_L2 and MASTERY_L3 points the tier reaches Level 2 and 3 and drains a fifth and two fifths slower. */
+#define MASTERY_TICK (*(volatile u8 *)0x0203FFC0)
+static int form_tier(int form) {
+    int f = form_table[form * 24];
+    if (is_kaioken(form)) return 5;
+    if (is_ssj4(form)) return 3;
+    if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) return 4;
+    if (is_ss2(form)) return 1;
+    if (f & 2) return 2;
+    if (f & 1) return 0;
+    return -1;
+}
+static int mastery_train(u8 *rec, int every) {        /* -> 1 to skip this drain unit */
+    int c = *(u8 *)0x03001068, t = form_tier(rec[0x14]), m, lv;
+    if (c > 7 || t < 0 || (m = mastery_slot[c][t]) < 0) return 0;
+    MASTERY_TICK++;
+    if (MASTERY_TICK % every == 0 && MASTERY[m] < 255) {
+        lv = mastery_level(c, tier_skill[t]);
+        MASTERY[m]++;
+        if (mastery_level(c, tier_skill[t]) != lv) PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
+    }
+    lv = mastery_level(c, tier_skill[t]);
+    return MASTERY_TICK % 5 < lv;
+}
+static int mastery_skip(u8 *rec) { return mastery_train(rec, 10); }
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
 extern const int absorb_vt[14];
 void majuub_use(u8 *record, void *sprite) {
@@ -1396,10 +1767,12 @@ static void ssj4_pending(const u8 *record) { SK.pending_rest = *(const u16 *)(re
 /* The Super Saiyan 3 class's drain (0x0800E4C4) is about to take `need` (whole units, when its accumulator rolls over) from the pool;
    returns what it takes. Super Saiyan 4: when the purple is down to its last, the orange put aside takes its place; then every other
    unit is skipped, which halves the rate (a skipped unit takes nothing, so the empty-pool check only fires on a pool already empty). */
+static int mastery_train(u8 *rec, int every);
 int ssj4_refill(u8 *rec, int need) {
     u16 *pool = (u16 *)(rec + 0x20);
     if (rec != RECORDS + *(u8 *)0x03001068 * RECORD_SIZE) return need;
     ssj4_track(rec);
+    if (mastery_train(rec, 45)) return 0;            /* a mastered tier drains slower */
     if (!SK.active) return need;
     if (SK.purple && *pool <= need) {
         SK.purple = 0;
@@ -1438,17 +1811,23 @@ __asm__(".syntax unified\n.thumb\n.thumb_func\ncombat_orig:\npush {r4, r5, r6, r
 void combat_hook(void *defender, int *hit) {
     int scale = hit[1], form = FORM_OF(*(u8 *)0x03001068);
     u16 *stats = (u16 *)((u8 *)hit[3] + 0x1B0), strength = stats[0], power = stats[1];
-    if ((hit[0] & 255) == 2) {
+    int mine = hit[3] && *((u8 *)hit[3] + 0x1D0) == 1;    /* the attacker (hit[3], the owner of a blast) is on the player's side (team 1). hit[0] is the direction */
+    if (mine) {
         if (is_ssj4(form)) {                         /* Super Saiyan 4: 2.5x Super Saiyan's damage, Gogeta's 3x (from Super Saiyan 3's figure where it is that class) */
             hit[1] = form == FORM_GOGETA_SSJ4 ? scale * 3 : scale * 2 + (scale >> 1);
             if ((form_table[form * 24] & 2) && strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
         }
-        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
+        else if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) {      /* Super Saiyan Blue: 2x, from Super Saiyan's figure as Super Saiyan 3 */
+            hit[1] = scale * 2;
+            if (strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
+        }
+        else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE || is_kaioken(form)) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             stats[0] = strength - 10; stats[1] = power - 10;
         }
     }
+    if (mine && dragon4_live) hit[1] += hit[1] >> 2;      /* Super Saiyan 4's red Dragon Fist: 1.25x */
     combat_orig(defender, hit);
     hit[1] = scale; stats[0] = strength; stats[1] = power;
 }

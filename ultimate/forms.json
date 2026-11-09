@@ -165,7 +165,7 @@
    "owner": 7,
    "name": 1055,
    "portrait": 34,
-   "down": "gogeta_dbs_ss"
+   "down": "gogeta_dbs"
   },
   {
    "id": "gogeta_ssb_skin",
@@ -446,7 +446,8 @@
    "actor": "gohan_gt_ssj",
    "owner": 1,
    "portrait": "gt:gohan_ssj",
-   "down": "gohan_gt"
+   "down": "gohan_gt",
+   "up": "gohan_gt_ss2"
   },
   {
    "id": "gohan_gt_noglasses",
@@ -462,7 +463,8 @@
    "actor": "gohan_gt_ssj",
    "owner": 1,
    "portrait": "gt:gohan_ssj",
-   "down": "gohan_gt_noglasses"
+   "down": "gohan_gt_noglasses",
+   "up": "gohan_gt_ng_ss2"
   },
   {
    "id": "saiyaman_from_gt",
@@ -711,6 +713,24 @@
    "flags": 81,
    "down": "uub",
    "portrait": "gt:uub"
+  },
+  {
+   "id": "gohan_gt_ss2",
+   "copy": 16,
+   "actor": "gohan_gt_ss2",
+   "owner": 1,
+   "portrait": "gt:gohan_ssj",
+   "up": 255,
+   "down": "gohan_gt"
+  },
+  {
+   "id": "gohan_gt_ng_ss2",
+   "copy": 16,
+   "actor": "gohan_gt_ss2",
+   "owner": 1,
+   "portrait": "gt:gohan_ssj",
+   "up": 255,
+   "down": "gohan_gt_noglasses"
   }
  ],
  "edit": {

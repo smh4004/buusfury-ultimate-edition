@@ -238,6 +238,10 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             src = a['bolts_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
             rec = bolted_actor(ins, rom, src - BASE, a['bolt_colours']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
+        if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
+            src = a['tint_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
+            rec = tinted_actor(ins, rom, src - BASE, a['tint']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            continue
         if 'proto_actor' in a:                             # whole actor copied from the Prototype D cart
             if proto is None: continue
             rec = proto_actor(ins, proto, a['proto_actor']); n = rec[0]
@@ -460,6 +464,43 @@ PROTO_ACTOR_LIST = 0x6A1BBC      # Prototype D (DBZ3_cart27): 280 actors, same r
 BOLTS = (('...X..', '..X...', '.XXX..', '...X..', '..X...', '.X....'),
          ('..X...', '...X..', '..XXX.', '..X...', '...X..', '....X.'),
          ('.X....', '..X...', '.XXX..', '...X..', '....X.', '......'))
+
+
+def tinted_actor(ins, rom, rec_at, remap):
+    """A copy of an actor with every frame's pixels through `remap`: 256 bytes (as bytes.translate; Kaioken's red), or a function of each
+    piece as an index image (Super Saiyan Blue's hair). Tiles are stored raw."""
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    n = u(rec_at) & 0xFF; rec = bytearray(rom[rec_at:rec_at + 0x54 + 4 * n])
+    done, frames, anims = {}, {}, {}
+    def tile(tp, w, h):
+        if tp not in done:
+            o = tp - BASE; t, size = u(o), u(o + 4)
+            raw = rom[o + 8:o + 8 + size] if t == 0 else bytes(decompress_stream(rom, o + 8, size)[0])
+            if callable(remap):                            # a function of the whole piece (tiles laid out as an image)
+                img = np.frombuffer(bytes(raw[:w * h]), np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+                data = np.asarray(remap(img), np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+            else:
+                data = bytes(raw[:w * h]).translate(remap)
+            done[tp] = ins.put(struct.pack('<II', 0, len(data)) + data)
+        return done[tp]
+    def frame(fp):
+        if fp not in frames:
+            o = fp - BASE; k = u(o); body = bytearray(rom[o:o + 4 + 16 * k])
+            for j in range(k):
+                w, h = body[4 + 16 * j + 2], body[4 + 16 * j + 3]
+                struct.pack_into('<I', body, 4 + 16 * j + 12, tile(u(o + 4 + 16 * j + 12), w, h))
+            frames[fp] = ins.put(bytes(body))
+        return frames[fp]
+    for s in range(n):
+        ap = u(rec_at + 0x54 + 4 * s)
+        if not ap: continue
+        if ap not in anims:
+            o = ap - BASE; k = u(o)
+            ptrs = [frame(u(o + 4 + 4 * j)) if u(o + 4 + 4 * j) else 0 for j in range(4 * k)]
+            anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
+        struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
+    return rec
 
 
 def bolted_actor(ins, rom, rec_at, colours):

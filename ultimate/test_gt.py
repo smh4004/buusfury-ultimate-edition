@@ -115,15 +115,15 @@ pos = picker_order()
 print('picker positions', pos, flush=True)
 CASES = [
     ('goku', 0, 2, [7, 15, 20, 22], [(20, 4, 'SS'), (20, 'goku_ss2_b', 'SS2'), (20, 2, 'SS2 off'), (20, 4, 'SS again'), (20, 'goku_ss2_b', 'SS2'), (22, 6, 'SS3'), (22, 2, 'SS3 off')]),     # retail Goku (form 2: dead, with his halo), the same presses
-    ('kid_goku', 0, 'kid_goku', [7, 15, 20, 22], [(20, 'kid_goku_ssj', 'SS'), (20, 'kid_goku', 'SS off'), (20, 'kid_goku_ssj', 'SS'), (22, 'kid_goku_ssj3', 'SS3'),
-                                                  (22, 'kid_goku_ssj4', 'SS4'), (22, 'kid_goku', 'SS4 off')]),
-    ('gohan_gt', 1, 'gohan_gt', [7, 17, 20], [(20, 'gohan_gt_ssj', 'SS'), (20, 'gohan_gt', 'SS off')]),
+    ('kid_goku', 0, 'kid_goku', [7, 15, 20, 22, 36], [(20, 'kid_goku_ssj', 'SS'), (20, 'kid_goku', 'SS off'), (20, 'kid_goku_ssj', 'SS'), (22, 'kid_goku_ssj3', 'SS3'),
+                                                  (36, 'kid_goku_ssj4', 'SS4'), (36, 'kid_goku', 'SS4 off')]),
+    ('gohan_gt', 1, 'gohan_gt', [7, 17, 20, 35], [(20, 'gohan_gt_ssj', 'SS'), (20, 'gohan_gt', 'SS off'), (20, 'gohan_gt_ssj', 'SS'), (35, 'gohan_gt_ss2', 'SS2'), (35, 'gohan_gt', 'SS2 off')]),
     ('gohan_gt_ng', 1, 'gohan_gt_noglasses', [7, 17, 20], [(20, 'gohan_gt_ng_ssj', 'SS'), (20, 'gohan_gt_noglasses', 'SS off')]),
     ('goten_gt', 2, 'goten_gt', [7, 16, 20], [(20, 'goten_gt_ssj', 'SS'), (20, 'goten_gt', 'SS off')]),
     ('goten_gt_green', 2, 'goten_gt_green', [7, 16, 20], [(20, 'goten_gt_green_ssj', 'SS'), (20, 'goten_gt_green', 'SS off')]),
     ('trunks_gt', 3, 'trunks_gt', [7, 20], [(20, 'trunks_gt_ssj', 'SS'), (20, 'trunks_gt', 'SS off')]),
-    ('vegeta_gt', 4, 'vegeta_gt', [7, 20], [(20, 'vegeta_gt_ssj', 'SS'), (20, 'vegeta_gt_ssj4', 'SS4'), (20, 'vegeta_gt', 'SS4 off')]),
-    ('vegeta_gt_tank', 4, 'vegeta_gt_tank', [7, 20], [(20, 'vegeta_gt_tank_ssj', 'SS'), (20, 'vegeta_gt_tank_ssj4', 'SS4'), (20, 'vegeta_gt_tank', 'SS4 off')]),
+    ('vegeta_gt', 4, 'vegeta_gt', [7, 20, 36], [(20, 'vegeta_gt_ssj', 'SS'), (36, 'vegeta_gt_ssj4', 'SS4'), (36, 'vegeta_gt', 'SS4 off')]),
+    ('vegeta_gt_tank', 4, 'vegeta_gt_tank', [7, 20, 36], [(20, 'vegeta_gt_tank_ssj', 'SS'), (36, 'vegeta_gt_tank_ssj4', 'SS4'), (36, 'vegeta_gt_tank', 'SS4 off')]),
     ('vegeta_gt_mustache', 4, 'vegeta_gt_mustache', [7, 20], [(20, 'vegeta_gt_mustache', 'no Super Saiyan')]),
     ('pan', 8, 'pan', [7, 8, 20], [(20, 'pan_ssj', 'SS'), (20, 'pan', 'SS off')]),
     ('pan_nobandana', 8, 'pan_nobandana', [7, 8, 20], [(20, 'pan_ssj_spiky', 'SS'), (20, 'pan_nobandana', 'SS off')]),

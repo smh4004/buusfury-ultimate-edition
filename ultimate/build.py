@@ -14,6 +14,7 @@ sys.path.insert(0, 'ultimate/lib')
 import bps
 import numpy as np
 import sprites, artclean, wfz
+import icons as iconlib
 sys.path.insert(0, 'ultimate')
 import gogeta
 import goku_black
@@ -23,6 +24,7 @@ CLEAN_SHA1 = 'f1c4b07554d2a3b1ad2f325307051e775ce68087'
 ROM_BASE = 0x08000000
 FORMS, FORM_COUNT, FORM_SIZE = 0x6B82EC, 54, 24
 NATIVES = 0x55098
+NATIVE_REFS = (0x3F40, 0x4030)      # the only two literals naming the native table
 CODE_END = 0x54FBC
 HEAP_WORDS = 0xFDFE - 0x400      # the top 4 KB of work RAM belongs to outfit.c
 SPACE = 0x800000                 # new data starts at the old 8 MB end: forms, then code
@@ -32,8 +34,8 @@ COMBO_SHA1 = 'f02d179accbeb9b68bcaef8720eb0ae426dde6ee'
 PROTO = os.environ.get('BFU_PROTO', 'protoD.gba')   # Prototype D cart: Super 13 and Zone 26
 LOG2 = os.environ.get('BFU_LOG2', 'log2.gba')      # Legacy of Goku II (USA): Zone 26's snow tiles
 COMBO = os.environ.get('BFU_COMBO', 'combo.gba')   # Legacy of Goku I & II cart; LoG2 = its second 8 MB
-JOIN_NATIVE = 0xE8               # party_join in outfit.c; no game script calls this native
-JOIN_OLD = 0x08003891
+JOIN_NATIVE = 0xFE               # party_join in outfit.c. The mod's natives are 0xF8-0xFF (the native table moved and grown: retail has 248)
+BOMB_FX, BOMB_AT = 0xFB, 0xFC     # the Spirit Bomb scene's effects
 ERASER_SKILL = 24                # a new row past the retail table: Big Bang's code with green frames
 ERASER_UI = 1534                 # strings past the retail table: name, description of each new move
 BOMBER_SKILL = 25
@@ -49,6 +51,81 @@ ROSE_SKILL, BLACK_KAME_SKILL = 32, 33      # Goku Black: Super Saiyan Rose (Supe
 BLACK_NAME_UI, ROSE_NAME_UI = 1534 + 42, 1534 + 43     # form names, after Glacier's
 GT_NAME_UI = 1534 + 44            # Pan, Uub, Majuub, Brapan (forms.json uses these numbers)
 MAJUUB_SKILL = 34                # Uub becomes Majuub: Super Saiyan's mechanics, Android 13's aura-less power-up
+# Transformations and moves added Nov 9 (owner): each its own row, icon and name
+SS2_SKILL, SS4_SKILL, KAIOKEN_SKILL = 35, 36, 37                  # Super Saiyan 2 and 4 (Super Saiyan 3's icon with a 2 / a purple 4), Kaioken (a red Z)
+GALICK_SKILL, TENX_SKILL, FINAL_SHINE_SKILL, DRAGON4_SKILL = 38, 39, 40, 41     # Kamehameha's code violet / red, Final Flash's green, Dragon Fist's red
+SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
+# Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
+KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
+           'krillin': ('krillin', 8, 'krillin'), 'tien': ('tien', 8, 'tien_player'), 'yamcha': ('yamcha', 8, 'yamcha_player'),
+           'videl': ('videl', 8, 'videl_player'), 'hercule': ('hercule', 8, 'hercule_player')}
+# Super Saiyan Blue for Goku and Vegeta (post-game mastery): each Super Saiyan form -> its Blue, a Super Saiyan 3 class copy whose hair is blue.
+SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
+             'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
+SSB_FORMS = tuple((v[0], k) for k, v in SSB_LOOKS.items())
+# The blue: Super Saiyan's hair ramp (BF indices) -> DBS Gogeta's Blue tones (gogeta.py's sheet, flattened), lightest as his lightest
+SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86, 246, 246), 29: (200, 248, 248), 2: (200, 248, 248)}
+KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outlines stay)
+
+
+def kaioken_rows(clean):
+    """Kaioken's forms: the base row's copy with the red actor, in the Super Saiyan class (drain, +5) with no form above, back down to the base.
+    Then Super Saiyan Blue's: Super Saiyan 3's row (its class: the orange pool, +15) with the blue actor, the owner's portraits, down to base."""
+    rows = [{'id': n + '_kaioken', 'copy': base, 'actor': n + '_kaioken', 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base}
+            for n, (base, owner, _) in KAIOKEN.items()]
+    for n, (ss, row, owner, _, base) in SSB_LOOKS.items():
+        portraits = list(clean[FORMS + FORM_SIZE * (ss if isinstance(ss, int) else 28) + 0x10:][:6])
+        rows.append({'id': n, 'copy': row, 'actor': n, 'owner': owner, 'name': 1057, 'portrait': portraits, 'up': 255, 'down': base})
+    return rows
+
+
+def ssb_hair(one):
+    """Super Saiyan hair -> blue. Hair and skin share BF's colours: a ramp pixel is hair when nearer the hair's highlights than the face's
+    own colours, within 3 px (BSO's kidcombat.ssj_gold)."""
+    from scipy import ndimage
+    to = {k: one(np.array(v)) for k, v in SSB_HAIR.items()}
+    def fn(img):
+        ramp = np.isin(img, list(SSB_HAIR))
+        dh = ndimage.distance_transform_edt(~np.isin(img, [28, 29, 2]))
+        df = ndimage.distance_transform_edt(~np.isin(img, [200, 203, 215, 216, 117]))
+        hair = ramp & (dh < df) & (dh <= 3)
+        out = img.copy()
+        for k, v in to.items(): out[hair & (img == k)] = v
+        return out
+    return fn
+
+
+def kaioken_remap(pal, one):
+    def colour(v):
+        if v == 0: return 0
+        r, g, b = (int(c) for c in pal[v])
+        if max(r, g, b) < 48: return v
+        a = KAIOKEN_TINT
+        return one(np.array((r * (1 - a) + 248 * a, g * (1 - a) * 0.75, b * (1 - a) * 0.75)))
+    return bytes(colour(v) for v in range(256))
+
+
+# The skill book (outfit.c): per party character, the skills the loadout can hold beyond the seven slots. 21 is the story's locked Super Saiyan.
+SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
+MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21), 1: (7, 20, 35, 6, 17, 18, 26, 21), 2: (7, 20, 16, 8, 12, 21),
+              3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
+              7: (7, 3, 5, 20, 44)}
+# A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,
+# level for Level 2 or 0 = from the start (a story grant), level for Level 3). The new beams follow the move they're built on.
+LEVEL_STEPS = ((0, 14, 75, 125), (0, 15, 100, 150), (0, 43, 100, 150), (0, 39, 100, 150), (1, 17, 75, 125), (1, 6, 100, 150), (2, 16, 100, 150),
+               (2, 8, 0, 125), (3, 4, 75, 125), (3, 11, 100, 150), (4, 10, 100, 150), (4, 2, 0, 125), (4, 38, 100, 150), (4, 40, 100, 150))
+KAME_VARIANTS = (   # name, skill, strength x, beam colours (Kamehameha's two ramps, as KAME_TINT), title, text
+    ('galick', GALICK_SKILL, 1.0, {2: (240, 236, 255), 76: (200, 184, 255), 195: (160, 128, 248), 75: (112, 72, 224), 74: (48, 24, 128),
+                                    30: (240, 236, 255), 29: (216, 208, 255), 28: (184, 160, 255), 5: (160, 128, 248), 27: (136, 96, 240), 110: (112, 72, 224), 109: (80, 48, 176), 4: (48, 24, 128)},
+     'Galick Gun', 'Hold the B Button to gather energy in both hands, then release a long violet beam.'),
+    ('tenx', TENX_SKILL, 1.5, {2: (255, 240, 232), 76: (255, 184, 168), 195: (248, 104, 80), 75: (208, 32, 24), 74: (112, 0, 0),
+                                30: (255, 240, 232), 29: (255, 208, 192), 28: (255, 160, 136), 5: (248, 104, 80), 27: (232, 64, 48), 110: (208, 32, 24), 109: (160, 8, 8), 4: (112, 0, 0)},
+     '10x Kamehameha', 'Super Saiyan 4 only. Hold the B Button to emit a huge red Kamehameha, 1.5x as strong.'),
+    ('superkame', SUPER_KAME_SKILL, 1.4, {2: (255, 255, 255), 76: (224, 248, 255), 195: (152, 232, 255), 75: (64, 184, 248), 74: (24, 96, 200),
+                                           30: (255, 255, 255), 29: (232, 248, 255), 28: (192, 240, 255), 5: (152, 232, 255), 27: (104, 208, 255), 110: (64, 184, 248), 109: (40, 136, 224), 4: (24, 96, 200)},
+     'Super Kamehameha', 'A mastered Kamehameha. Hold the B Button to emit a brighter, wider beam, 1.4x as strong.'),
+)
 BLACK_PORTRAIT = 166             # speaker ids: Goku Black, then Rose
 # The Kamehameha's colours, by brightness: a cyan set (levels 1-2) and a gold set (level 3). Black's ki is dark purple and Rose's pink.
 KAME_TINT = {'black': {2: (240, 208, 248), 76: (216, 144, 240), 195: (176, 80, 224), 75: (120, 32, 176), 74: (56, 0, 88),
@@ -61,12 +138,12 @@ NEW_MOVES = (('eraser', ERASER_SKILL, (2.95, 2.85, 2.45), 'Eraser Cannon', 'Pres
              ('bomber', BOMBER_SKILL, (2.4, 2.2, 2), 'SS Deadly Bomber', 'Press the B Button and release to emit a large ball of reddish pink energy that explodes on contact.  Hold the B Button longer to make the attack stronger.', (1, 0, 0.03, 0.55, 0.12, 0.45)),
              ('blitz', BLITZ_SKILL, (1, 1, 1), 'Power Blitz', 'Press the B Button and release to emit a large ball of golden energy that explodes on contact.  Hold the B Button longer to make the attack stronger.', (1, 0, 0.75, 0.1, 0.05, 0.3)),
              ('disc', DISC_SKILL, (2.4, 2.2, 2), 'Destructo Disc', 'Press the B Button and release to throw a spinning disc of energy that explodes on contact.  Hold the B Button longer to make the attack stronger.', (1, 0, 0.85, 0.15, 0.1, 0.8)))
-SUPER_BLUE_SKILL = 21            # a skill row with stubs only: becomes Super Saiyan Blue
+SUPER_BLUE_SKILL = 44            # Super Saiyan Blue (Nov 9: its own row; retail stub 21 stays the story's locked Super Saiyan)
+OLD_SUPER_BLUE = 21              # where it was before: saves holding it are moved on (outfit.c skills_sync)
 BROLY_DEFEAT = 'assets/scripts/gUnknown_0879321C.evt'
-DEBUG_NATIVE = 0xF5              # debug builds only: "save to slot 1". Not 0xF7: the death script uses that one
+DEBUG_NATIVE = 0xDB              # debug builds only: "save to slot 1". No script calls 0xDB (equipment uses 0xDF-0xE8 and 0xF5, the death script 0xF7)
 OUT = os.environ.get('BFU_OUT', 'ultimate/out')
 SAIYAMAN = [(10, 14), (15, 'saiyaman_from_green'), (13, 'saiyaman_from_orange'), ('gohan_gt', 'saiyaman_from_gt'), ('gohan_gt_noglasses', 'saiyaman_from_gt_ng')]
-SS2_LIKE = ('vegeta_gt_ssj4', 'vegeta_gt_tank_ssj4')      # GT Vegeta's Super Saiyan 4 sits where Super Saiyan 2 would: Super Saiyan pressed again
 ACTORS_FILE = 'assets/areas/a033_w01_01_Snakeway.actors'
 INTRO = 'assets/scripts/gUnknown_0877CBF0.evt'
 ENDING = 'assets/scripts/gUnknown_08796114.evt'
@@ -271,8 +348,8 @@ L1:
     call 0x04
     call 0x05
     call 0x06
-    call 0xE6
-    call 0xE5(1)
+    call 0xFC
+    call 0xFB(1)
     inc 0x06
     call wait(2)
     loop L1
@@ -290,8 +367,8 @@ L1:
     call 0x04
     call 0x05
     call 0x06
-    call 0xE6
-    call 0xE5(1)
+    call 0xFC
+    call 0xFB(1)
     dec 0x05
     call wait(1)
     loop L1
@@ -303,8 +380,8 @@ L3:
     call 0x04
     call 0x05
     call 0x06
-    call 0xE6
-    call 0xE5(1)
+    call 0xFC
+    call 0xFB(1)
     call 0x19(10)
     push 0
     eq
@@ -318,13 +395,13 @@ L4:
     pushn %d, 16, 0
     call 0x51
     call play_sfx(24)
-    call 0xE5(2)
+    call 0xFB(2)
     call wait(3)
-    call 0xE5(5)
+    call 0xFB(5)
     call wait(3)
-    call 0xE5(8)
+    call 0xFB(8)
     call wait(3)
-    call 0xE5(11)
+    call 0xFB(11)
     push 5
     loop_begin
 L2:
@@ -332,7 +409,7 @@ L2:
     call 0x4C
     call wait(15)
     loop L2
-    call 0xE5(0)
+    call 0xFB(0)
     pushn 882
     call set_flag
     call max_hp
@@ -363,7 +440,7 @@ step auto code
 def tournament_npc(src):
     """The West City resident who ran the World Tournament now sends you to Hercule City. A debug zone build also uses him as a test's way into that city."""
     head, old = src.split('step 1 say', 1)
-    warp = '    call 0xE4\n    call 0x95\n    call 0xE3\n' if '--trailer' in sys.argv else '    pushn 3, 1, 1, 208, 134\n'     # a trailer build takes the room from RAM a filming script pokes
+    warp = '    call 0xCA\n    call 0x95\n    call 0xD8\n' if '--trailer' in sys.argv else '    pushn 3, 1, 1, 208, 134\n'     # a trailer build takes the room from RAM a filming script pokes
     hook = '    pushn 862\n    call flag\n    jz L0\n    call 0x78(30)\n' + warp + '    call 0x77\n    call 0x79(30)\n    push 4\n    end\nL0:\n' if '--zone' in sys.argv else ''
     credits = '''step 2 say 0x00 "Buu's Fury: Ultimate Edition\\nComing Soon"
 step auto say 0x00 "An unofficial fan project. Dragon Ball Z and Buu's Fury belong to their owners."
@@ -993,6 +1070,14 @@ def ssj4_ki_hooks(rom, sym):
     if rom[HUD:HUD + 18] != bytes.fromhex('a08971490522400140181202291c3df03cfa'):
         sys.exit('HUD copy changed: %s' % rom[HUD:HUD + 18].hex())
     rom[HUD:HUD + 18] = bytes.fromhex('201c291c024b') + thumb_bl(HUD + 6, 0x46AA6) + bytes.fromhex('02e0c046') + struct.pack('<I', sym['ssj4_hud'] | 1)
+    XFORM_AT = 0x1C35C               # the end of a power-up: the record's new form (row +0x16) -> xform_hook, which lets Kaioken and Blue choose theirs
+    if rom[XFORM_AT:XFORM_AT + 8] != bytes.fromhex('b87d207543001818'):
+        sys.exit('power-up end changed: %s' % rom[XFORM_AT:XFORM_AT + 8].hex())
+    rom[XFORM_AT:XFORM_AT + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['xform_hook'] | 1)
+    SS_DRAIN = 0xE42C                # Super Saiyan's drain taking a unit from +0x1E -> ss_drain_hook (Kaioken's health cost, mastery's slower drain)
+    if rom[SS_DRAIN:SS_DRAIN + 8] != bytes.fromhex('011c1e310a88002a'):
+        sys.exit('Super Saiyan drain changed: %s' % rom[SS_DRAIN:SS_DRAIN + 8].hex())
+    rom[SS_DRAIN:SS_DRAIN + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['ss_drain_hook'] | 1)
 
 
 def add_actors(rom, clean):
@@ -1042,6 +1127,13 @@ def add_actors(rom, clean):
     cfg['goku_black'] = {'template': goku_black.SOURCE['black'], 'raw_frames': {str(k): v for k, v in looks['black'].items()}}
     cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg.update(gt.actors(clean, pal, lengths))      # GT: Black Star Odyssey's fighters (bso_import.py; BFU_BSO points at the owner's sheet)
+    cfg['gohan_gt_ss2'] = {'bolts_of': 'gohan_gt_ssj', 'bolt_colours': bright, 'high': True}     # GT Gohan's Super Saiyan 2: his Super Saiyan with the lightning
+    hair = ssb_hair(one)
+    for n, (_, _, _, src, _) in SSB_LOOKS.items():
+        cfg[n] = {'tint_of': src, 'tint': hair, 'high': True}
+    red = kaioken_remap(pal, one)
+    for n, (_, _, src) in KAIOKEN.items():
+        cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
     cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, end
@@ -1053,7 +1145,8 @@ def patch_forms(rom, clean, cfg, actors):
     index = {}
     ids = {r['id']: k for k, r in enumerate(cfg['rows'])}
     for k, r in enumerate(cfg['rows']):
-        row = bytearray(rows[FORM_SIZE * r['copy']:FORM_SIZE * (r['copy'] + 1)])
+        src = r['copy'] if isinstance(r['copy'], int) else index[r['copy']]     # a retail row, or a new one made above
+        row = bytearray(rows[FORM_SIZE * src:FORM_SIZE * (src + 1)])
         if 'name' in r:
             struct.pack_into('<HH', row, 2, r['name'], r.get('status_name', r['name']))
         row[0x0C] = r['owner']
@@ -1145,12 +1238,16 @@ def add_outfits(rom, clean, at, art):
         table += ['{%d,%d,%d,(const u16 *)L"%s"}' % (form(o['form']), form(o.get('also', 255)), o['flag'], o['name']) for o in lst]
     d = tempfile.mkdtemp()
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
-    c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b')) or k in SS2_LIKE), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
+    c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
+    c += 'const u8 skill_book[8][16] = {%s};\n' % ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (16 - len(SKILL_BOOK[k]))) for k in range(8))
+    c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
+    c += 'const u8 kaioken_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base if isinstance(base, int) else fm[base], fm[n + '_kaioken']) for n, (base, _, _) in KAIOKEN.items())
+    c += 'const u8 ssb_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (fm[a] if isinstance(a, str) else a, fm[b]) for a, b in SSB_FORMS if b in fm)
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1181,40 +1278,46 @@ def add_outfits(rom, clean, at, art):
     vt = sym['spirit_vt'] - ROM_BASE                      # 0 delete, 2 update every frame, others do nothing
     for k, name in enumerate(('spirit_destroyed', 'spirit_nop', 'spirit_update', 'spirit_nop', 'spirit_nop', 'spirit_nop')):
         struct.pack_into('<i', rom, vt + 4 * k, (sym[name] | 1) - (ROM_BASE + vt))
-    tab = find_once(rom, clean[NATIVES:NATIVES + 64], 'native table')
-    if struct.unpack_from('<I', rom, tab + 4 * JOIN_NATIVE)[0] != JOIN_OLD:
-        sys.exit('native 0x%X changed' % JOIN_NATIVE)
-    struct.pack_into('<I', rom, tab + 4 * JOIN_NATIVE, sym['party_join'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * 0xE0, sym['add_zenie'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.MORE_GET, sym['more_get'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.LADDER, sym['ladder'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.MORE_PUT, sym['more_put'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * 0xE5, sym['bomb_fx'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.BALL_NATIVE, sym['ball_here'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.WISH_NATIVE, sym['wish_power'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * 0xE6, sym['bomb_at'] | 1)
+    # The native table, moved and grown to the 256 a script's u8 can name: retail's 248 stay as they are (equipment's effect scripts use
+    # 0xDF-0xE8 and 0xF5, the level-up script 0xEA), and the mod's own natives take 0xF8-0xFF.
+    tab = (at + len(code) + 3) & ~3
+    if any(struct.unpack_from('<I', rom, lit)[0] != ROM_BASE + NATIVES for lit in NATIVE_REFS):
+        sys.exit('native table reference moved')
+    if set(rom[tab:tab + 1024]) != {0xFF}:
+        sys.exit('no room for the native table')
+    rom[tab:tab + 4 * 248] = clean[NATIVES:NATIVES + 4 * 248]
+    for lit in NATIVE_REFS: struct.pack_into('<I', rom, lit, ROM_BASE + tab)
     import zone26
-    struct.pack_into('<I', rom, tab + 4 * zone26.TOUR_PICK, sym['tour_pick'] | 1)
-    struct.pack_into('<I', rom, tab + 4 * zone26.TOUR_GET, sym['tour_get'] | 1)
-    if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xE3, sym['trailer_warp'] | 1)
-    if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xE4, sym['trailer_slot'] | 1)
-    row = SKILLS + 24 * SUPER_BLUE_SKILL                  # Super Saiyan 3's code runs on the form table's up and down, so only the words change
-    if struct.unpack_from('<II', rom, row + 4) != (0x08019D25, 0x08019D29):
-        sys.exit('skill row %d is in use' % SUPER_BLUE_SKILL)
-    rom[row:row + 12] = rom[SKILLS + 24 * 22:SKILLS + 24 * 22 + 12]     # SKILLS is a row's +12: names, usable, use. Its level and icons stay (Super Saiyan's)
-    struct.pack_into('<HH', rom, row, 1057, 1051)
+    mine = {JOIN_NATIVE: 'party_join', zone26.ADD_ZENIE: 'add_zenie', zone26.MORE_GET: 'more_get', BOMB_FX: 'bomb_fx', BOMB_AT: 'bomb_at',
+            zone26.BALL_NATIVE: 'ball_here', zone26.TOUR_PICK: 'tour_pick', zone26.TOUR_GET: 'tour_get'}
+    if sorted(mine) != list(range(0xF8, 0x100)): sys.exit('mod natives: %s' % sorted(mine))
+    for n, name in mine.items(): struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
+    for n, name in ((zone26.LADDER, 'ladder'), (zone26.MORE_PUT, 'more_put'), (zone26.WISH_NATIVE, 'wish_power')):     # retail natives no script calls
+        struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
+    for n, name, was in ((0xA4, 'skill_add', 0x08002AB7), (0xA5, 'skill_remove', 0x08002AE5), (0xA6, 'skill_replace', 0x08002B13)):    # the skill book keeps in step
+        if struct.unpack_from('<I', rom, tab + 4 * n)[0] != was: sys.exit('native 0x%X changed' % n)
+        struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
+    SKILL_TAB = 0x4B024                  # the pause menu's Skills tab: setup (slot 1) learns what play has earned, keys (slot 10) swap with SELECT
+    for slot, want, name in ((1, 0x080171A9, 'skilltab_setup'), (10, 0x080175FD, 'skilltab_keys')):
+        if ROM_BASE + SKILL_TAB + struct.unpack_from('<i', rom, SKILL_TAB + 4 * slot)[0] != want: sys.exit('Skills tab vtable changed')
+        struct.pack_into('<i', rom, SKILL_TAB + 4 * slot, (sym[name] | 1) - (ROM_BASE + SKILL_TAB))
+    if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xD8, sym['trailer_warp'] | 1)
+    if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xCA, sym['trailer_slot'] | 1)
     row = SKILLS + 24 * SPIRIT_SKILL                     # an unused skill row: its stubs become the Spirit Bomb
     if struct.unpack_from('<II', rom, row + 4) != (0x08019D25, 0x08019D29):
         sys.exit('skill row %d is in use' % SPIRIT_SKILL)
     struct.pack_into('<HHII', rom, row, SPIRIT_NAME, SPIRIT_NAME + 3, sym['spirit_usable'] | 1, sym['spirit_use'] | 1)
     rom[row - 8:row] = rom[SKILLS + 24 * 15 - 8:SKILLS + 24 * 15]       # the Kamehameha's icons; no level (0xFF, as the stub had)
     row = SKILLS + 24 * 20                               # Super Saiyan's use goes up to Super Saiyan 2 where a form has one; Super Saiyan 3 waits for it
-    if struct.unpack_from('<I', rom, row + 8)[0] != 0x0801A513 or struct.unpack_from('<I', rom, SKILLS + 24 * 22 + 4)[0] != 0x0801A55F:
+    if struct.unpack_from('<II', rom, row + 4) != (0x0801A4C5, 0x0801A513) or struct.unpack_from('<I', rom, SKILLS + 24 * 22 + 4)[0] != 0x0801A55F:
         sys.exit('Super Saiyan skill rows changed')
-    struct.pack_into('<I', rom, row + 8, sym['ss_use'] | 1)
+    struct.pack_into('<II', rom, row + 4, sym['ss_can'] | 1, sym['ss_use'] | 1)    # no Super Saiyan in Kaioken
+    rom[row - 12] = rom[SKILLS + 24 * 22 - 12] = 2            # Super Saiyan and 3 show a level: their mastery (outfit.c mastery_level)
+    if struct.unpack_from('<I', rom, SKILLS + 24 * 15 + 8)[0] != 0x0801A35B: sys.exit('Kamehameha use changed')
+    struct.pack_into('<I', rom, SKILLS + 24 * 15 + 8, sym['kame_use'] | 1)      # counts Goku's uses towards the Super Kamehameha
     struct.pack_into('<I', rom, SKILLS + 24 * 22 + 4, sym['ss3_can'] | 1)
     if struct.unpack_from('<I', rom, SKILLS + 24 * 22 + 8)[0] != 0x0801A5BD: sys.exit('Super Saiyan 3 use changed')
-    struct.pack_into('<I', rom, SKILLS + 24 * 22 + 8, sym['ss3_use'] | 1)       # Kid Goku: Super Saiyan 3 pressed again goes on to Super Saiyan 4
+    struct.pack_into('<I', rom, SKILLS + 24 * 22 + 8, sym['ss3_use'] | 1)
     # The flag array runs into other bit arrays: map rooms visited at G+0x8D (flag 448 up) and Scouter entries at G+0xC5 . Custom flags live in their gaps: see zone26.py.
     rooms = max(struct.unpack_from('<H', rom, struct.unpack_from('<I', rom, struct.unpack_from('<I', rom, 0x74C948 + 4 * w)[0] - ROM_BASE + 0x18 + 4 * i)[0] - ROM_BASE + 2)[0]
                 for w in range(0x37) for i in range(struct.unpack_from('<i', rom, struct.unpack_from('<I', rom, 0x74C948 + 4 * w)[0] - ROM_BASE + 0x14)[0]))
@@ -1237,7 +1340,7 @@ def add_outfits(rom, clean, at, art):
         sys.exit('Combat_Damage changed: %s' % rom[DAMAGE:DAMAGE + 8].hex())
     rom[DAMAGE:DAMAGE + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['combat_hook'] | 1)
     ssj4_ki_hooks(rom, sym)
-    end, art = add_eraser(rom, clean, sym, at + len(code), art)    # after the row edits above: it moves the skill table
+    end, art = add_eraser(rom, clean, sym, tab + 1024, art)    # after the row edits above: it moves the skill table
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:
         sys.exit('Select Game party loop changed')
@@ -1300,7 +1403,7 @@ def add_eraser(rom, clean, sym, at, art):
             fn = ROM_BASE + OLD_VT + struct.unpack_from('<i', clean, OLD_VT + 4 * k)[0]
             struct.pack_into('<i', rom, vt + 4 * k, ((sym[name + '_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
         row = bytearray(clean[SKILL_ROWS + 24 * 2:SKILL_ROWS + 24 * 3])
-        struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(remap)) for p in icons])
+        struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], remap)) for p in icons])
         struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
         struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
         rows[skill] = bytes(row)
@@ -1346,7 +1449,7 @@ def add_eraser(rom, clean, sym, at, art):
         fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, ((sym['beam_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
     row = bytearray(clean[SKILL_ROWS + 24 * 15:SKILL_ROWS + 24 * 16])
-    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(remap)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], remap)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['beam_use'] | 1)
     rows[BEAM_SKILL] = bytes(row)
@@ -1386,7 +1489,7 @@ def add_eraser(rom, clean, sym, at, art):
         fn = ROM_BASE + WAVE_VT + struct.unpack_from('<i', clean, WAVE_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, ((sym['wave_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
     row = bytearray(clean[SKILL_ROWS + 24 * 6:SKILL_ROWS + 24 * 7])
-    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(green)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 6 + 4)])
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], green)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 6 + 4)])
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['wave_use'] | 1)
     rows[WAVE_SKILL] = bytes(row)
@@ -1400,14 +1503,15 @@ def add_eraser(rom, clean, sym, at, art):
         strings += [put(t.encode('utf-16-le') + b'\0\0') for t in (name, text)]
     # Goku Black. Rose is Super Saiyan's row under its own name (its use is ss_use, as Goku's). The Black Kamehameha is the Kamehameha's code with Black's purple frames,
     # or Rose's pink ones: black_kame_start picks by form. Its icons are the Kamehameha's in Black's purple.
-    row = bytearray(rom[SKILLS - 12 + 24 * 20:SKILLS - 12 + 24 * 21])
+    row = bytearray(rom[SKILLS - 12 + 24 * 20:SKILLS - 12 + 24 * 21]); row[0] = 0xFF      # Rose: no level (Super Saiyan's shows mastery)
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     pink = shifted(325 / 360)                   # Rose's aura and icon: Super Saiyan's, pink
-    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(pink)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], pink)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
     struct.pack_into('<I', row, 20, sym['rose_use'] | 1)
     rows[ROSE_SKILL] = bytes(row)
     red = shifted(4 / 360)                      # Super Saiyan 4's aura: Super Saiyan's, red
-    for who, tint in (('rose', pink), ('ssj4', red)):
+    ssb_blue = shifted(200 / 360)               # Super Saiyan Blue's
+    for who, tint in (('rose', pink), ('ssj4', red), ('ssb', ssb_blue)):
         for name, at_, count in ((who + '_aura_field', 0x752D28, 3), (who + '_aura_other', 0x7520D4, 7)):
             out = bytearray(clean[at_:at_ + 12 * count])
             for k in range(0, 12 * count, 12):
@@ -1442,11 +1546,97 @@ def add_eraser(rom, clean, sym, at, art):
         fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, ((sym['black_kame_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
     row = bytearray(clean[SKILL_ROWS + 24 * 15:SKILL_ROWS + 24 * 16])
-    struct.pack_into('<II', row, 4, *[put(bytes(clean[p - ROM_BASE:p - ROM_BASE + 0x200]).translate(icon_map)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], icon_map)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['black_kame_use'] | 1)
     rows[BLACK_KAME_SKILL] = bytes(row)
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Black Kamehameha', 'Hold the B Button to emit a long beam of dark energy.')]
+    new_strings = []                             # the Nov 9 moves' names: after every fixed id below
+    def new_text(*texts):
+        first = len(new_strings); new_strings.extend(texts); return first
+    for k, (name, skill, power, tint, title, text) in enumerate(KAME_VARIANTS):     # Galick Gun, 10x Kamehameha: the Kamehameha's code, own frames and strength
+        remap = bytes(0 if v == 0 else one(np.array(tint.get(v, tuple(pal[v])), dtype=int)) for v in range(256)); copies = {}
+        def frames(o, count):
+            out = bytearray(clean[o:o + 12 * count])
+            for j in range(0, 12 * count, 12):
+                tiles = struct.unpack_from('<I', out, j + 8)[0]
+                if not 0x08700000 <= tiles < 0x08800000: continue
+                if tiles not in copies:
+                    t = tiles - ROM_BASE; copies[tiles] = put_art(bytes(clean[t:t + out[j + 2] * out[j + 3]]).translate(remap))
+                struct.pack_into('<I', out, j + 8, copies[tiles])
+            return put(bytes(out))
+        shape, table = {}, sym['kv_params'] - ROM_BASE + 48 * k
+        for i in range(3):
+            a, strength, body, head = struct.unpack_from('<4I', clean, BEAM_PARAMS + 16 * i)
+            shape.setdefault(body, frames(body - ROM_BASE, 9)); shape.setdefault(head, frames(head - ROM_BASE, 64))
+            struct.pack_into('<4I', rom, table + 16 * i, min(int((a >> 16) * power), 0xFFFF) << 16 | a & 0xFFFF, strength, shape[body], shape[head])   # +0's top half: the damage (41, 164, 328 by level)
+        vt = sym['kv_vt'] - ROM_BASE + 36 * k
+        for j in range(9):
+            fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * j)[0]
+            struct.pack_into('<i', rom, vt + 4 * j, ((sym[name + '_start'] | 1) if j == 0 else fn) - (ROM_BASE + vt))
+        row = bytearray(clean[SKILL_ROWS + 24 * 15:SKILL_ROWS + 24 * 16])
+        struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], remap)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)])
+        struct.pack_into('<I', row, 12, new_text(title, text))       # an index into new_strings for now: made a UI id when they are placed
+        if skill == TENX_SKILL: struct.pack_into('<I', row, 16, sym['ssj4_kame_can'] | 1)
+        struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
+        rows[skill] = row
+    def tinted_frames(rows_at, count, lo, hi, remap, cache):
+        """A copy of `count` {header, attributes, tiles} rows whose tiles in [lo, hi) are recoloured (each block once)."""
+        out = bytearray(clean[rows_at - ROM_BASE:rows_at - ROM_BASE + 12 * count])
+        for j in range(0, 12 * count, 12):
+            h, _, tiles = struct.unpack_from('<III', out, j)
+            if lo <= tiles < hi:
+                if tiles not in cache: cache[tiles] = put_art(bytes(clean[tiles - ROM_BASE:tiles - ROM_BASE + (h >> 16 & 255) * (h >> 24 & 255)]).translate(remap))
+                struct.pack_into('<I', out, j + 8, cache[tiles])
+        return bytes(out)
+    def behaviour(vt_sym, orig_vt, mine):
+        vt = sym[vt_sym] - ROM_BASE
+        for j in range(9):
+            fn = (sym[mine[j]] | 1) if j in mine else ROM_BASE + orig_vt + struct.unpack_from('<i', clean, orig_vt + 4 * j)[0]
+            struct.pack_into('<i', rom, vt + 4 * j, fn - (ROM_BASE + vt))
+    def move_row(base_skill, remap, title, text, usable, use):
+        row = bytearray(clean[SKILL_ROWS + 24 * base_skill:SKILL_ROWS + 24 * base_skill + 24])
+        struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], remap)) for p in struct.unpack_from('<II', row, 4)])
+        struct.pack_into('<I', row, 12, new_text(title, text))
+        if usable: struct.pack_into('<I', row, 16, sym[usable] | 1)
+        struct.pack_into('<I', row, 20, sym[use] | 1)
+        return row
+    # Final Shine: Final Flash's beam (rows 0x76174C: frames, 8, damage by level) green and 1.5x as strong. Vegeta as Super Saiyan 4.
+    FLASH_PARAMS, FLASH_VT, FLASH_ART = 0x76174C, 0x4D9D4, (0x0875F000, 0x08761800)
+    green_shine = shifted(140 / 360); cache = {}; table = sym['shine_params'] - ROM_BASE
+    for i in range(3):
+        frames_at, eight, damage = struct.unpack_from('<3I', clean, FLASH_PARAMS + 12 * i)
+        struct.pack_into('<3I', rom, table + 12 * i, put(tinted_frames(frames_at, 8, *FLASH_ART, green_shine, cache)), eight, int(damage * 1.5))
+    behaviour('shine_vt', FLASH_VT, {2: 'shine_update'})
+    rows[FINAL_SHINE_SKILL] = move_row(10, green_shine, 'Final Shine', 'Super Saiyan 4 only. Hold the B Button to fire a green beam across the land, 1.5x as strong as Final Flash.', 'ssj4_flash_can', 'shine_use')
+    # Super Saiyan 4's Dragon Fist: the dragon's rows (0x77AD10, 4 facings x 4 rows) red, its hits 1.25x (outfit.c). Kid Goku as Super Saiyan 4.
+    DRAGON_ROWS, DRAGON_VT, DRAGON_ART = 0x77AD10, 0x4D9B0, (0x08771000, 0x0877AD10)
+    red = shifted(0 / 360); cache = {}
+    rom[sym['red_dragon'] - ROM_BASE:sym['red_dragon'] - ROM_BASE + 0xC0] = tinted_frames(ROM_BASE + DRAGON_ROWS, 16, *DRAGON_ART, red, cache)
+    behaviour('dragon4_vt', DRAGON_VT, {2: 'dragon4_update', 3: 'dragon4_end'})
+    rows[DRAGON4_SKILL] = move_row(5, red, 'Dragon Fist', 'Super Saiyan 4 only. Hold the B Button to make a giant red dragon of energy; steer its head with the +Control Pad and release to bite. 1.25x as strong.', 'ssj4_dragon_can', 'dragon4_use')
+    # The transformations' own rows (Nov 9). Super Saiyan 2 and 4: Super Saiyan 3's icon with a 2 (cyan as its 3) or a purple 4. Kaioken: Super
+    # Saiyan's Z in red. Super Saiyan Blue: the Z in blue (its name and text are UI 1057 and 1051, UI_EDITS).
+    ss3_icons = [clean[p - ROM_BASE:p - ROM_BASE + 0x200] for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 22 + 4)]
+    ss_icons = [clean[p - ROM_BASE:p - ROM_BASE + 0x200] for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)]
+    def tier_row(base_skill, icons, usable, use, texts):
+        row = bytearray(clean[SKILL_ROWS + 24 * base_skill:SKILL_ROWS + 24 * base_skill + 24])
+        row[0] = 2                                   # a level: its mastery
+        struct.pack_into('<II', row, 4, *[put_art(i) for i in icons])
+        struct.pack_into('<III', row, 12, new_text(*texts), sym[usable] | 1, sym[use] | 1)
+        return row
+    rows[SS2_SKILL] = tier_row(22, (iconlib.with_digit(ss3_icons[0], '2', 0x4B, 0x4B), iconlib.with_digit(ss3_icons[1], '2', 0xBA, 0xBA)), 'ss2_can', 'ss2_use',
+        ('Super Saiyan 2', 'Press the B Button to transform into a Super Saiyan 2: attacks hit 1.5x as hard. You must already be a Super Saiyan. Press it again to change back.'))
+    rows[SS4_SKILL] = tier_row(22, (iconlib.with_digit(ss3_icons[0], '4', 0x94, 0x4B), iconlib.with_digit(ss3_icons[1], '4', 0x56, 0xBA)), 'ss4_can', 'ss4_use',
+        ('Super Saiyan 4', 'Press the B Button to transform into a Super Saiyan 4: attacks hit 2.5x as hard, on a ki bar of its own. You must be in the form below it. Press it again to change back.'))
+    kk_red = shifted(0 / 360)
+    rows[KAIOKEN_SKILL] = tier_row(20, [iconlib.recolour(i, kk_red) for i in ss_icons], 'kaioken_can', 'kaioken_use',
+        ('Kaioken', 'Press the B Button to use the Kaioken: attacks hit 1.5x as hard, but it wears on your health. It cannot be used with Super Saiyan. Press it again to stop.'))
+    ssb_row = bytearray(clean[SKILL_ROWS + 24 * 22:SKILL_ROWS + 24 * 22 + 24])
+    struct.pack_into('<II', ssb_row, 4, *[put_art(iconlib.recolour(i, ssb_blue)) for i in ss_icons])
+    struct.pack_into('<HHII', ssb_row, 12, 1057, 1051, sym['ssb_can'] | 1, sym['ssb_use'] | 1)
+    ssb_row[0] = 2
+    rows[SUPER_BLUE_SKILL] = bytes(ssb_row)
     import zone26 as z26
     if ERASER_UI + len(strings) > z26.CELL_NAME_UI: sys.exit('move CELL_NAME_UI up')
     while ERASER_UI + len(strings) < z26.CELL_NAME_UI: strings.append(put(b'\0\0'))
@@ -1461,6 +1651,13 @@ def add_eraser(rom, clean, sym, at, art):
     struct.pack_into('<I', row, 20, sym['majuub_use'] | 1)
     rows[MAJUUB_SKILL] = bytes(row)
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Majuub', 'Press the B Button to draw on Majin Buu\'s power and become Majuub: attacks hit 1.5x as hard.  Press it again to change back.')]
+    base_new = ERASER_UI + len(strings)          # the Nov 9 moves' names and descriptions, after everything with a fixed id
+    strings += [put(t.encode('utf-16-le') + b'\0\0') for t in new_strings]
+    for skill, row in rows.items():
+        if isinstance(row, bytearray):
+            i = struct.unpack_from('<I', row, 12)[0]
+            struct.pack_into('<HH', row, 12, base_new + i, base_new + i + 1)
+            rows[skill] = bytes(row)
     BLAST_TILES, BLAST_TABLE, BLAST_SITE = (0x71300C, 0x71370C), 0x71370C, 0x197F2
     if rom[BLAST_SITE:BLAST_SITE + 14] != bytes.fromhex('207cbc4a41000918090189182165'):
         sys.exit('player blast code changed')
@@ -1509,6 +1706,8 @@ def add_eraser(rom, clean, sym, at, art):
     for k in range(14):
         fn = (sym['absorb_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    for k in range(ERASER_SKILL, max(rows) + 1):   # ids not built yet: the empty row, so the table stays in id order
+        rows.setdefault(k, bytes(clean[SKILL_ROWS:SKILL_ROWS + 24]))
     if struct.unpack_from('<I', rom, 0x13618)[0] != ROM_BASE + SKILL_ROWS:
         sys.exit('skill table reference moved')
     struct.pack_into('<I', rom, 0x13618, put(bytes(rom[SKILL_ROWS:SKILL_ROWS + 24 * ERASER_SKILL]) + b''.join(rows[k] for k in sorted(rows))))
@@ -1521,7 +1720,7 @@ def add_eraser(rom, clean, sym, at, art):
     if n != 51:
         sys.exit('UI table: expected 51 references, found %d' % n)
     t = struct.unpack_from('<I', rom, 0x13618)[0] - ROM_BASE      # the retail moves keep their level byte and icons (row +0..+11)
-    bad = [k for k in range(ERASER_SKILL) if k not in (SPIRIT_SKILL, SUPER_BLUE_SKILL) and rom[t + 24 * k:t + 24 * k + 12] != clean[SKILL_ROWS + 24 * k:SKILL_ROWS + 24 * k + 12]]
+    bad = [k for k in range(ERASER_SKILL) if k not in (SPIRIT_SKILL, 20, 22) and rom[t + 24 * k:t + 24 * k + 12] != clean[SKILL_ROWS + 24 * k:SKILL_ROWS + 24 * k + 12]]
     if bad:
         sys.exit('skill rows %s lost their level or icons' % bad)
     return at, art
@@ -1589,6 +1788,7 @@ def main():
     if not os.path.exists('assets/manifest.json'):
         subprocess.run(['make', 'extract'], check=True, stdout=subprocess.DEVNULL)
     cfg = json.load(open('ultimate/forms.json'))
+    cfg['rows'] += kaioken_rows(clean)
     saved = {p: open(p).read() for p in (INTRO, FIELD, ACTORS_FILE, ENDING)}
     try:
         for p, s in unlock_edits_paths().items():
@@ -1644,7 +1844,7 @@ def main():
         at = (free + 3) & ~3
         code = save_stub(at)
         rom[at:at + len(code)] = code
-        tab = find_once(rom, clean[NATIVES:NATIVES + 64], 'native table')
+        tab = struct.unpack_from('<I', rom, NATIVE_REFS[0])[0] - ROM_BASE      # the moved table
         struct.pack_into('<I', rom, tab + 4 * DEBUG_NATIVE, ROM_BASE + at + 1)
     os.makedirs(OUT, exist_ok=True)
     name = ('BFU_debug_enemy' if '--enemy' in sys.argv else 'BFU_debug_zone' if '--zone' in sys.argv else 'BFU_debug') if debug else 'BFU'

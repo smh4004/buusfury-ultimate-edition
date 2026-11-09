@@ -180,12 +180,12 @@ TOUR_NAMES = (('Yamu', 'Spopovich', 'Idasa', 'Olibu', 'Ninja Boss', 'Knight Dest
 #   858-863   858-860 story outfits, 862 debug hook, 861 and 863 spare
 #   864-895   864-872 Super Saiyan 2 by owner, 873-880 rewards, 881-886 Super 13, 887-890 Boss Rush and tournament, 891-894 trials won, 895 all trials
 #   1128-1143 1128-1131 trials paid, 1132-1140 tournament picks, 1141 ordered tournament test, 1142-1143 spare
-TOUR_PICKS, TOUR_PICK, TOUR_GET = 1132, 0xE1, 0xE2    # flags 1132-1140 hold each round's opponent, 3 bits a round; natives tour_pick(round, place) and tour_get(round)
+TOUR_PICKS, TOUR_PICK, TOUR_GET = 1132, 0xF9, 0xFA    # flags 1132-1140 hold each round's opponent, 3 bits a round; natives tour_pick(round, place) and tour_get(round)
 TRIALS = ((0, 'Goku', 91, 224, 'Pikkon', 39, 'Titanium Breastplate'), (1, 'Gohan', 18, 73, 'Dabura', 70, 'Enhanced Energy Gloves'),
           (3, 'Vegeta', 28, 43, 'Majin Buu', 108, 'Clean Boots'), (4, 'Trunks', 39, 123, 'Goten', 159, 'Clean Belt'))     # party slot, name, enemy row, character, opponent, equipment row, its name
 TRIAL_GEAR = 160                                   # all four: Geromantium Bandana, with the Senzu Beans below
 if os.environ.get('BFU_CLASH_TEST'): TRIALS = ((int(os.environ.get('BFU_CLASH_SLOT', 0)), 'Goku', 61, 47, 'Kid Buu', 39, 'Titanium Breastplate'),) + TRIALS[1:]     # test_clash.py fights the game's beam user
-TRIAL_HP, TRIAL_STATS, TRIAL_PRIZE, TRIAL_ITEM, TRIAL_ITEMS = 40000, (148, 65, 60, 65), 30000, 11, 10    # all four: ten Senzu Beans (item 11)
+TRIAL_HP, TRIAL_STATS, TRIAL_PRIZE, TRIAL_ITEM, TRIAL_ITEMS = 40000, (148, 65, 60, 65), 30000, 21, 10    # all four: ten Senzu Beans (item 21)
 TRIAL_WON, TRIAL_PAID, TRIAL_ALL = 891, 1128, 895
 # Hyperbolic Time Chamber: Mr. Popo on the Lookout spars you against anyone from the story, after the ending, in the Chamber's white room. Stats as in the story, EXP cut to SPAR_EXP tenths.
 # Category, then (name, enemy row, character). Broly needs flag 111, his story fight. Buu with Gohan (row 119) isn't listed: his health can't be taken down outside his story fight. Rows are the story's own, with at least SPAR_MIN_HP: a few story rows have next to none.
@@ -197,9 +197,9 @@ SPAR = (('Tournament', (('Spopovich', 112, 252), ('Yamu', 148, 303), ('Pui Pui',
         ('Friends', (('Goten', 39, 123), ('Trunks', 130, 269), ('Gohan', 35, 110), ('Gotenks', 40, 126))))
 # Dragon Ball hunt, after the ending: one ball in each of seven lands, a short walk from the capsule pad you land on. (world, area, x, y). Carrying a ball is the game's own item 16-22.
 BALLS = ((5, 1, 264, 344), (7, 1, 152, 112), (8, 1, 144, 104), (11, 1, 160, 40), (13, 1, 96, 120), (15, 1, 368, 352), (14, 1, 96, 128))
-BALL_ITEM, BALL_ZENIE, BALL_NATIVE, WISH_NATIVE = 16, 1000000, 0xEA, 0xEB
+BALL_ITEM, BALL_ZENIE, BALL_NATIVE, WISH_NATIVE = 26, 1000000, 0xFF, 0xEB     # the Dragon Balls are items 26-32 (the game's real table, 0x083BD2F8)
 BUILDING = (0, 92)
-MORE_FLAG, MORE_GET, MORE_PUT = 2000, 0xE7, 0xF0    # flags past the story's, kept with the bench (32 of them): an outfit's flag from 2000 up, and natives more_get(n), more_put(n, value)
+MORE_FLAG, MORE_GET, MORE_PUT = 2000, 0xFD, 0xF0    # flags past the story's, kept with the bench (32 of them): an outfit's flag from 2000 up, and natives more_get(n), more_put(n, value)
 MORE_YAMCHA, MORE_TIEN, MORE_PIKKON, MORE_HERCULE = 0, 1, 2, 3
 MORE_TIER, MORE_RACE, MORE_MUSEUM, MORE_RANK_NEW, MORE_HARD, MORE_HARD_PAID, MORE_ENDLESS_NEW, MORE_HERC_WON = 4, 5, 6, 7, 13, 14, 15, 24
 MORE_LEDGIC_WON, MORE_GT, MORE_UUB_WON, MORE_UUB = 27, 28, 29, 30    # Ledgic beaten, not yet told; GT looks and Pan; Uub beaten, not yet told; Uub joined
@@ -207,7 +207,7 @@ MORE_BLACK, MORE_BLACK_WON = 25, 26                  # Goku Black: joined; Rose 
 LADDER = 0xDC                                       # native ladder(op): 0 start Endless, gives the first room; 1 is it on; 2 a win: pays, gives the next room; 3 it ended; 4 this run's wins; 5 best run; 6 rank(hp, max); 7 last rank; 8 best rank (1 C, 2 B, 3 A, 4 S)
 ENDLESS_STEP, ENDLESS_CAP = 20000, 1000000          # an Endless win pays this times the run's wins, up to the cap
 RANK_PRIZE = (50000, 100000, 200000, 300000)        # C, B, A, S
-HARD_PRIZE, RACE_PRIZE, MUSEUM_PRIZE, MUSEUM_ITEM, MUSEUM_ITEMS = 300000, 50000, 1000000, 13, 5   # the museum: five Lazarus Crystals as well
+HARD_PRIZE, RACE_PRIZE, MUSEUM_PRIZE, MUSEUM_ITEM, MUSEUM_ITEMS = 300000, 50000, 1000000, 23, 5   # the museum: five Lazarus Crystals as well
 # Harder copies of the tournament: tier 1 is the Hard bracket, tier 2 only comes up in Endless. HP and stats by round, as TOUR_HP and TOUR_STATS.
 TIER_HP = ((30000, 40000, 60000), (60000, 80000, 120000))
 TIER_STATS = (((150, 75, 70, 75), (152, 82, 80, 80), (155, 90, 100, 90)), ((158, 100, 110, 100), (160, 105, 120, 105), (160, 110, 130, 110)))
@@ -221,7 +221,7 @@ LEDGIC_ROW, LEDGIC_FIGHT = 12, (('ledgic', 70000, (156, 100, 60, 105)),)
 UUB_ROW, UUB_FIGHT = 61, (('uub', 60000, (155, 95, 100, 90)), ('majuub', 90000, (160, 105, 120, 105)))
 SPAR_EXP, SPAR_MIN_HP, SPAR_ROOM, SPAR_HOME = 4, 2000, (6, 9), (288, 500)
 # Trials II (More, then Next): the same four heroes against harder story foes, once the first four are paid. Party slot, name, enemy row, character, opponent, equipment, its name.
-TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115, 49, 'Super Buu', 75, 'Geromantis Gloves'),
+TRIALS2 = ((0, 'Goku', 70, 282, 'Majin Vegeta', 42, 'Z Armor'), (1, 'Gohan', 115, 49, 'Super Buu', 74, 'Crystal Gauntlets'),
            (3, 'Vegeta', 60, 47, 'Kid Buu', 107, 'Saiyan Boots'), (4, 'Trunks', 122, 154, 'Janemba', 157, 'Black Belt'))
 TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 60000, (43, 76, 111)   # all four: Geromantium Kataginu, Gloves and Tabi, with ten Senzu Beans
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
@@ -267,7 +267,7 @@ CELL = (('Imperfect Cell', 115, 30000, (145, 65, 60, 55), 'cell_imperfect', 1),
 CELL_MAP, CELL_FOE, CELL_START, CELL_WON, CELL_PAID, CELL_COUNT, CELL_PRIZE, CELL_NAME_UI = 0x4E7668, (444, 432), (444, 520), 1142, 1143, (861, 863), 200000, 1534 + 40
 HUB_AT = (208, 112)                                # where the tournament official stands in Hercule City; wins come home just below him
 TOUR_ORDERED = 1141                                 # a test sets this to walk every opponent in turn instead of drawing
-TOUR_ROOM, TOUR_PRIZE, TOUR_WON, ADD_ZENIE = (7, 6), 100000, 889, 0xE0
+TOUR_ROOM, TOUR_PRIZE, TOUR_WON, ADD_ZENIE = (7, 6), 100000, 889, 0xF8
 RUSH_FIRST, RUSH_WON = 19, 888   # room of the first fight, flag for a win not yet rewarded
 RUSH_HP = (10000, 40000, 25840, 20240, 30000, 32000, 34000, 36000, 55000)    # shorter than the story's, since all nine share one health bar
 
