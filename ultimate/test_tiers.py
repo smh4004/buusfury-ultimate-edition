@@ -48,6 +48,11 @@ fs = [f for f, _, _ in seq]
 print('   Goku:', fs)
 check('Super Saiyan 2 does nothing from base', fs[0] == 0)
 check('Super Saiyan, then 2, then 3, then back to base', fs[1] in (3, 4) and fs[2] in (F['goku_ss2'], F['goku_ss2_b']) and fs[3] in (5, 6) and fs[4] in (0, 2) and not bad)
+# Without Super Saiyan 2 in the loadout (or before the story opens it) Super Saiyan 3 goes straight on from Super Saiyan, as in the retail game
+seq, bad = play('goku_direct', [7, SS, SS3, 15, 14, 19], 0, (SS, SS3, SS3))      # six held: no room for Super Saiyan 2
+fs = [f for f, _, _ in seq]
+print('   Goku without Super Saiyan 2 held:', fs)
+check('without Super Saiyan 2 held, Super Saiyan 3 straight from Super Saiyan, then back', fs[0] in (3, 4) and fs[1] in (5, 6) and fs[2] in (0, 2) and not bad)
 # Super Saiyan 2 pressed in Super Saiyan 2 powers down
 seq, bad = play('goku2', [7, SS, SS2], 0, (SS, SS2, SS2))
 fs = [f for f, _, _ in seq]

@@ -1141,7 +1141,8 @@ void spirit_destroyed(void) {
 /* Solar Flare (Tien, Krillin; Nov 9). The white flash of the Super Saiyan power-up above, from the same effect slot, while the fighter
    holds a pose; every ordinary enemy on screen is stunned. The stun is the game's own (state 1 of the enemy state table 0x0870F514,
    which Burning Attack's hit pushes: the dizzy pose with a 120-frame timer), pushed through the enemy's vtable (+0x6C, sub_0800AA9C)
-   and its timer (the state's second part, {0x080497D4, frames}) set longer. Bosses (actor record byte 3 bit 4, likely) shrug it off. */
+   and its timer (the state's second part, {0x080497D4, frames}) set longer. Bosses and duels (any enemy whose stats row has its own
+   defeat handler, not the usual 0x08708920) shrug it off. */
 #define SOLAR_COST 40
 #define CanAfford ((int (*)(u8 *, int))0x080134B9)
 #define IN_COMBAT (*(volatile u32 *)0x03001988)
@@ -1171,9 +1172,9 @@ static void stun(u8 *e, int frames) {
     timer = (u32 *)top[4];
     if (timer && timer[1] < (u32)frames) timer[1] = frames;
 }
-static int boss(u8 *e) {
-    u8 *actor = *(u8 **)(e + 0x58);
-    return actor && (actor[3] & 0x10);
+static int boss(u8 *e) {        /* an ordinary enemy's stats row (e +0x224) has the usual defeat handler (+0x14); bosses and duels have their own */
+    const u8 *row = *(const u8 **)(e + 0x224);
+    return !row || *(const u32 *)(row + 0x14) != 0x08708920;
 }
 #define SOLAR_AT (*(volatile u32 *)0x0203FFCC)
 #define SOLAR_REST 360                 /* six seconds before the next one: a stunned crowd can't be kept down for good */
@@ -1605,14 +1606,30 @@ void ss2_use(u8 *record, void *sprite) {
     XFORM = 0;
     if (is_ss2(record[0x14])) power_down(record, sprite); else SS3_Use(record, sprite);
 }
-int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one, not from Super Saiyan */
-    int form = record[0x14];
+static int slot_of(const u8 *rec, int skill);
+/* From a Super Saiyan whose next form is Super Saiyan 2: while Super Saiyan 2 is open and held, the way up is through it; before the story
+   opens it, or with it swapped out of the loadout, Super Saiyan 3 goes straight on as in the retail game (its form: Super Saiyan 2's next). */
+static int ss3_direct(u8 *record) {
+    int form = record[0x14], ss3;
+    if (!(flags_of(form) & 1) || up_of(form) == 255 || !is_ss2(up_of(form))) return -1;
+    if (ss2_open(record, form_table[form * 24 + 0x0C]) && slot_of(record, 35) >= 0) return -2;
+    ss3 = up_of(up_of(form));
+    return ss3 != 255 && (flags_of(ss3) & 2) ? ss3 : -2;
+}
+int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one and it is held */
+    int form = record[0x14], d = ss3_direct(record);
     if (is_kaioken(form) || is_ssj4(form)) return 0;
-    if ((flags_of(form) & 1) && up_of(form) != 255 && is_ss2(up_of(form))) return 0;
+    if (d == -2) return 0;
+    if (d >= 0) return SS3_Can(record);
     if ((flags_of(form) & 2) && up_of(form) != 255 && is_ssj4(up_of(form))) return 1;        /* Kid Goku's Super Saiyan 3: powers down */
     return SS3_Can(record);
 }
-void ss3_use(u8 *record, void *sprite) { XFORM = 0; SS3_Use(record, sprite); }
+void ss3_use(u8 *record, void *sprite) {
+    int d = ss3_direct(record);
+    XFORM = 0;
+    if (d >= 0) { XFORM = d + 1; XFORM_FROM = record[0x14]; XFORM_AT = FRAMES; }      /* xform_hook: Super Saiyan 3, not the form above */
+    SS3_Use(record, sprite);
+}
 int ss4_can(u8 *record) {      /* from the form below Super Saiyan 4 (Kid Goku's Super Saiyan 3, GT Vegeta's Super Saiyan) */
     int form = record[0x14];
     if (is_ssj4(form)) return form != FORM_GOGETA_SSJ4;
@@ -1965,7 +1982,11 @@ void combat_hook(void *defender, int *hit) {
             hit[1] = scale * 2;
             if (strength > 10 && power > 10) { stats[0] = strength - 10; stats[1] = power - 10; }
         }
-        else if (is_kaioken(form)) hit[1] = scale + (scale >> 2) * (1 + mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL));    /* Kaioken: 1.25x, 1.5x mastered, 1.75x at its third level */
+        else if (is_kaioken(form)) {                 /* Kaioken: 1.25x, 1.5x mastered, 1.75x at its third level, from the fighter's own stats (its row is Super
+                                                        Saiyan's class, which adds 5 to Strength and Power on the way in: taken off again, so Kaioken stays below Super Saiyan 2) */
+            hit[1] = scale + (scale >> 2) * (1 + mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL));
+            if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
+        }
         else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
             hit[1] = scale + (scale >> 1) + (scale >> 2);

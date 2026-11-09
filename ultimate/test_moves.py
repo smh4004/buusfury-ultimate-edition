@@ -34,9 +34,9 @@ def setup(skills, form=None, presses=()):
         L += ['poke8 %08X %02X' % (R + 0x15, p)] + FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in AWAY + ['run 30']]
     return L
 
-def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None):
+def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=()):
     """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in does nothing (test_build), so one goes first."""
-    L = setup(skills, form, presses) + AWAY + ['run 1', 'poke %s %x' % (ENEMY_HP, 9000 << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']
+    L = setup(skills, form, presses) + list(extra) + AWAY + ['run 1', 'poke %s %x' % (ENEMY_HP, 9000 << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']
     o = run(L + ['mem %s 2' % PX], name); m = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o)[-1]
     near = ['poke %s %x' % (ENEMY_X, int(m[0], 16) - (40 << 8)), 'poke %s %x' % (ENEMY_Y, int(m[1], 16))]
     L += near + ['poke8 %08X %02X' % (R + 0x15, slot)] + FULL
