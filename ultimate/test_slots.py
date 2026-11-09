@@ -42,6 +42,7 @@ def read(name='x'):
     return dict(cur=g[0], form=r[0x14], hp=struct.unpack_from('<H', r, 0x16)[0], maxhp=struct.unpack_from('<H', r, 0x18)[0], exp=struct.unpack_from('<I', r, 0x24)[0], stat=r[0x28],
                 gear=struct.unpack_from('<4I', r, 0x3C), gen=g[GEN_AT] | g[GEN_AT + 1] << 8, out=g[GEN_AT + 2], bag=struct.unpack_from('<%dI' % struct.unpack_from('<I', g, 0xE4)[0], g, 0xE8), raw=g)
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
+WALK_IN = 150    # frames after the zone 26 door until Goku's walk into West City is over (about 117; 110 left two frames, Nov 9)
 def talk_at(base, x, y, sav=None):
     lines = list(base)
     pl = int([l for l in run(lines + ['mem 03001C34 1'], sav).splitlines() if l.startswith('mem 03001c34')][-1].split()[2], 16)
@@ -102,7 +103,7 @@ door = [x for x in zone26.links(cfg, {a: zone26.floor_mask(P, os.environ['BFU_PR
 KEYS = 'DOWN UP LEFT RIGHT'.split(); PL = 0x0202E8E4
 home = list(start)
 x0, y0, x1, y1 = door['rect']
-home += ['poke %08X %08X' % (PL + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (PL + 0x1A4, ((y0 + y1) // 2) << 8), 'keys ' + KEYS[door['key']], 'run 12', 'keys', 'run 110']
+home += ['poke %08X %08X' % (PL + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (PL + 0x1A4, ((y0 + y1) // 2) << 8), 'keys ' + KEYS[door['key']], 'run 12', 'keys', 'run %d' % WALK_IN]
 hub = talk_at(home + ['poke8 %08X %02X' % (G + 0x55 + 862 // 8, 1 << 862 % 8), 'poke8 %08X %02X' % (G + 0x55 + 883 // 8, 1 << 883 % 8)], 96, 328)
 hub = talk_at(hub + ['run 200'], *zone26.HUB_AT)           # the picker is open now
 at = lambda base: talk_at(base, *zone26.HUB_AT, sav=None)

@@ -24,7 +24,8 @@ door = [x for x in zone26.links(cfg, {a: zone26.floor_mask(P, os.environ['BFU_PR
 x0, y0, x1, y1 = door['rect']; KEYS = 'DOWN UP LEFT RIGHT'.split()
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, 1 << n % 8)
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
-start += ['poke %08X %08X' % (PL + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (PL + 0x1A4, ((y0 + y1) // 2) << 8), 'keys ' + KEYS[door['key']], 'run 12', 'keys', 'run 110']
+WALK_IN = 150    # frames after the zone 26 door until Goku's walk into West City is over (about 117; 110 left two frames, Nov 9)
+start += ['poke %08X %08X' % (PL + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (PL + 0x1A4, ((y0 + y1) // 2) << 8), 'keys ' + KEYS[door['key']], 'run 12', 'keys', 'run %d' % WALK_IN]
 strong = ['poke8 %08X %s' % (REC0 + o, v) for o, v in ((0x28, '96'), (0x29, '96'), (0x2A, '96'), (0x2B, '96'), (0x16, 'FF'), (0x17, '7F'))]
 
 class Game:

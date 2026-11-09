@@ -241,6 +241,12 @@ def quest_npc(src):
     m = len(re.findall(r'(?m)^step ', text))                   # steps so far: the Battle of Gods' are numbered on from here (counted from 0)
     steps = bog.steps(zone26.MORE_GET, zone26.MORE_PUT, zone26.bog_first())
     number = {n: m + k for k, (n, _) in enumerate(steps)}; number['END'] = m + len(steps)
+    # The story steps end the list with `push m` (one past their last step). With the scenes appended that is the first scene,
+    # so every such end now goes past the scenes instead: before Nov 9's fix, talking to the resident after the ending ran the
+    # quest's dispatcher and he never sent you to Hercule City.
+    ends = len(re.findall(r'\bpush %d\b' % m, text))
+    text, n = re.subn(r'(?m)^(\s+)push %d\n(\s+)end$' % m, lambda q: '%spush %d\n%send' % (q.group(1), number['END'], q.group(2)), text)
+    if n != ends or not n or number['END'] > 255: sys.exit("the resident's script ends its list in a way quest_npc doesn't know")
     get = lambda f: '    pushn %d\n    call 0x%X\n' % (f, zone26.MORE_GET)
     here = [bog.CAPSULE] + [(26, bog.room_of(r[0], zone26.bog_first())) for r in bog.ROOMS if r[3] is None]
     branch = ''.join(get(bog.Q_AREA) + '    pushn %d\n    eq\n    jz G%d\n    push %d\n    end\nG%d:\n' % (a << 8 | w, k, number['bog'], k) for k, (w, a) in enumerate(here))

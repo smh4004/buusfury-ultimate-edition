@@ -10,6 +10,7 @@ FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the t
 D = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix='cell'); os.makedirs(D, exist_ok=True)
 G = 0x03001068; PLAYER = 0x03001C34; ENEMIES = 0x03001BB4; COUNT = 0x03001BB0; AT = 0x0300197C; REC0 = 0x03001560; ZENIE = 0x0300155C
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
+WALK_IN = 150    # frames after the zone 26 door until Goku's walk into West City is over (about 117; 110 left two frames, Nov 9)
 fails = []
 def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)
@@ -43,7 +44,7 @@ send('guardon 0x09000000', *start); mem(G)
 send(flag_on(149)); send(flag_on(862)); send(flag_on(883)); mem(G)
 door = [x for x in zone26.links(json.load(open('ultimate/zone26.json')), {a: zone26.floor_mask(open(os.environ['BFU_PROTO'], 'rb').read(), os.environ['BFU_PROTO'], a) for a in range(1, 16)})[1] if 'world' in x][0]
 pl = mem(PLAYER)[0]; x0, y0, x1, y1 = door['rect']
-send('poke %08X %08X' % (pl + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (pl + 0x1A4, (y0 + y1) // 2 << 8), 'keys ' + 'DOWN UP LEFT RIGHT'.split()[door['key']], 'run 12', 'keys', 'run 110'); mem(G)
+send('poke %08X %08X' % (pl + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (pl + 0x1A4, (y0 + y1) // 2 << 8), 'keys ' + 'DOWN UP LEFT RIGHT'.split()[door['key']], 'run 12', 'keys', 'run %d' % WALK_IN); mem(G)
 talk(96, 328); send('run 200'); mem(G)
 send(flag_on(883)); send(*strong())
 talk(*zone26.HUB_AT); send('run 150', 'tap A 20', 'run 80'); sheet('board')

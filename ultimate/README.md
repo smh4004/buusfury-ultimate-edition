@@ -124,10 +124,14 @@ official warps to Capsule Corporation: `BFU_HUB_WARP="4, 20, 1, 192, 196"`).
   his neck (Kibito's orange trims just under his chin), white hair.
 - Its 2,446 characters of lines are in dialogue bank 7, a bank of their own (`bog.TEXT_BANK`; an evt line `say 0x02 @7 "..."`). The game
   unpacks a line's whole bank every time it shows the line (`Text_LoadString2`, no cache), so in bank 6 (7,613 characters of the mod's
-  other new lines) they made every bank-6 line slower and broke the fixed-timing test routes (residents had walked off by the time a route
-  talked to them).
-  `tools/assets/assets.py` adds banks 7 and up as new objects and grows the bank table (`gTextBankTable`, read only through the literal at
-  0x123CC), which moves it to the appendix. Later quests should do the same.
+  other new lines) they would make every bank-6 line slower to appear. `tools/assets/assets.py` adds banks 7 and up as new objects and
+  grows the bank table (`gTextBankTable`, read only through the literal at 0x123CC), which moves it to the appendix. Later quests should
+  do the same.
+- The resident's story steps end his list with `push 25` (one past their last step). With the scenes appended, step 25 is the quest's
+  dispatcher, so `quest_npc` repoints those ends past the scenes (found by the suite: after the ending he ran the dispatcher instead).
+- The suite's route tests had waited 110 frames after the zone 26 door before teleporting to a West City resident; Goku's walk into the
+  city ends about frame 117 (it starts a frame later since Super Saiyan God's commit), so the walk carried him off the talk spot. They wait
+  150 now (`WALK_IN`; `test_zone26.go(settle=150)`).
 
 ## Zone 26 and Super 13
 

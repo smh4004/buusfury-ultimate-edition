@@ -83,7 +83,7 @@ def lines():
 BEERUS, WHIS, NARR, GOKU, KING_KAI, BULMA, VEGETA, GOHAN, VIDEL, SHENRON = 'BEERUS', 'WHIS', 0x00, 0x02, 0x57, 0x11, 0x93, 0x26, 0x99, 0x74
 SCENES_TEXT = []
 # The quest's lines live in a dialogue bank of their own (tools/assets/assets.py). The game unpacks a line's whole bank
-# to show it, so its 2,446 characters in bank 6 (7,613 before) made every bank-6 line slower and shifted old routes.
+# to show it, so its 2,446 characters in bank 6 (7,613 without them) would make every bank-6 line slower to appear.
 TEXT_BANK = 7
 
 
