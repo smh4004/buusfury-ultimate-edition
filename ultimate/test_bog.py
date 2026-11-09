@@ -102,6 +102,10 @@ spots += [(*wa, 'Beerus', x, y) for wa, x, y, _ in bog.FOES] + [(w, a, 'Goku arr
 spots += [(*bog.CAPSULE, 'Whis', *bog.WHIS_AT), (*bog.CAPSULE, 'talk to Whis', bog.WHIS_AT[0], bog.WHIS_AT[1] + 22), (bog.HOME[0], bog.HOME[1], 'home', *bog.HOME[3:])]
 walls = [s for s in spots if not FLOOR.walkable(*s[:2], *s[3:])]
 check('all %d places the quest puts someone are on walkable floor%s' % (len(spots), (': not ' + str(walls)) if walls else ''), not walls)
+fights = [(*wa, 'Beerus', x, y) for wa, x, y, _ in bog.FOES] + [(*wa, 'Goku below him', x, y + 20) for wa, x, y, _ in bog.FOES] + [(w, a, 'Goku arrives', x, y) for w, a, _, x, y in bog.ARRIVE]
+doors = [(s, FLOOR.near_trigger(s[0], s[1], s[3], s[4])) for s in fights]
+doors = [d for d in doors if d[1]]
+check('every fight stands clear of its area\'s doors, capsule and gates%s' % ((': not ' + str(doors)) if doors else ''), not doors)
 send('guardon 0x09000000', *start); mem(G)
 send(flag_on(149)); send(flag_on(862)); send(flag_on(883)); mem(G)
 door = [x for x in zone26.links(__import__('json').load(open('ultimate/zone26.json')), {a: zone26.floor_mask(open(os.environ['BFU_PROTO'], 'rb').read(), os.environ['BFU_PROTO'], a) for a in range(1, 16)})[1] if 'world' in x][0]

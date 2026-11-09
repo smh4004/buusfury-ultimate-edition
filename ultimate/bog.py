@@ -40,10 +40,12 @@ PEOPLE = ((KAI, (('king_kai', 200, 176), ('beerus', 152, 176), ('whis', 120, 176
 # Beerus's fights: (where, x, y, when), one per row of ROWS; `arrive` is where Goku lands for it.
 FOES = ((KAI, 152, 176, ((MORE_BOG_START, MORE_BOG_FIGHT), (MORE_BOG_LOST,))),
         (CAPSULE, 168, 232, ((MORE_BOG_LOST, MORE_BOG_FIGHT), (MORE_BOG_PARTY,))),
-        (WEST_CITY, 400, 336, ((MORE_BOG_RITUAL, MORE_BOG_FIGHT), (MORE_BOG_GOD2, MORE_BOG_DONE))),
-        (FOREST, 152, 208, ((MORE_BOG_GOD2, MORE_BOG_FIGHT), (MORE_BOG_GOD3, MORE_BOG_DONE))),
-        (DESERT, 240, 176, ((MORE_BOG_GOD3, MORE_BOG_FIGHT), (MORE_BOG_DONE,))))
-ARRIVE = (KAI_AT, PARTY_AT, (4, 0x01, 1, 400, 392), (13, 0x01, 1, 152, 264), (11, 0x01, 1, 240, 232))
+        (WEST_CITY, 240, 336, ((MORE_BOG_RITUAL, MORE_BOG_FIGHT), (MORE_BOG_GOD2, MORE_BOG_DONE))),
+        (FOREST, 144, 168, ((MORE_BOG_GOD2, MORE_BOG_FIGHT), (MORE_BOG_GOD3, MORE_BOG_DONE))),
+        (DESERT, 96, 208, ((MORE_BOG_GOD3, MORE_BOG_FIGHT), (MORE_BOG_DONE,))))
+# Each fight stands clear of the area's doors, save capsule and gates (area record +0x10): A beside the desert's gate said "Goku cannot open
+# this gate!" instead of punching, and West City's first spot was in a building's door (test_bog.py checks the distance).
+ARRIVE = (KAI_AT, PARTY_AT, (4, 0x01, 1, 240, 392), (13, 0x01, 1, 144, 224), (11, 0x01, 1, 96, 264))
 ASIDE = (WEST_CITY, DESERT)                      # areas whose own people and enemies stand aside while a Beerus fight is on
 CHARS = {'king_kai': 161, 'bulma': 41, 'vegeta': 279, 'gohan': 123, 'videl': 287, 'goten': 166, 'trunks': 269}
 # Beerus's rows (copies of Kid Buu's): HP and (level + 50, Strength, Power, Endurance). On King Kai's planet he can't really be beaten

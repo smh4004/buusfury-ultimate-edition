@@ -37,6 +37,19 @@ class Floor:
             self.masks[world, area] = np.unpackbits(np.frombuffer(d, np.uint8), bitorder='little').reshape(-1, 256)
         return self.masks[world, area]
 
+    def record(self, world, area):
+        t, n = self.table()
+        return next(t + 56 * q for q in range(n) if (self.rom[t + 56 * q], self.rom[t + 56 * q + 1]) == (world, area))
+
+    def triggers(self, world, area):
+        """The area's doors, save capsule and step triggers (record +3 count, +0x10 list of (condition, record); each record's +8 is its
+        rectangle x0, y0, x1, y1)."""
+        e = self.record(world, area); n = self.rom[e + 3]; lst = self.u32(e + 0x10) - BASE
+        return [struct.unpack_from('<4h', self.rom, self.u32(lst + 8 * k + 4) - BASE + 8) for k in range(n)]
+
+    def near_trigger(self, world, area, x, y, margin=24):
+        return [r for r in self.triggers(world, area) if r[0] - margin <= x <= r[2] + margin and r[1] - margin <= y <= r[3] + margin]
+
     def walkable(self, world, area, x, y):
         m = self.mask(world, area)
         return 0 <= x < 2048 and 0 <= y < 8 * m.shape[0] and bool(m[y // 8, x // 8])
