@@ -28,8 +28,15 @@ check('release: opening plays with no bad jumps', 'bad pc' not in o)
 rel = open(d + '/g.bin', 'rb').read()
 run('baserom.gba', route + tail, d)
 base = open(d + '/g.bin', 'rb').read()
-book = set(range(0x4F8 + 0x0C, 0x4F8 + 0x14)) | {0x4F8 + 0x22, 0x4F8 + 0x23}      # Goku's skills and his skill book's mask: Kaioken is his from the start (Nov 9)
-check('release: game state matches the clean ROM after the opening, Kaioken apart', all(i in book for i in range(len(rel)) if rel[i] != base[i]) and 37 in rel[0x4F8 + 0x0D:0x4F8 + 0x0D + rel[0x4F8 + 0x0C]])
+# The skill book (Nov 9, outfit.c skills_sync, run for the whole party in turn): each fighter's book mask (+0x22) fills in, and a move he knows
+# from the start that wasn't held joins his skills (+0x0C count, +0x0D..): Goku's Kaioken, Vegeta's Galick Gun. Nothing else may change.
+import ast
+SKILL_BOOK = next(ast.literal_eval(n.value) for n in ast.parse(open('ultimate/build.py').read()).body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'SKILL_BOOK')
+held = lambda g, c: list(g[0x4F8 + 0x68 * c + 0x0D:0x4F8 + 0x68 * c + 0x0D + g[0x4F8 + 0x68 * c + 0x0C]])
+book = {0x4F8 + 0x68 * c + o for c in range(8) for o in list(range(0x0C, 0x14)) + [0x22, 0x23]}
+grown = all(held(rel, c)[:len(held(base, c))] == held(base, c) and set(held(rel, c)[len(held(base, c)):]) <= set(SKILL_BOOK[c]) for c in range(8))
+print('   skills added at the start:', {c: held(rel, c)[len(held(base, c)):] for c in range(8) if held(rel, c) != held(base, c)})
+check('release: game state matches the clean ROM after the opening, the skill book apart', all(i in book for i in range(len(rel)) if rel[i] != base[i]) and grown and 37 in held(rel, 0))
 
 forms = json.load(open(OUT + '/BFU_debug.map.json'))['forms']; broly = forms['broly']
 rom = OUT + '/BFU_debug_PERSONAL_USE_ONLY.gba'; sav = os.path.join(d, 'g.sav')

@@ -469,7 +469,10 @@ void beam_update(u8 *b, int arg) {
     if (state == 0 && owner == PLAYER_OBJ) { CL.p = b; CL.p_at = FRAMES; return; }
     if (state != 1) return;
     if (owner == PLAYER_OBJ) { CL.p = b; CL.p_at = FRAMES; }
-    else if (owner) { CL.e = b; CL.e_at = FRAMES; clash_answer(b); }     /* any fighter's beam can clash: it needs only to be a beam with an owner other than the player */
+    else if (owner) {                      /* any fighter's beam can clash: it needs only to be a beam with an owner other than the player */
+        if (CL.active && b != CL.e) return;      /* a second fighter's beam while one is clashing goes its own way (two Kid Buus in a Trial) */
+        CL.e = b; CL.e_at = FRAMES; clash_answer(b);
+    }
     else return;
     if (!CL.active) {
         if (CL.p_at + 1 >= FRAMES && CL.e_at + 1 >= FRAMES) clash_begin();

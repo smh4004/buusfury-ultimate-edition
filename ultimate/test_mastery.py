@@ -8,7 +8,7 @@ Saiyan Blue, and his Kamehameha at level 3 with SUPER_KAME_USES uses the Super K
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
-R = T.R; G = 0x03001068
+R = T.R; G = 0x03001068; forms = T.forms
 MASTERY = 0x0203F000 + 20 + 20 * 22
 # a bench of this game's own (magic, generation, and the generation in the game at +0x4F1), so the mastery bytes poked here stay: a fresh
 # game has none until something is saved there (outfit.c bench_mine)
@@ -49,6 +49,17 @@ check('Super Saiyan Blue comes with Super Saiyan 3 mastered, after the ending', 
 L = T.setup([7, 20], None, (0,)) + poke_mastery(2, 250) + ['run 300', 'mem %08X 26' % R]
 o = T.run(L, 'ssb_story'); b = b''.join(w.to_bytes(4, 'little') for w in words(o, R)[-1])
 check('but not during the story', 44 not in b[0x0D:0x0D + b[0x0C]])
+# Vegeta (record 4): his Super Saiyan 2 mastered (byte 12) teaches him Super Saiyan Blue after the ending. The party is synced in turn
+# (outfit.c player_input), so he needn't be the one fighting; with his six held it waits in his book (+0x22 bit 4: build.py SKILL_BOOK[4])
+V = R + 4 * 0x68
+def vegeta_blue(extra, name):
+    o = T.run(T.setup([7, 20], None, (0,)) + extra + poke_mastery(12, 250) + ['run 600', 'mem %08X 26' % V], name)
+    b = b''.join(w.to_bytes(4, 'little') for w in words(o, V)[-1])
+    return 44 in b[0x0D:0x0D + b[0x0C]] or b[0x22] >> 4 & 1, list(b[0x0D:0x0D + b[0x0C]]), 'bad pc' in o
+got, held, bad = vegeta_blue(POST, 'ssb_vegeta')
+print('   Vegeta skills', held)
+check('Vegeta: Super Saiyan Blue comes with his Super Saiyan 2 mastered, after the ending', got and not bad)
+check('but not during the story', not vegeta_blue([], 'ssb_vegeta_story')[0])
 # 4. Super Kamehameha: the Kamehameha at level 3 (Goku's level) and used enough, after the ending
 L = T.setup([7, 15], None, (0,)) + POST + ['poke %08X 00FFFFFF' % (R + 0x24)] + poke_mastery(21, 100) + ['run 300', 'mem %08X 26' % R]
 o = T.run(L, 'superkame'); b = b''.join(w.to_bytes(4, 'little') for w in words(o, R)[-1])
@@ -64,6 +75,11 @@ k1, f1, _ = T.fire('kame_kk1', [7, 15, 37], 1, presses=(0, 2), extra=poke_master
 k3, f3, b3 = T.fire('kame_kk3', [7, 15, 37], 1, presses=(0, 2), extra=poke_mastery(5, 250))
 print('   Kamehameha %.1f; in Kaioken %.1f (level 1), %.1f (level 3)' % (base, k1, k3))
 check('Kaioken: about 1.25x at level 1 and 1.75x at level 3', base > 0 and 1.15 < k1 / base < 1.4 and 1.6 < k3 / base < 1.95 and not b3)
+# 6. Blue's strength (outfit.c combat_hook): 2x Super Saiyan's, between Super Saiyan 3 (1.75x) and Super Saiyan 4 (2.5x)
+ss, f_ss, _ = T.fire('kame_ss', [7, 15, 20, 44], 1, presses=(0, 2))
+bl, f_bl, b6 = T.fire('kame_blue', [7, 15, 20, 44], 1, presses=(0, 2, 3))
+print('   Kamehameha %.1f as a Super Saiyan (form %d), %.1f in Blue (form %d)' % (ss, f_ss, bl, f_bl))
+check('Blue: about 2x Super Saiyan', f_bl in (forms['goku_ssb'], forms['goku_ssb_b']) and ss > 0 and 1.75 < bl / ss < 2.3 and not b6)
 print('screens in', T.D)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

@@ -58,27 +58,34 @@ def into_fight():
     return g
 
 def clash(g, mash, tag):
-    """Wait for Kid Buu to fire, answer him, and return what happened."""
-    for cycle in range(400):
-        pl, n = g.mem(PLAYER)[0], g.mem(0x03001BB0)[0]
-        if not n: return None
-        foe = g.mem(ENEMIES)[0]
-        fx, fy = g.mem(foe + 0x1A0, 2)
-        g.send('poke %08X %08X' % (pl + 0x1A0, fx), 'poke %08X %08X' % (pl + 0x1A4, fy + (90 << 8)), 'poke8 %08X 01' % (pl + 0x10), 'poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17), 'poke8 %08X 64' % (REC0 + 0x1A), 'poke8 %08X 00' % (REC0 + 0x1B), 'bp 08033002 8')
-        while True:
-            l = g.p.stdout.readline()
-            if 'bad pc' in l: g.bad = True
-            if l.startswith('bp 08033002'): break
-        if ' hit' in l and 'not hit' not in l: break
+    """Wait for Kid Buu to fire, answer him, and return what happened. Where his beam starts beside him varies from shot to shot (0-32 px
+    across), so a shot whose beam doesn't come down in line with Goku's (outfit.c clash_begin: within 16 px) passes it by, as in play;
+    then the next one."""
+    for shot in range(6):
+        for cycle in range(400):
+            pl, n = g.mem(PLAYER)[0], g.mem(0x03001BB0)[0]
+            if not n: return None
+            foe = g.mem(ENEMIES)[0]
+            fx, fy = g.mem(foe + 0x1A0, 2)
+            g.send('poke %08X %08X' % (pl + 0x1A0, fx), 'poke %08X %08X' % (pl + 0x1A4, fy + (90 << 8)), 'poke8 %08X 01' % (pl + 0x10), 'poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17), 'poke8 %08X 64' % (REC0 + 0x1A), 'poke8 %08X 00' % (REC0 + 0x1B), 'bp 08033002 8')
+            while True:
+                l = g.p.stdout.readline()
+                if 'bad pc' in l: g.bad = True
+                if l.startswith('bp 08033002'): break
+            if ' hit' in l and 'not hit' not in l: break
+        else:
+            return None
+        print('   he fired after', cycle, 'tries', flush=True)
+        g.send('keys B', 'run 8')
+        began = False
+        for k in range(120):
+            g.send('run 2')
+            if g.mem(CL + 0x18)[0]: began = True; break
+        if began: break
+        print('   his beam passed Goku\'s by (not in line): the next shot', flush=True)
+        g.send('keys', 'run 120')
     else:
-        return None
-    print('   he fired after', cycle, 'tries', flush=True)
-    g.send('keys B', 'run 8')
-    began = False
-    for k in range(120):
-        g.send('run 2')
-        if g.mem(CL + 0x18)[0]: began = True; break
-    if not began: return dict(began=False)
+        return dict(began=False)
     g.send('shot %s_start' % tag)
     rec0 = g.mem(REC0 + 0x18)[0]
     foe = g.mem(CL + 4)[0]; foe = g.mem(foe + 0x50)[0]

@@ -86,6 +86,18 @@ seq, bad = play('gogeta', [7, SS, SSB], F['gogeta_dbs'], (SS, SSB, SSB))
 fs = [f for f, _, _ in seq]
 print('   DBS Gogeta:', fs)
 check('DBS Gogeta: Super Saiyan, then Blue, then back', fs[0] == F['gogeta_dbs_ss'] and fs[1] == F['gogeta_ssb'] and fs[2] == F['gogeta_dbs'] and not bad)
+# Goku's and Vegeta's Super Saiyan Blue (after the ending, from mastery: test_mastery.py): from Super Saiyan only, then back to base
+seq, bad = play('goku_blue', [7, SS, SSB], 0, (SSB, SS, SSB, SSB))
+fs = [f for f, _, _ in seq]
+print('   Goku Blue:', fs)
+check('Blue does nothing from base', fs[0] == 0)
+check('Goku: Super Saiyan, then Blue, then back to base', fs[1] in (3, 4) and fs[2] in (F['goku_ssb'], F['goku_ssb_b']) and fs[3] in (0, 2) and not bad)
+seq, bad = play('vegeta_blue', [7, SS, SSB], 26, (SS, SSB, SSB))           # Vegeta's own form 26, his Super Saiyan 28 (build.py SSB_LOOKS)
+fs = [f for f, _, _ in seq]
+print('   Vegeta Blue:', fs)
+check('Vegeta: Super Saiyan, then Blue, then back to base', fs[0] in (28, 29) and fs[1] in (F['vegeta_ssb'], F['vegeta_ssb_b']) and fs[2] in (26, 27) and not bad)
+seq, bad = play('blue_kaioken', [7, SS, SSB, KK], 0, (SS, SSB, KK))
+check('no Kaioken in Blue', seq[2][0] == seq[1][0] and seq[1][0] in (F['goku_ssb'], F['goku_ssb_b']))
 # the icons on the HUD: each tier's own
 shots = {'Super Saiyan 2': ('goku2', 1), 'Super Saiyan 4': ('kid', 3), 'Kaioken': ('kaioken', 0), 'Super Saiyan Blue': ('gogeta', 1)}
 grid = []

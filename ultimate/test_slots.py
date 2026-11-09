@@ -80,7 +80,7 @@ two = ['run 600', 'tap START 60', 'tap START 60', 'tap A 90', 'tap A 120', 'tap 
 run(two, old_sav, OLD); la = open(d + '/l.bin', 'rb').read()
 keep = d + '/k.sav'; shutil.copy(old_sav, keep)
 out = run(two, keep, newdebug); lb = open(d + '/l.bin', 'rb').read()
-check('an old save loads into the new build unchanged', 'bad pc' not in out and la == lb and lb[0] == 8)
+check('an old save loads into the new build unchanged (the skill book apart)', 'bad pc' not in out and strip(la) == strip(lb) and lb[0] == 8)
 check('loading writes nothing', open(keep, 'rb').read() == sa)
 
 # 2. Fresh variables, whatever the save held: the memory that used to overlap the save mirror.
