@@ -519,7 +519,8 @@ static void pouch_heal(void) {                 /* Senzu Pouch: 1% of health back
     *hp = *hp + add > max ? max : *hp + add;
 }
 /* Quick skill wheel (Nov 9): hold L and press a direction to pick a skill at once (up the first, right the second, down the third,
-   left the fourth). The fighter doesn't walk while L is held. A tap of L alone still steps through them as before. */
+   left the fourth), or A for the fifth and R for the sixth (a fighter holds six: MAX_HELD; the owner asked for more than four). The
+   fighter doesn't walk, attack or guard while L is held. A tap of L alone still steps through all of them as before. */
 #define wheel_keys ((volatile u16 *)0x0203F25C)      /* (in work RAM: a static would sit in ROM, past the code, where writes go nowhere) */
 #define GUARD_AT (*(volatile u32 *)0x0203FFC8)
 static u16 *quick_wheel(u16 *keys) {
@@ -528,12 +529,13 @@ static u16 *quick_wheel(u16 *keys) {
     int d = keys[2] & 0xF0, i;
     if (keys[2] & 0x100) GUARD_AT = FRAMES;       /* R: the guard's first frame (a perfect guard, guard_msg) */
     if (!(keys[1] & 0x200)) return keys;
-    if (d) {
-        for (i = 0; i < 4; i++) if (d & (0x10 << i)) break;
-        if (pick[i] < rec[0x0C] && rec[0x15] != pick[i]) { rec[0x15] = pick[i]; PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0); }
-    }
+    if (d) { for (i = 0; i < 4; i++) if (d & (0x10 << i)) break; d = pick[i]; }
+    else if (keys[2] & 0x001) d = 4;              /* A: the fifth */
+    else if (keys[2] & 0x100) d = 5;              /* R: the sixth */
+    else d = -1;
+    if (d >= 0 && d < rec[0x0C] && rec[0x15] != d) { rec[0x15] = d; PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0); }
     for (i = 0; i < 6; i++) wheel_keys[i] = keys[i];
-    wheel_keys[1] &= ~0xF0; wheel_keys[2] &= ~0xF0;
+    wheel_keys[1] &= ~0x1F1; wheel_keys[2] &= ~0x1F1;      /* no walking, attack or guard while L is held */
     return (u16 *)wheel_keys;
 }
 void kk_track(void);
@@ -1698,8 +1700,21 @@ static void power_up(void *sprite, const void *vt) {
 static int can_step(u8 *record) { return IN_COMBAT && CanAfford(record, 10); }   /* a tier up, as retail Super Saiyan 3: a fight and 10 ki */
 static int can_start(u8 *record) { return can_step(record) && *(u32 *)(record + 4) == 0; }   /* from base, as retail Super Saiyan: no cool-down either */
 static int is_ssg(int form);
-int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) ? 0 : SS_Can(record); }
-void ss_use(u8 *record, void *sprite) { XFORM = 0; SS_Use(record, sprite); }
+static int is_fp(int form);
+/* Super Saiyan 2 follows Super Saiyan in its own skill (Nov 9, the owner: "make it so SS2 follows SS1 and precedes SS3 so it doesn't have
+   to be swapped for SS1 in the skill menu"): pressed in a Super Saiyan whose next form is Super Saiyan 2, once the story has opened it, Super
+   Saiyan goes up to it; pressed in Super Saiyan 2 (or without the energy to go up) it powers down as before. Super Saiyan 3 then goes up
+   from Super Saiyan 2 (ss3_direct). The Super Saiyan 2 skill still works where a fighter holds it. */
+static int ss_to_ss2(u8 *record) {
+    int form = record[0x14], f = flags_of(form);
+    return (f & 1) && !(f & 2) && !is_kaioken(form) && up_of(form) != 255 && is_ss2(up_of(form)) && ss2_open(record, form_table[form * 24 + 0x0C]) && can_step(record);
+}
+int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) || is_fp(record[0x14]) ? 0 : ss_to_ss2(record) || SS_Can(record); }
+void ss_use(u8 *record, void *sprite) {
+    XFORM = 0;
+    if (ss_to_ss2(record)) SS3_Use(record, sprite);       /* the form's up: Super Saiyan 2, as its own skill goes (ss2_use) */
+    else SS_Use(record, sprite);
+}
 int ss2_can(u8 *record) {
     int form = record[0x14], f = flags_of(form);
     if (is_ss2(form)) return 1;
@@ -1710,18 +1725,19 @@ void ss2_use(u8 *record, void *sprite) {
     if (is_ss2(record[0x14])) power_down(record, sprite); else SS3_Use(record, sprite);
 }
 static int slot_of(const u8 *rec, int skill);
-/* From a Super Saiyan whose next form is Super Saiyan 2: while Super Saiyan 2 is open and held, the way up is through it; before the story
-   opens it, or with it swapped out of the loadout, Super Saiyan 3 goes straight on as in the retail game (its form: Super Saiyan 2's next). */
+/* From a Super Saiyan whose next form is Super Saiyan 2: once Super Saiyan 2 is open, the way up is through it (the Super Saiyan skill
+   reaches it, held or not: ss_use); before the story opens it, Super Saiyan 3 goes straight on as in the retail game (its form: Super
+   Saiyan 2's next). */
 static int ss3_direct(u8 *record) {
     int form = record[0x14], ss3;
     if (!(flags_of(form) & 1) || up_of(form) == 255 || !is_ss2(up_of(form))) return -1;
-    if (ss2_open(record, form_table[form * 24 + 0x0C]) && slot_of(record, 35) >= 0) return -2;
+    if (ss2_open(record, form_table[form * 24 + 0x0C])) return -2;
     ss3 = up_of(up_of(form));
     return ss3 != 255 && (flags_of(ss3) & 2) ? ss3 : -2;
 }
 int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one and it is held */
     int form = record[0x14], d = ss3_direct(record);
-    if (is_kaioken(form) || is_ssj4(form) || is_ssg(form)) return 0;
+    if (is_kaioken(form) || is_ssj4(form) || is_ssg(form) || is_fp(form)) return 0;
     if (d == -2) return 0;
     if (d >= 0) return SS3_Can(record);
     if ((flags_of(form) & 2) && up_of(form) != 255 && is_ssj4(up_of(form))) return 1;        /* Kid Goku's Super Saiyan 3: powers down */
@@ -1934,7 +1950,8 @@ void skills_sync(int c) {
         set_known(c, rec[0x0D + i], 1);
         if (tier_of(rec[0x0D + i]) >= 0) rec[0x2E + 2 * i] = rec[0x2F + 2 * i] = mastery_level(c, rec[0x0D + i]);
     }
-    if (book_at(c, 35) >= 0) learn(c, 35, (knows(c, 20) || slot_of(rec, 20) >= 0) && ss2_open(rec, c));
+    if (book_at(c, 35) >= 0 && (knows(c, 20) || slot_of(rec, 20) >= 0) && ss2_open(rec, c) && !knows(c, 35) && slot_of(rec, 35) < 0)
+        set_known(c, 35, 1);            /* Super Saiyan 2 comes through the Super Saiyan skill (ss_use): known, in the book, no slot taken */
     if (c == 0) {
         learn(c, KAIOKEN_SKILL, 1);
         learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
@@ -1942,6 +1959,7 @@ void skills_sync(int c) {
         learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && (more_flag(MORE_BOG_RITUAL) || more_flag(MORE_BOG_DONE)));     /* from the ritual on */
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
     }
+    if (c == 1) learn(c, FP_SKILL, GetFlag(G_FLAGS, MYSTIC_FLAG));      /* Full Power: with the orange gi */
     if (c == 4) {
         learn(c, GALICK_SKILL, 1);
         learn(c, 36, gt); learn(c, FINAL_SHINE_SKILL, gt);
@@ -2051,7 +2069,7 @@ int ss_tick(u8 *rec) {
         else if (*hp > cost + 1) *hp -= cost;
         else *(u16 *)(rec + 0x1E) = 0;
     }
-    if (is_ssg(rec[0x14]) && (SSG_TICK ^= 1)) return 1;          /* Super Saiyan God drains at half the rate */
+    if ((is_ssg(rec[0x14]) || is_fp(rec[0x14])) && (SSG_TICK ^= 1)) return 1;      /* Super Saiyan God and Full Power drain at half the rate */
     if (potara_skip(rec)) return 1;
     return mastery_skip(rec);
 }
@@ -2102,6 +2120,28 @@ void maxp_start(u32 *state, void *sprite) { tinted_start(state, sprite, maxp_aur
 void maxp_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, maxp_vt);
     else SS_Use(record, sprite);
+}
+/* Full Power (Nov 9, the owner: "add a full power Mystic form for Mystic Gohan only don't allow any of his other forms to use it"): Gohan
+   in his orange gi (form 13: the Elder Kai unlocked his potential) to its copy with white lightning on every frame (fp_map, build.py
+   FP_LOOKS), powering up in Max Power's white aura. Its row is Super Saiyan's class without the +5 (taken off in combat_hook): 1.75x, and
+   the pool drains at half Super Saiyan's rate (ss_tick), as Super Saiyan God's. No other form of his has it, no tier goes up from it, and
+   Super Saiyan doesn't work in it; pressed again it powers down to the orange gi. Learned with the orange gi (MYSTIC_FLAG, skills_sync). */
+extern const u8 fp_map[][2];
+static int is_fp(int form) {
+    int i;
+    for (i = 0; fp_map[i][0] != 255; i++) if (fp_map[i][1] == form) return 1;
+    return 0;
+}
+int fp_can(u8 *record) {
+    int form = record[0x14];
+    if (is_fp(form)) return 1;
+    return mapped(fp_map, form) != 255 && !(flags_of(form) & 3) && can_start(record);
+}
+void fp_use(u8 *record, void *sprite) {
+    int form = record[0x14];
+    XFORM = 0;
+    if (is_fp(form)) SS_Use(record, sprite);
+    else power_to(record, sprite, mapped(fp_map, form), maxp_vt);
 }
 void majuub_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
@@ -2231,7 +2271,7 @@ void combat_hook(void *defender, int *hit) {
             if (!(flags_of(form_table[form * 24 + 0x17]) & 1) && strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
             /* (Super Saiyan Kaioken, down to Super Saiyan, keeps Super Saiyan's +5: 1.75x a Super Saiyan's hit) */
         }
-        else if (is_ssg(form)) {                     /* Super Saiyan God: 1.75x, without Super Saiyan's +5 */
+        else if (is_ssg(form) || is_fp(form)) {      /* Super Saiyan God and Full Power: 1.75x, without Super Saiyan's +5 */
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
         }

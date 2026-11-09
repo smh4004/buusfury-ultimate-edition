@@ -235,6 +235,13 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         ins.compress = a.get('compress', False)            # WFZ-compressed tile blocks (only the actors that ask)
         ins.high_on = bool(a.get('high')) and high is not None
         target = a.get('replace')                          # modify an existing actor instead of adding one
+        if 'hairswap' in a:                                # an outfit's Super Saiyan: its base's frames with another outfit's gold hair (hairswap_actor)
+            h = a['hairswap']; at_ = lambda x: table[x] - BASE
+            rec, made, kept = hairswap_actor(ins, rom, at_(h['base']), at_(h['ref']), at_(h['ss']), {int(k): tuple(v) for k, v in h.get('slots', {}).items()}, h.get('idle_slots', ()))
+            print('%s: %d frames made, %d left as the source Super Saiyan\'s' % (name, made, kept))
+            if kept > h.get('kept_max', 0): sys.exit('%s: %d frames could not be matched (allowed %d)' % (name, kept, h.get('kept_max', 0)))
+            ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            continue
         if 'bolts_of' in a:                                # a copy of an actor with lightning on its frames: its source is built first
             src = a['bolts_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
             rec = bolted_actor(ins, rom, src - BASE, a['bolt_colours']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
@@ -613,6 +620,65 @@ def frame_image(rom, fp):
     t, size = u(tp), u(tp + 4)
     raw = rom[tp + 8:tp + 8 + size] if t == 0 else bytes(decompress_stream(rom, tp + 8, size)[0])
     return np.frombuffer(bytes(raw[:w * h]), np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+
+
+def hairswap_actor(ins, rom, base_at, ref_at, ss_at, slot_map=None, idle_slots=()):
+    """An outfit's Super Saiyan made from three retail actors of one character (Nov 9: orange-gi Gohan went Super Saiyan in his school
+    uniform, because the game has no orange-gi Super Saiyan). `ss_at` (Super Saiyan in another outfit) gives the record and its slots;
+    in each of its frames the pixels that differ from the same frame of `ref_at` (that outfit's base: the gold hair, the green eyes) are
+    laid over the same frame of `base_at` (the new outfit's base), so the body and clothes are the outfit's own. slot_map {ss slot:
+    (ref slot, base slot)} where the actors number a slot differently; idle_slots (the power-down, which the base forms lack) are diffed
+    against the Super Saiyan's idle and laid over the new idle. Returns (record, frames made, frames left as the Super Saiyan's)."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    slot_map = slot_map or {}
+    def anim(rec_at, s):
+        n = u(rec_at) & 0xFF
+        ap = u(rec_at + 0x54 + 4 * s) if s < n else 0
+        if not ap: return None
+        k = u(ap - BASE); return [u(ap - BASE + 4 + 4 * i) for i in range(4 * k)]
+    def one_piece(fp): return fp and u(fp - BASE) == 1
+    def origin(fp): return struct.unpack_from('<bb', rom, fp - BASE + 4)      # the piece's x, y from the sprite's origin
+    def put_frame(fp, img):
+        o = fp - BASE; body = bytearray(rom[o:o + 4 + 16])
+        h, w = img.shape
+        data = np.ascontiguousarray(img, np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+        struct.pack_into('<I', body, 4 + 12, ins.put(struct.pack('<II', 0, len(data)) + data))
+        return ins.put(bytes(body))
+    n = u(ss_at) & 0xFF; rec = bytearray(rom[ss_at:ss_at + 0x54 + 4 * n])
+    made = kept = 0
+    ss_idle, new_idle = anim(ss_at, 0), {}
+    for s in range(n):
+        ss = anim(ss_at, s)
+        if not ss: continue
+        if s in idle_slots:
+            pairs = [(ss_idle[d % 4], None) for d in range(len(ss))]     # against the idle's first frame, the same view
+        else:
+            rs, bs = slot_map.get(s, (s, s)); ref, base = anim(ref_at, rs), anim(base_at, bs)
+            pairs = list(zip(ref, base)) if ref and base and len(ref) == len(ss) == len(base) else [(None, None)] * len(ss)
+        out = []
+        for i, fp in enumerate(ss):
+            rp, bp = pairs[i]
+            if s in idle_slots: bp = new_idle.get(i % 4)
+            base_ok = isinstance(bp, np.ndarray) or (bp is not None and one_piece(bp))
+            if not fp or not one_piece(fp) or not one_piece(rp) or not base_ok:
+                out.append(fp); kept += bool(fp); continue
+            a, r = frame_image(rom, fp), frame_image(rom, rp)
+            b = bp if isinstance(bp, np.ndarray) else frame_image(rom, bp)
+            if s in idle_slots and r.shape == b.shape and r.shape != a.shape:
+                # the power-down's frames are 32x32 where the idle is 16x32: the idle on the frame's grid, by the pieces' own offsets
+                (ax, ay), (rx, ry) = origin(fp), origin(rp)
+                dx, dy = rx - ax, ry - ay
+                if 0 <= dx and 0 <= dy and dx + r.shape[1] <= a.shape[1] and dy + r.shape[0] <= a.shape[0]:
+                    def grid(img):
+                        g = np.zeros_like(a); g[dy:dy + img.shape[0], dx:dx + img.shape[1]] = img; return g
+                    r, b = grid(r), grid(b)
+            if not (a.shape == r.shape == b.shape):
+                out.append(fp); kept += 1; continue
+            img = b.copy(); m = a != r; img[m] = a[m]
+            if s == 0 and i < 4: new_idle[i] = img
+            out.append(put_frame(fp, img)); made += 1
+        struct.pack_into('<I', rec, 0x54 + 4 * s, ins.put(struct.pack('<I', len(ss) // 4) + struct.pack('<%dI' % len(out), *out)))
+    return rec, made, kept
 
 
 def bolted_actor(ins, rom, rec_at, colours):

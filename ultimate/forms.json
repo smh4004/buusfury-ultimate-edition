@@ -40,12 +40,12 @@
   {
    "id": "gohan_orange_ss",
    "copy": 16,
-   "character": 113,
    "owner": 1,
    "name": 1186,
    "flags": 81,
    "down": 13,
-   "up": "gohan_orange_ss2"
+   "up": "gohan_orange_ss2",
+   "actor": "gohan_orange_ss"
   },
   {
    "id": "saiyaman_from_green",
@@ -220,7 +220,7 @@
   {
    "id": "gohan_orange_ss2",
    "copy": 16,
-   "actor": "gohan_ss2",
+   "actor": "gohan_orange_ss2",
    "owner": 1,
    "up": 255,
    "down": 13

@@ -42,9 +42,17 @@ Super Saiyan, Gogeta's 3x (`combat_hook`). `python3 ultimate/test_ki.py` (on the
 
 ## Moves, mastery and the post-game (Nov 9)
 Skill ids past retail (`build.py`): 35 Super Saiyan 2, 36 Super Saiyan 4, 37 Kaioken, 38 Galick Gun, 39 10x Kamehameha, 40 Final Shine,
-41 Super Saiyan 4's Super Dragon Fist, 42 Solar Flare, 43 Super Kamehameha, 44 Super Saiyan Blue, 45 Max Power. Each transformation tier is
-its own skill (`outfit.c` `ss_can`... `kaioken_use`): a tier goes up from the one below and, pressed in its own form, powers down. No
-Super Saiyan during Kaioken, and no Kaioken in Super Saiyan until Kaioken is fully mastered. Icons: `lib/icons.py` (Super Saiyan 3's icon with a cyan 2 or a purple 4, the Z in red or
+41 Super Saiyan 4's Super Dragon Fist, 42 Solar Flare, 43 Super Kamehameha, 44 Super Saiyan Blue, 45 Max Power, 46 Super Saiyan God, 47 Full
+Power. Each transformation tier is its own skill (`outfit.c` `ss_can`... `kaioken_use`): a tier goes up from the one below and, pressed in
+its own form, powers down. Super Saiyan 2 also follows Super Saiyan in Super Saiyan's own skill (Nov 9, the owner: "so it doesn't have to be
+swapped for SS1"): once the story opens Super Saiyan 2, Super Saiyan pressed in Super Saiyan goes up to it (Super Saiyan 3 then goes up from
+there), and pressed in Super Saiyan 2 powers down; Super Saiyan 2 is known but takes no slot (`ss_to_ss2`, `skills_sync`). No
+Super Saiyan during Kaioken, and no Kaioken in Super Saiyan until Kaioken is fully mastered. Full Power (Nov 9): Mystic Gohan only, from
+his orange gi (form 13) and none of his other forms, learned with the orange gi (outfit flag 860): his frames with white lightning
+(`build.py FP_LOOKS`, a bolted copy of actor 101), Max Power's white aura, 1.75x without Super Saiyan's +5, half Super Saiyan's drain, back
+to the orange gi; no Super Saiyan from it (`fp_can`, `test_fp.py`). Orange-gi Gohan's Super Saiyan and 2 (forms 58, 79) are his own
+frames with the school Super Saiyan's gold hair (`lib/sprites.py hairswap_actor`: the pixels where actor 104 differs from 98, laid over 101;
+the power-down's 32x32 frames on the idle's grid); before, he changed into the school uniform as he powered up. Icons: `lib/icons.py` (Super Saiyan 3's icon with a cyan 2 or a purple 4, the Z in red or
 blue). Super Saiyan 2's lightning aura, GT Gohan's Super Saiyan 2 and the Blue hair (`ssb_hair`, Super Saiyan Gogeta's blues) are recolours.
 Kaioken (Goku from the start, Krillin, Tien, Yamcha, Videl, Hercule): 1.25x, 1.5x and 1.75x by its mastery level, costing health as it goes.
 Fully mastered (level 3) it changes (`outfit.c` `kk_track`, `kk_hud`, `combat_hook`): no health cost; it brings a cyan bar of its own over the
@@ -66,7 +74,8 @@ class every 10 drain units, Super Saiyan 3's every 45); 100 is level 2, 250 leve
 drains slower. After the ending, Goku's mastered Super Saiyan 3 and Vegeta's Super Saiyan 2 teach Super Saiyan Blue (2x), and Goku's
 Kamehameha at level 3, used 100 times, the Super Kamehameha. Super Saiyan 4 moves and looks come with the GT unlock, never in the story.
 The skill book (record +0x22, `skill_book`): what a fighter knows beyond the six he holds; the pause menu's Skills tab swaps the
-highlighted skill with SELECT. Hold L and press a direction to pick the first to fourth skill at once. Pressing R just before an
+highlighted skill with SELECT (a fighter holds six; the tab shows four at a time and scrolls). Hold L and press a direction to pick the
+first to fourth skill at once, A for the fifth and R for the sixth; a tap of L steps through all six. Pressing R just before an
 enemy shot lands, facing it, takes no damage: a ki blast goes back at its shooter, a gunman's shot is turned away (a perfect guard). The flight map's mini-map marks every place you can land.
 
 Master Roshi joins at Kame House after the ending (`lib/roshi.py`: Krillin's LoG2 fighting frames with Roshi's head, beard and clothes

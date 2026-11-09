@@ -58,6 +58,8 @@ SOLAR_FLARE_SKILL, SUPER_KAME_SKILL = 42, 43
 MAX_POWER_SKILL = 45             # Master Roshi's Max Power (Nov 9)
 STORY_MARKS = ((858, 38), (860, 132), (864, 120))     # outfits.json unlocks whose scene also sets a story flag: (unlock flag, scene's flag; outfit.c story_sync)
 SSG_SKILL = 46                   # Super Saiyan God (Nov 9): Goku, from base, after the Battle of Gods ritual with Super Saiyan mastered
+FP_SKILL = 47                    # Full Power (Nov 9): Mystic Gohan only, from his orange gi (form 13), learned with it (outfit flag MYSTIC_FLAG)
+MYSTIC_FLAG = 860                # outfits.json: the Elder Kai's scene gives Gohan the orange gi (outfit 110)
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
 # picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
 GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH = 162, 163, 164, 165, 166
@@ -70,6 +72,7 @@ GEAR_TABLE, GEAR_COUNT = 0x6F82EC, 162
 GEAR_REFS = (0x2BFC, 0x453C, 0x4814, 0xD528, 0x13E28, 0x16FBC, 0x1D400, 0x1D5F0, 0x1D968, 0x1DC74, 0x1DF88, 0x1FB4C, 0x2BD44, 0x31844, 0x31C3C, 0x321B8, 0x325AC)
 ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
 SSG_NAME_UI = ROSHI_NAME_UI + 2  # 'Super Saiyan God'
+FP_NAME_UI = SSG_NAME_UI + 1     # 'Full Power Gohan'
 # Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
 KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
            'goku_ss': (3, 0, 109), 'goku_ss_b': (4, 0, 110), 'kid_goku_ssj': ('kid_goku_ssj', 0, 'kid_goku_ssj'),      # Super Saiyan Kaioken (Kaioken fully mastered)
@@ -79,6 +82,9 @@ SS_KAIOKEN = ('goku_ss', 'goku_ss_b', 'kid_goku_ssj')     # their rows go after 
 # Super Saiyan God: each of Goku's base looks -> (its form, owner, the actor its red-haired copy is made from). Rows after Super Saiyan Kaioken's.
 SSG_LOOKS = {'goku_ssg': (0, 0, 106), 'goku_b_ssg': (1, 0, 107), 'goku_halo_ssg': (2, 0, 108)}
 SSG_HAIR = ((120, 32, 64), (200, 32, 64))         # his hair: edge and fill (crimson, from colours the game has)
+# Full Power Mystic: Gohan's orange-gi form -> (its form, owner, the actor its copy with white lightning is made from). Rows after Super Saiyan God's.
+FP_LOOKS = {'gohan_mystic_fp': (13, 1, 101)}
+FP_BOLTS = ((176, 200, 248), (248, 248, 248))     # the lightning: a cool white edge and a white core (Max Power's aura is the same white)
 # Super Saiyan Blue for Goku and Vegeta (post-game mastery): each Super Saiyan form -> its Blue, a Super Saiyan 3 class copy whose hair is blue.
 SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
@@ -98,8 +104,11 @@ def kaioken_rows(clean):
         rows.append({'id': n, 'copy': row, 'actor': n, 'owner': owner, 'name': 1057, 'portrait': portraits, 'up': 255, 'down': base})
     rows += [kk(n, *KAIOKEN[n][:2]) for n in SS_KAIOKEN]
     # Super Saiyan God: the base row's copy with the red-haired actor, Super Saiyan's class (its drain, halved in outfit.c), back down to base
-    return rows + [{'id': n, 'copy': base, 'actor': n, 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base, 'name': SSG_NAME_UI}
-                   for n, (base, owner, _) in SSG_LOOKS.items()]
+    rows += [{'id': n, 'copy': base, 'actor': n, 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base, 'name': SSG_NAME_UI}
+             for n, (base, owner, _) in SSG_LOOKS.items()]
+    # Full Power Mystic: the orange gi's row copied, Super Saiyan's class (its drain, halved in outfit.c, and +5 taken off there), back down to it
+    return rows + [{'id': n, 'copy': base, 'actor': n, 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base, 'name': FP_NAME_UI}
+                   for n, (base, owner, _) in FP_LOOKS.items()]
 
 
 # The beam's body rows (the Kamehameha's, and every beam built on it): levels 1-2 point at 0x721188 and level 3 at 0x7211F4, nine rows on.
@@ -164,7 +173,7 @@ def kaioken_remap(pal, one):
 # The skill book (outfit.c): per party character, the skills the loadout can hold beyond the six slots (record +0x13 is not a seventh: it is the equipment flags byte). 21 is the story's locked Super Saiyan.
 SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21), 2: (7, 20, 16, 8, 12, 21),
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21, FP_SKILL), 2: (7, 20, 16, 8, 12, 21),
               3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 # A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,
@@ -1281,7 +1290,15 @@ def add_actors(rom, clean):
     cfg['beerus'] = {'beerus_of': 38, 'one': one, 'high': True, 'remap': {'17': [(9, 0), (9, 1), (9, 2)] + [(15, k) for k in range(4)] + [(15, 3)] * 4}}
     import whis                                            # Whis: Kibito's frames in his colours (lib/whis.py)
     cfg['whis'] = {'tint_of': 149, 'tint': whis.recolour(one), 'high': True}
-    cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
+    # Orange-gi Gohan's Super Saiyan and 2 (Nov 9): the game has no such figure, so form 58 used the school uniform's (actor 104) and he
+    # changed clothes as he powered up. His own frames (actor 101) with the school Super Saiyan's gold hair: the pixels where actor 104
+    # differs from the school base (98). Slot 20 (the spin attack) is the orange gi's slot 19; slot 11 (powering down) has no base frames.
+    cfg['gohan_orange_ss'] = {'hairswap': {'base': 101, 'ref': 98, 'ss': 104, 'slots': {'20': [20, 19]}, 'idle_slots': [11]}, 'high': True}
+    cfg['gohan_orange_ss2'] = {'bolts_of': 'gohan_orange_ss', 'bolt_colours': bright, 'high': True}
+    # Full Power Mystic: the orange gi's own frames (actor 101) with white lightning on them; its power-up is the orange gi's (_powerup)
+    for n, (_, _, src) in FP_LOOKS.items():
+        cfg[n] = {'bolts_of': src, 'bolt_colours': tuple(one(np.array(c)) for c in FP_BOLTS), 'high': True}
+    cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, powerup_frames(rom, ids, end)
 
@@ -1448,11 +1465,12 @@ def add_outfits(rom, clean, at, art):
     c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
     c += 'const u8 kaioken_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base if isinstance(base, int) else fm[base], fm[n + '_kaioken']) for n, (base, _, _) in KAIOKEN.items())
     c += 'const u8 ssg_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base, fm[n]) for n, (base, _, _) in SSG_LOOKS.items())
+    c += 'const u8 fp_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base, fm[n]) for n, (base, _, _) in FP_LOOKS.items())
     c += 'const u8 ssb_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (fm[a] if isinstance(a, str) else a, fm[b]) for a, b in SSB_FORMS if b in fm)
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1924,6 +1942,8 @@ def add_eraser(rom, clean, sym, at, art):
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Master Roshi', 'Max Power Roshi')]
     if ERASER_UI + len(strings) != SSG_NAME_UI: sys.exit('Super Saiyan God name moved')
     strings.append(put('Super Saiyan God'.encode('utf-16-le') + b'\0\0'))
+    if ERASER_UI + len(strings) != FP_NAME_UI: sys.exit('Full Power name moved')
+    strings.append(put('Full Power Gohan'.encode('utf-16-le') + b'\0\0'))
     row = bytearray(clean[SKILL_ROWS + 24 * 20:SKILL_ROWS + 24 * 21])          # Majuub: Super Saiyan's row, its own name and use
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
     struct.pack_into('<I', row, 20, sym['majuub_use'] | 1)
@@ -1934,6 +1954,12 @@ def add_eraser(rom, clean, sym, at, art):
     struct.pack_into('<I', row, 12, new_text('Max Power', 'Press the B Button to bulk up to full power: attacks hit 1.5x as hard. It drains like Super Saiyan. Press it again to calm down.'))
     struct.pack_into('<I', row, 20, sym['maxp_use'] | 1)
     rows[MAX_POWER_SKILL] = row
+    row = bytearray(clean[SKILL_ROWS + 24 * 20:SKILL_ROWS + 24 * 21])          # Full Power: Super Saiyan's row, its Z in violet, no level (not a mastered tier)
+    row[0] = 0xFF
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], shifted(275 / 360))) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 20 + 4)])
+    struct.pack_into('<III', row, 12, new_text('Full Power', 'Press the B Button to unleash Mystic Gohan\'s full power: attacks hit 1.75x as hard and its ki drains slowly. In his orange gi only. Press it again to calm down.'),
+                     sym['fp_can'] | 1, sym['fp_use'] | 1)
+    rows[FP_SKILL] = row
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Majuub', 'Press the B Button to draw on Majin Buu\'s power and become Majuub: attacks hit 1.5x as hard.  Press it again to change back.')]
     base_new = ERASER_UI + len(strings)          # the Nov 9 moves' names and descriptions, after everything with a fixed id
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in new_strings]

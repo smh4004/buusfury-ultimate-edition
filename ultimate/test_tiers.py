@@ -12,7 +12,7 @@ forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['for
 H = 'tools/harness/harness'; R = 0x03001560
 ENEMY_X, ENEMY_Y, PX = '0202d46c', '0202d470', '0202ce1c'
 base = [l for l in open('tools/harness/enemy_test.txt').read().split('\n') if l and not l.startswith('#') and not l.startswith('mem ') and not l.startswith('shot ') and l not in ('tap B 20', 'run 200')]
-SS, SS2, SS3, SS4, KK, SSB = 20, 35, 22, 36, 37, 44
+SS, SS2, SS3, SS4, KK, SSB, FP = 20, 35, 22, 36, 37, 44, 47
 fails = []
 def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)
@@ -48,11 +48,15 @@ fs = [f for f, _, _ in seq]
 print('   Goku:', fs)
 check('Super Saiyan 2 does nothing from base', fs[0] == 0)
 check('Super Saiyan, then 2, then 3, then back to base', fs[1] in (3, 4) and fs[2] in (F['goku_ss2'], F['goku_ss2_b']) and fs[3] in (5, 6) and fs[4] in (0, 2) and not bad)
-# Without Super Saiyan 2 in the loadout (or before the story opens it) Super Saiyan 3 goes straight on from Super Saiyan, as in the retail game
-seq, bad = play('goku_direct', [7, SS, SS3, 15, 14, 19], 0, (SS, SS3, SS3))      # six held: no room for Super Saiyan 2
+# Super Saiyan 2 follows Super Saiyan in its own skill (the owner, Nov 9: "SS2 follows SS1 and precedes SS3 so it doesn't have to be swapped
+# for SS1"): with six held and no room for Super Saiyan 2, Super Saiyan goes up to it, Super Saiyan 3 from there, and pressed again it's base
+seq, bad = play('goku_chain', [7, SS, SS3, 15, 14, 19], 0, (SS, SS, SS3, SS3))
 fs = [f for f, _, _ in seq]
 print('   Goku without Super Saiyan 2 held:', fs)
-check('without Super Saiyan 2 held, Super Saiyan 3 straight from Super Saiyan, then back', fs[0] in (3, 4) and fs[1] in (5, 6) and fs[2] in (0, 2) and not bad)
+check('without Super Saiyan 2 held: Super Saiyan, Super Saiyan again for 2, then 3, then back', fs[0] in (3, 4) and fs[1] in (F['goku_ss2'], F['goku_ss2_b']) and fs[2] in (5, 6) and fs[3] in (0, 2) and not bad)
+seq, bad = play('goku_ss_down', [7, SS, SS3, 15, 14, 19], 0, (SS, SS, SS))
+fs = [f for f, _, _ in seq]
+check('Super Saiyan pressed in Super Saiyan 2 powers down', fs[1] in (F['goku_ss2'], F['goku_ss2_b']) and fs[2] in (0, 2) and not bad)
 # Super Saiyan 2 pressed in Super Saiyan 2 powers down
 seq, bad = play('goku2', [7, SS, SS2], 0, (SS, SS2, SS2))
 fs = [f for f, _, _ in seq]
@@ -98,8 +102,23 @@ print('   Vegeta Blue:', fs)
 check('Vegeta: Super Saiyan, then Blue, then back to base', fs[0] in (28, 29) and fs[1] in (F['vegeta_ssb'], F['vegeta_ssb_b']) and fs[2] in (26, 27) and not bad)
 seq, bad = play('blue_kaioken', [7, SS, SSB, KK], 0, (SS, SSB, KK))
 check('no Kaioken in Blue', seq[2][0] == seq[1][0] and seq[1][0] in (F['goku_ssb'], F['goku_ssb_b']))
+# Full Power (the owner, Nov 9: "a full power Mystic form for Mystic Gohan only don't allow any of his other forms to use it"): from the
+# orange gi (form 13) only; Super Saiyan does nothing in it; pressed again it is the orange gi (and the cool-down after a power-down
+# holds the next transformation for a while, as retail Super Saiyan's)
+seq, bad = play('mystic_fp', [7, SS, FP], 13, (FP, SS, FP))
+fs = [f for f, _, _ in seq]
+print('   Mystic Gohan:', fs)
+check('Full Power from the orange gi', fs[0] == F['gohan_mystic_fp'] and not bad)
+check('no Super Saiyan in Full Power', fs[1] == F['gohan_mystic_fp'])
+check('Full Power pressed again is the orange gi', fs[2] == 13)
+for look, ss in ((10, 16), (15, 18)):                 # school uniform, green gi: no Full Power, from base or from their Super Saiyan
+    seq, bad = play('fp_%d' % look, [7, SS, FP], look, (FP, SS, FP))
+    fs = [f for f, _, _ in seq]
+    check('no Full Power in form %d or its Super Saiyan' % look, fs == [look, ss, ss] and not bad)
+seq, bad = play('fp_orange_ss', [7, SS, FP], 13, (SS, FP))
+check('the orange gi\'s Super Saiyan is its own form (not the school uniform\'s), and no Full Power from it', [f for f, _, _ in seq] == [F['gohan_orange_ss']] * 2 and not bad)
 # the icons on the HUD: each tier's own
-shots = {'Super Saiyan 2': ('goku2', 1), 'Super Saiyan 4': ('kid', 3), 'Kaioken': ('kaioken', 0), 'Super Saiyan Blue': ('gogeta', 1)}
+shots = {'Super Saiyan 2': ('goku2', 1), 'Super Saiyan 4': ('kid', 3), 'Kaioken': ('kaioken', 0), 'Super Saiyan Blue': ('gogeta', 1), 'Full Power': ('mystic_fp', 0)}
 grid = []
 for n, (who, k) in shots.items():
     grid.append(icon('%s_%d' % (who, k)))
