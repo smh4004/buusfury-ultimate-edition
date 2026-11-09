@@ -223,7 +223,16 @@ static void more_flag_set(int f, int on) {
 }
 /* Script natives: more_get(n) and more_put(n, value). more_put(MORE_POINTS, n) instead gives whoever is playing n stat points to spend (a Time Chamber wave's prize). */
 #define MORE_POINTS 255
-void more_get(int *sp) { int n = *sp; sp[n] = more_flag(sp[n]); }
+int mastery_level(int c, int skill);
+/* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (room << 8 | world), 252 Goku playing, 253 the quest can start
+   (after the ending, Goku's Super Saiyan mastered, Goku playing) */
+void more_get(int *sp) {
+    int n = *sp, f = sp[n], me = *(u8 *)0x03001068;
+    if (f == 251) sp[n] = *(volatile u16 *)0x0300197C;
+    else if (f == 252) sp[n] = me == 0;
+    else if (f == 253) sp[n] = GetFlag((void *)0x03001068, 149) && mastery_level(0, 20) == 2 && me == 0;
+    else sp[n] = more_flag(f);
+}
 void more_put(int *sp) {
     int n = *sp, f = sp[n - 1], v = sp[n];
     *sp = n - 2;
@@ -1835,7 +1844,7 @@ void skills_sync(int c) {
         learn(c, KAIOKEN_SKILL, 1);
         learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
         learn(c, SSB_SKILL, post && mastery_level(0, 22) == 2);
-        learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && more_flag(MORE_BOG_DONE));
+        learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && (more_flag(MORE_BOG_RITUAL) || more_flag(MORE_BOG_DONE)));     /* from the ritual on */
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
     }
     if (c == 4) {
