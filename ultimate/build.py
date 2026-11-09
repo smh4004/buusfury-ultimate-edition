@@ -94,6 +94,38 @@ SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86
 KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outlines stay)
 
 
+def crackle_frames(seed, glow, core):
+    """One bolt of the crackle (outfit.c crackle) as four 32x32 frames of colour indices: it strikes (the top half), stands with a branch,
+    jumps a pixel or two, then breaks up in the glow's colour. A 1-pixel core with a glow either side; a short zigzag about the frame's middle."""
+    import random
+    rng = random.Random(seed)
+    def path(x, y, n, spread):
+        pts = [(x, y)]
+        for _ in range(n):
+            dx, dy = rng.choice((-2, -1, 1, 2)), rng.choice((2, 3))
+            for _ in range(dy): y += 1; pts.append((x, y))
+            for _ in range(abs(dx)):
+                x = max(3, min(28, x + (1 if dx > 0 else -1))); pts.append((x, y))
+        return [(a, b) for a, b in pts if b < 31]
+    main = path(rng.randint(13, 18), 8, 5, 2)                 # about 14 px tall, in the middle of the frame (the spark's origin)
+    k = len(main) // 2
+    branch = path(main[k][0], main[k][1], 2, 2)
+    jit = [(min(28, max(3, x + (1 if (y // 4) % 2 else -1))), y) for x, y in main]
+    def draw(*lines, glow_only=False, broken=False):
+        img = np.zeros((32, 32), np.uint8)
+        for line in lines:
+            for i, (x, y) in enumerate(line):
+                if broken and (y // 3) % 2: continue
+                for gx in (x - 1, x + 1):
+                    if img[y, gx] == 0: img[y, gx] = glow
+        for line in lines:
+            for i, (x, y) in enumerate(line):
+                if broken and (y // 3) % 2: continue
+                img[y, x] = glow if glow_only else core
+        return img
+    return [draw(main[:len(main) * 9 // 20]), draw(main, branch), draw(jit, branch[:len(branch) // 2]), draw(jit, glow_only=True, broken=True)]
+
+
 def kaioken_rows(clean):
     """Kaioken's forms: the base row's copy with the red actor, in the Super Saiyan class (drain, +5) with no form above, back down to the base.
     Then Super Saiyan Blue's: Super Saiyan 3's row (its class: the orange pool, +15) with the blue actor, the owner's portraits, down to base."""
@@ -1257,9 +1289,9 @@ def add_actors(rom, clean):
             a.setdefault('log2_overrides', {}).setdefault('18', 18 if 0x08800000 <= has < 0x09000000 else 5)
     cfg['android13_player'] = {'template': 93, 'slots': ANDROID13_SLOTS, 'stretch': True, 'grow': lengths, 'reserve': 4096}    # the boss's small record can't carry a playable form
     cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths}
-    bright = (one(np.array((96, 248, 248))), one(np.array((200, 248, 248))))     # cyan: Super Saiyan 2's lightning
+    bright = (one(np.array((96, 248, 248))), one(np.array((200, 248, 248))))     # cyan: Super Saiyan 2's lightning (glow, core)
     for name, source in (('goku_ss2', 109), ('goku_ss2_b', 110), ('gohan_ss2', 104), ('gohan_green_ss2', 105), ('vegeta_ss2', 273), ('vegeta_ss2_b', 274), ('vegeta_armor_ss2', 'vegeta_armor_ss'), ('gohan_armor_ss2', 'gohan_armor_ss2_art'), ('trunks_ss2', 261), ('trunks_armor_ss2', 'trunks_armor_ss'), ('vegito_ss2', 276)):
-        cfg[name] = {'bolts_of': source, 'bolt_colours': bright}
+        cfg[name] = {'bolts_of': source, 'bolt_colours': bright, 'high': True}     # (above 16 MB: the widened frames take more room)
     cfg['android17']['reserve'] = 2048                  # the same as Super 17's: a change of size on transforming re-allocates OBJ memory and scrambled other sprites
     cfg['super17'] = {**cfg['android17'], 'size_scale': [1.12, 1.1], 'reserve': 2048}     # slightly taller and bulkier, as in Gero's Legacy
     cfg['android13_absorb'] = {'template': 152, 'slots': {'0': 'a13_absorb!front', '1': 'a13_absorb!front'}}     # a cutscene figure: only an idle animation plays by itself, as in Gero's Legacy
@@ -1795,6 +1827,15 @@ def add_eraser(rom, clean, sym, at, art):
         for k in range(14):
             fn = (sym[who + '_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
             struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    # The crackle around a Super Saiyan 2 and Full Power (outfit.c crackle): three bolts of four 32x32 frames (crackle_frames) per colour set,
+    # in the spark frame format of the hit sparks (0x712FDC): origin x, y, width, height, OAM attributes (256 colours, square, 32x32), tiles
+    for who, (g, c) in (('ss2', ((96, 248, 248), (200, 248, 248))), ('fp', FP_BOLTS)):
+        gi, ci = one(np.array(g)), one(np.array(c))
+        out = bytearray()
+        for b in range(3):
+            for img in crackle_frames(31 * b + (7 if who == 'fp' else 3), gi, ci):
+                out += struct.pack('<bbBBHHI', 16, 16, 32, 32, 0x2000, 0x8000, put_art(img.reshape(4, 8, 4, 8).transpose(0, 2, 1, 3).tobytes()))
+        rom[sym['bolt_' + who] - ROM_BASE:sym['bolt_' + who] - ROM_BASE + len(out)] = out
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Super Saiyan Rose', 'Press the B Button to transform into Super Saiyan Rose: attacks hit 1.5x as hard.  Press it again to change back.')]
     for form in ('black', 'rose'):
         tint = KAME_TINT[form]

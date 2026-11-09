@@ -53,7 +53,11 @@ his orange gi (form 13) and none of his other forms, learned with the orange gi 
 to the orange gi; no Super Saiyan from it (`fp_can`, `test_fp.py`). Orange-gi Gohan's Super Saiyan and 2 (forms 58, 79) are his own
 frames with the school Super Saiyan's gold hair (`lib/sprites.py hairswap_actor`: the pixels where actor 104 differs from 98, laid over 101;
 the power-down's 32x32 frames on the idle's grid); before, he changed into the school uniform as he powered up. Icons: `lib/icons.py` (Super Saiyan 3's icon with a cyan 2 or a purple 4, the Z in red or
-blue). Super Saiyan 2's lightning aura, GT Gohan's Super Saiyan 2 and the Blue hair (`ssb_hair`, Super Saiyan Gogeta's blues) are recolours.
+blue). GT Gohan's Super Saiyan 2 and the Blue hair (`ssb_hair`, Super Saiyan Gogeta's blues) are recolours. Super Saiyan 2's and Full
+Power's lightning (Nov 9, the owner: "more visible and more present", "move with the aura"): tall zigzag bolts with a glow on every frame of
+the figure (`lib/sprites.py bolted_actor`; the 16x32 idle and walk frames become 32x32 so they aren't clipped), and a crackle that keeps
+moving whatever the figure does: a short bolt strikes beside his head or chest every 7-14 frames and breaks up (`outfit.c crackle`, frames
+from `build.py crackle_frames`, drawn as hit sparks), cyan for Super Saiyan 2, white for Full Power.
 Kaioken (Goku from the start, Krillin, Tien, Yamcha, Videl, Hercule): 1.25x, 1.5x and 1.75x by its mastery level, costing health as it goes.
 Fully mastered (level 3) it changes (`outfit.c` `kk_track`, `kk_hud`, `combat_hook`): no health cost; it brings a cyan bar of its own over the
 health bar, half the fighter's health (`build.py` `kk_bar`), which pays the cost as it goes and takes the hits instead of health, with no

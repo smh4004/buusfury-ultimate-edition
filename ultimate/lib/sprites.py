@@ -490,10 +490,6 @@ def _shrink_fit(img, x, y, s):
 PROTO_ACTOR_LIST = 0x6A1BBC      # Prototype D (DBZ3_cart27): 280 actors, same record / animation / frame format as retail
 
 
-BOLTS = (('...X..', '..X...', '.XXX..', '...X..', '..X...', '.X....'),
-         ('..X...', '...X..', '..XXX.', '..X...', '...X..', '....X.'),
-         ('.X....', '..X...', '.XXX..', '...X..', '....X.', '......'))
-
 
 def tinted_actor(ins, rom, rec_at, remap):
     """A copy of an actor with every frame's pixels through `remap`: 256 bytes (as bytes.translate; Kaioken's red), or a function of each
@@ -682,39 +678,65 @@ def hairswap_actor(ins, rom, base_at, ref_at, ss_at, slot_map=None, idle_slots=(
 
 
 def bolted_actor(ins, rom, rec_at, colours):
-    """Super Saiyan 2's lightning: a copy of a Super Saiyan actor with small bolts drawn at both sides of the head, a different pair each frame. Whole frames are kept;
-    bolts only add pixels. colours = (bright index, edge index)."""
+    """Super Saiyan 2's lightning (and Full Power's): a copy of an actor with bolts drawn on every frame, a different set each frame. Nov 9 (the
+    owner: "make the SSJ2 and Mystic forms lightnings more visible and more present"): the bolts are tall zigzags with a glow, one at each
+    side of the head and, every other frame, one at the body; the narrow 16x32 frames (the idle, the walk) become 32x32 like the retail
+    attack frames (the piece 8 px further left, both boxes and the OAM shape to match; a character's OBJ memory is 1 KB a frame, so they
+    fit) so the bolts aren't clipped at the frame's edge. The core overwrites the body where it crosses it; the glow only fills empty
+    pixels. colours = (glow index, core index)."""
     from wfz import decompress_stream
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    core, glow = colours[1], colours[0]
     n = u(rec_at) & 0xFF; rec = bytearray(rom[rec_at:rec_at + 0x54 + 4 * n])
     done = {}; phase = 0
-    def tile(tp, w, h):
+    def bolt(img, x0, y0, path):
+        h, w = img.shape
+        lo, hi = min(dx for dx, _ in path), max(dx for dx, _ in path)
+        x0 = max(1 - lo, min(w - 2 - hi, x0))           # whole, glow included, inside the frame: a clipped bolt reads as a stray line
+        pts = [(x0 + dx, y0 + dy) for dx, dy in path]
+        for x, y in pts:
+            for gx in (x - 1, x + 1):
+                if 0 <= gx < w and 0 <= y < h and img[y, gx] == 0: img[y, gx] = glow
+        for x, y in pts:
+            if 0 <= x < w and 0 <= y < h: img[y, x] = core
+    def tile(tp, w, h, wide):
         nonlocal phase
-        if tp in done: return done[tp]
+        if (tp, wide) in done: return done[(tp, wide)]
         o = tp - BASE; t, size = u(o), u(o + 4)
         raw = rom[o + 8:o + 8 + size] if t == 0 else bytes(decompress_stream(rom, o + 8, size)[0])
         img = np.frombuffer(raw, np.uint8).copy()[:w * h].reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+        if wide:
+            img = np.pad(img, ((0, 0), (8, 8))); w = 32
         ys, xs = np.nonzero(img)
         if len(ys):
             top = ys.min(); head = img[top:top + 12]; hx = np.nonzero(head.any(0))[0]
-            for side, (x0, pattern) in enumerate(((hx.min() - 3, BOLTS[phase % 3]), (hx.max() - 2, BOLTS[(phase + 1) % 3]))):
-                y0 = top + 1 + (phase + side * 2) % 4
-                for j, line in enumerate(pattern):
-                    for i, c in enumerate(line):
-                        x, y = x0 + i, y0 + j
-                        if c == 'X' and 0 <= x < w and 0 <= y < h: img[y, x] = colours[0]
-                        elif c == 'X': pass
+            b0, b1 = BOLT_PATHS[phase % len(BOLT_PATHS)], BOLT_PATHS[(phase + 2) % len(BOLT_PATHS)]
+            bolt(img, hx.min() - 3 - phase % 2, top - 2 + phase % 3, b0)
+            bolt(img, hx.max() + 1 + (phase + 1) % 2, top - 1 + (phase + 1) % 3, [(-dx, dy) for dx, dy in b1])
+            if phase % 2 == 0:                       # a third at the body, on alternate sides
+                body = img[top + 12:]; bx = np.nonzero(body.any(0))[0]
+                if len(bx):
+                    b2 = BOLT_PATHS[(phase + 1) % len(BOLT_PATHS)][:8]
+                    if phase % 4 == 0: bolt(img, bx.min() - 2, top + 13, b2)
+                    else: bolt(img, bx.max() + 1, top + 13, [(-dx, dy) for dx, dy in b2])
         phase += 1
         data = img.reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
-        done[tp] = ins.put(struct.pack('<II', 0, len(data)) + data)
-        return done[tp]
+        done[(tp, wide)] = ins.put(struct.pack('<II', 0, len(data)) + data)
+        return done[(tp, wide)]
     frames = {}
     def frame(fp):
         if fp not in frames:
             o = fp - BASE; k = u(o); body = bytearray(rom[o:o + 4 + 16 * k])
             for j in range(k):
-                w, h = body[4 + 16 * j + 2], body[4 + 16 * j + 3]
-                struct.pack_into('<I', body, 4 + 16 * j + 12, tile(u(o + 4 + 16 * j + 12), w, h))
+                p = 4 + 16 * j
+                w, h = body[p + 2], body[p + 3]
+                a0, a1 = struct.unpack_from('<HH', body, p + 8)
+                wide = k == 1 and w == 16 and h == 32 and a0 >> 14 == 2 and (a1 >> 14) == 2      # 16x32 (vertical, size 2) -> 32x32 (square, size 2)
+                if wide:
+                    for q in (p, p + 4):
+                        body[q] = (body[q] - 8) & 0xFF; body[q + 2] = 32
+                    struct.pack_into('<H', body, p + 8, a0 & 0x3FFF)
+                struct.pack_into('<I', body, p + 12, tile(u(o + 4 + 16 * j + 12), w, h, wide))
             frames[fp] = ins.put(bytes(body))
         return frames[fp]
     anims = {}
@@ -727,6 +749,21 @@ def bolted_actor(ins, rom, rec_at, colours):
             anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
         struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
     return rec
+
+
+def _bolt_path(steps):
+    """A zigzag from (0, 0) downwards: steps of (dx, dy) joined pixel by pixel (no gaps)."""
+    x = y = 0; pts = [(0, 0)]
+    for dx, dy in steps:
+        for _ in range(abs(dy)):
+            y += 1 if dy > 0 else -1; pts.append((x, y))
+        for _ in range(abs(dx)):
+            x += 1 if dx > 0 else -1; pts.append((x, y))
+    return pts
+BOLT_PATHS = [_bolt_path(s) for s in (((1, 2), (-2, 2), (1, 0), (2, 2), (-1, 2), (-2, 2), (1, 1)),
+                                      ((-1, 2), (2, 1), (-1, 2), (-2, 2), (2, 2), (1, 2), (-1, 1)),
+                                      ((2, 1), (-1, 2), (-2, 2), (2, 1), (1, 2), (-2, 2), (0, 1)),
+                                      ((0, 2), (-2, 1), (2, 2), (1, 1), (-2, 2), (-1, 2), (2, 1)))]
 
 
 def proto_actor(ins, P, i):
