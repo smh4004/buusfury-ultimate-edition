@@ -71,8 +71,9 @@ if __name__ == '__main__':
     sh0, _, _ = fire('shine_base', [7, 40], 1, forms['vegeta_gt'])
     check('Final Shine does nothing outside Super Saiyan 4', sh0 == 0)
     df, g1, _ = fire('dragon4', [7, 15, 20, 22, 41, 36], 4, forms['kid_goku'], (2, 2, 3, 5), hold=90, after=90)
-    print('   Kid Goku Super Saiyan 4: red Dragon Fist %.1f (form %d)' % (df, g1))
-    check('the red Dragon Fist hits in Super Saiyan 4', g1 == forms['kid_goku_ssj4'] and df > 0)
+    print('   Kid Goku Super Saiyan 4: Super Dragon Fist %.1f (form %d)' % (df, g1))
+    check('the Super Dragon Fist hits in Super Saiyan 4', g1 == forms['kid_goku_ssj4'] and df > 0)
+    check("its name is the Super Dragon Fist", 'Super Dragon Fist'.encode('utf-16-le') in open(ROM, 'rb').read())
     # Vegeta himself, the debug picker's fourth fighter (his own record and figures). The Kamehameha's code shows frames 0-2 of the pose it sets; his
     # figures' slot 18 is his two-frame Big Bang, so they get a Galick Gun pose of their own (build.py beam_poses): no frame shown may be missing,
     # since a missing one draws junk over other sprites' tiles. His Big Bang keeps its own pose.

@@ -340,7 +340,7 @@ void heap_init(void) {
     volatile u32 *vars = (volatile u32 *)0x0203FF20;
     int i;
     for (i = 0; i < 24; i++) vars[i] = 0;
-    for (i = 0; i < 8; i++) ((volatile u32 *)0x0203FFB0)[i] = 0;     /* Super Saiyan 4's ki bar state, the red Dragon Fist, and the rest to 0x0203FFCF */
+    for (i = 0; i < 8; i++) ((volatile u32 *)0x0203FFB0)[i] = 0;     /* Super Saiyan 4's ki bar state, the Super Dragon Fist, and the rest to 0x0203FFCF */
     BENCH.magic = 0;
     CL.active = 0; CL.cool = 0; CL.surge = 0; CL.p_at = 0; CL.e_at = 0;
     *(u32 *)0x0203F300 = 0;                /* no bomb sprite */
@@ -510,7 +510,7 @@ static void pouch_heal(void) {                 /* Senzu Pouch: 1% of health back
 }
 /* Quick skill wheel (Nov 9): hold L and press a direction to pick a skill at once (up the first, right the second, down the third,
    left the fourth). The fighter doesn't walk while L is held. A tap of L alone still steps through them as before. */
-static u16 wheel_keys[6];
+#define wheel_keys ((volatile u16 *)0x0203F25C)      /* (in work RAM: a static would sit in ROM, past the code, where writes go nowhere) */
 #define GUARD_AT (*(volatile u32 *)0x0203FFC8)
 static u16 *quick_wheel(u16 *keys) {
     static const u8 pick[4] = {1, 3, 0, 2};       /* RIGHT, LEFT, UP, DOWN -> the 2nd, 4th, 1st, 3rd skill */
@@ -524,10 +524,12 @@ static u16 *quick_wheel(u16 *keys) {
     }
     for (i = 0; i < 6; i++) wheel_keys[i] = keys[i];
     wheel_keys[1] &= ~0xF0; wheel_keys[2] &= ~0xF0;
-    return wheel_keys;
+    return (u16 *)wheel_keys;
 }
+void kk_track(void);
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
+    kk_track();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
     if ((FRAMES & 63) == 0) { skills_sync(*(u8 *)0x03001068); skills_sync((FRAMES >> 6) & 7); }      /* what play has earned (the skill book): the fighter in play, and the party in turn */
@@ -1476,7 +1478,7 @@ int ssj4_flash_can(u8 *record) { return is_ssj4(record[0x14]) && FlashCan(record
    0x0877AD10 through +0x5C and +0x18); ours moves each segment onto the red rows. +0x10 marks it done (0x14 bytes allocated). */
 const u32 red_dragon[48] = {1};
 const int dragon4_vt[9] = {1};
-#define dragon4_live (*(u32 *volatile *)0x0203FFB8)      /* the red Dragon Fist in play, for combat_hook (after SK) */
+#define dragon4_live (*(u32 *volatile *)0x0203FFB8)      /* the Super Dragon Fist in play, for combat_hook (after SK) */
 #define DragonFist_Update ((void (*)(u32 *, int *))0x0801ABBF)
 #define DragonFist_End ((void (*)(u32 *))0x0801AB97)
 #define DragonFist_Can ((int (*)(u8 *))0x08019E9F)
@@ -1575,7 +1577,7 @@ static void ssj4_pending(const u8 *record);
 static int is_kaioken(int form);
 /* Each tier is its own skill (Nov 9): Super Saiyan (20) powers up from base and back down from any Super Saiyan class form; Super Saiyan 2
    (SS2_SKILL), 3 (22), 4 (SS4_SKILL) and Blue (SSB_SKILL) each go up from the tier below, and pressed in their own form power down.
-   None of them works in Kaioken, and Kaioken works only in a base form. A form's up (row +0x16) is the tier above it; Kaioken and Goku's
+   None of them works in Kaioken, and Kaioken works only in a base form (and, fully mastered, in Super Saiyan: kaioken_can). A form's up (row +0x16) is the tier above it; Kaioken and Goku's
    and Vegeta's Super Saiyan Blue aren't up anywhere, so their skills ask sub_0801C312 for their form through XFORM (xform_target). */
 #define IN_COMBAT (*(volatile u32 *)0x03001988)
 #define XFORM (*(volatile u8 *)0x0203FFBC)            /* form + 1 the next power-up ends in, or 0 */
@@ -1587,8 +1589,18 @@ static int up_of(int form) { return form_table[form * 24 + 0x16]; }
 static void power_down(u8 *record, void *sprite) {             /* the retail way out of the form's class */
     if (flags_of(record[0x14]) & 2) SS3_Use(record, sprite); else SS_Use(record, sprite);
 }
+#define EARLY (*(volatile u8 *)0x0203F253)            /* form + 1 a power-up started from, while it plays on its new figure */
+/* mastered Kaioken's bar (kk_track, below) */
+#define KK_GUARD (*(volatile u16 *)0x0203F250)
+#define KK_ON (*(volatile u8 *)0x0203F252)
+#define KK_EMPTY (*(volatile u8 *)0x0203F254)       /* 1: the bar ran out, 2: powering down for it */
+#define KK_DRAWN (*(volatile u8 *)0x0203F255)       /* the bar's columns on the HUD as last drawn */
+#define KK_POOL (*(volatile u16 *)0x0203F256)       /* Super Saiyan's pool + 1, kept while Super Saiyan Kaioken powers down to Super Saiyan */
 static void power_to(u8 *record, void *sprite, int form, const void *vt) {
     XFORM = form + 1; XFORM_FROM = record[0x14]; XFORM_AT = FRAMES;
+    /* Kaioken and Blue power up on their new figure: the old one's slot 10 is Super Saiyan's (gold hair). build.py powerup_frames makes theirs. */
+    Sprite_SetCharacter(sprite, Form_Sprite((void *)(form_table + form * 24)));
+    EARLY = record[0x14] + 1;
     power_up(sprite, vt);
 }
 int xform_target(int up, u8 *record) {                          /* sub_0801C312's new form */
@@ -1677,21 +1689,31 @@ void ssb_use(u8 *record, void *sprite) {
     else power_to(record, sprite, mapped(ssb_map, form), ssb_vt);
 }
 /* Kaioken (Goku and the humans): from a base form to its red copy (kaioken_map), a Super Saiyan class form without the +5, as the build
-   makes its row, with the red aura. Its bar drains as Super Saiyan's does and it costs health as it goes (ss_tick); hits are 1.5x. */
+   makes its row, with the red aura. Its bar drains as Super Saiyan's does and it costs health as it goes (ss_tick); hits are 1.25x to 1.75x
+   by its mastery. Fully mastered: Goku's Super Saiyan forms have a red copy too (Super Saiyan Kaioken, down to Super Saiyan), and the health
+   cost becomes a bar of its own that also takes hits without a stagger (kk_track). */
 static int is_kaioken(int form) {
     int i;
     for (i = 0; kaioken_map[i][0] != 255; i++) if (kaioken_map[i][1] == form) return 1;
     return 0;
 }
+int mastery_level(int c, int skill);
+static int kk_mastered(void) { return mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL) == 2; }
 int kaioken_can(u8 *record) {
     int form = record[0x14];
     if (is_kaioken(form)) return 1;
-    return !(flags_of(form) & 3) && mapped(kaioken_map, form) != 255 && can_start(record);
+    if (mapped(kaioken_map, form) == 255) return 0;
+    if (!(flags_of(form) & 3)) return can_start(record);              /* from a base form */
+    return kk_mastered() && can_step(record);                          /* Super Saiyan Kaioken: from Super Saiyan once Kaioken is fully mastered */
+}
+void kk_down(u8 *record, void *sprite) {       /* out of Kaioken: to its base, or from Super Saiyan Kaioken to Super Saiyan with its pool */
+    if (flags_of(form_table[record[0x14] * 24 + 0x17]) & 1) KK_POOL = *(u16 *)(record + 0x1E) + 1;
+    SS_Use(record, sprite);
 }
 void kaioken_use(u8 *record, void *sprite) {
     int form = record[0x14];
     XFORM = 0;
-    if (is_kaioken(form)) SS_Use(record, sprite);
+    if (is_kaioken(form)) kk_down(record, sprite);
     else power_to(record, sprite, mapped(kaioken_map, form), ssj4_vt);
 }
 /* Skills beyond the six a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
@@ -1844,13 +1866,56 @@ __asm__(".syntax unified\n.thumb\n.thumb_func\n.global xform_hook\nxform_hook:\n
 /* Super Saiyan's drain (sub_0800E3E6) is about to take a unit from the pool (+0x1E): ss_tick sees it first. It returns 1 to skip the unit
    (a mastered form drains slower); in Kaioken it costs health too, and when health runs short the pool empties so the game powers down. */
 static int mastery_skip(u8 *rec);
+/* Fully mastered Kaioken (level 3) costs no health. It brings a bar of its own instead, half the fighter's health, drawn cyan over the health bar
+   (kk_hud): it pays Kaioken's cost as it goes, takes the hits first, and while it lasts hits don't stagger the fighter (kk_absorb). When it runs out
+   the Kaioken ends (kk_track). */
+static int flags_of(int form);
+static void kk_pool_back(u8 *rec) {     /* the power-down empties the pool (retail goes to base): back in Super Saiyan, it has what it had */
+    if (KK_POOL && !is_kaioken(rec[0x14]) && (flags_of(rec[0x14]) & 1)) { *(u16 *)(rec + 0x1E) = KK_POOL - 1; KK_POOL = 0; }
+}
+#define hud_widget (*(u8 * volatile *)0x0203F258)     /* the HUD widget seen while in Kaioken (cleared outside it) */
+static int kk_mastered(void);
+static void kk_start(const u8 *rec) {
+    if (KK_ON) return;
+    KK_ON = 1; KK_EMPTY = 0; KK_GUARD = *(const short *)(rec + 0x18) / 2;
+}
+/* every frame (player_input): the bar's start and end, the HUD's redraw when it changes, and the figure of a power-up that was cut short */
+void kk_track(void) {
+    u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = PLAYER_OBJ;
+    int form = rec[0x14], max = *(short *)(rec + 0x18), cols;
+    /* (These variables aren't cleared at boot: heap_init's timing is tight, and even a few more stores there leave the game a frame behind every
+       few dozen. Each is checked before use: EARLY only within a power-up's time, the rest are reset outside Kaioken.) */
+    if (EARLY) {
+        u32 *state = me ? *(u32 **)(me + 0x14) : 0;
+        if (!me || (u16)(FRAMES - XFORM_AT) >= 600) EARLY = 0;
+        else if (!state || (state[0] != (u32)ssb_vt && state[0] != (u32)ssj4_vt)) {
+            if (form == EARLY - 1) Sprite_SetCharacter(me, Form_Sprite((void *)(form_table + form * 24)));
+            EARLY = 0;
+        }
+    }
+    if (!is_kaioken(form)) {
+        kk_pool_back(rec);
+        if (!(flags_of(form) & 1)) KK_POOL = 0;
+        KK_ON = 0; KK_GUARD = 0; KK_EMPTY = 0; KK_DRAWN = 0; hud_widget = 0; return;
+    }
+    if (kk_mastered()) kk_start(rec);
+    if (KK_EMPTY == 1 && me) { KK_EMPTY = 2; kk_down(rec, me); }        /* the bar ran out: Kaioken ends */
+    cols = max > 0 ? KK_GUARD * 41 / max : 0;
+    if (cols != KK_DRAWN && hud_widget) *(u32 *)(hud_widget + 0x1C) = 0xFFFFFFFF;     /* the HUD redraws when its cached bar lengths differ */
+}
 int ss_tick(u8 *rec) {
     if (rec != RECORDS + *(u8 *)0x03001068 * RECORD_SIZE) return 0;
+    kk_pool_back(rec);                 /* before the drain looks at the pool */
     if (is_kaioken(rec[0x14])) {
         short *hp = (short *)(rec + 0x16), cost = *(short *)(rec + 0x18) / 150;
         if (cost < 1) cost = 1;
         if (wearing(rec, GEAR_SHADES) && (SHADES_TICK ^= 1)) cost = 0;          /* King Kai's Shades: every other unit is free */
-        if (*hp > cost + 1) *hp -= cost;
+        if (kk_mastered()) {                                                     /* mastered: the bar pays */
+            kk_start(rec);
+            if (KK_GUARD > cost) KK_GUARD -= cost;
+            else { KK_GUARD = 0; if (!KK_EMPTY) KK_EMPTY = 1; }
+        }
+        else if (*hp > cost + 1) *hp -= cost;
         else *(u16 *)(rec + 0x1E) = 0;
     }
     if (potara_skip(rec)) return 1;
@@ -1952,7 +2017,18 @@ __asm__(".syntax unified\n.thumb\n.thumb_func\n.global ssj4_drain\nssj4_drain:\n
         "adds r1, r0, #0\nadds r1, #32\nldrh r3, [r1]\ncmp r3, r2\nble 1f\nldr r3, =0x0800E513\nbx r3\n1:\nldr r3, =0x0800E525\nbx r3\n.ltorg\n");
 /* The HUD (0x0800B99C) has drawn the bars into buf (orange for the first +0x20 columns); before it goes to VRAM, Super Saiyan 4 paints
    those columns purple and the orange left under it after them. 41 columns, three pixels each at the offsets in BAR_COLS. */
-extern const u8 ssj4_bar[0x500];
+extern const u8 ssj4_bar[0x500], kk_bar[0x500];
+#define HP_COLS ((const u32 *)0x08071CB0)
+static void kk_hud(const u8 *widget, u8 *buf, const u8 *rec) {     /* mastered Kaioken's bar: cyan over the health bar's first columns */
+    int max = *(const short *)(rec + 0x18), cols = 0, c, k;
+    if (KK_ON && max > 0) {
+        hud_widget = (u8 *)widget;
+        cols = KK_GUARD * 41 / max;
+        if (cols > 41) cols = 41;
+        for (c = 0; c < cols; c++) for (k = 0; k < 3; k++) { u32 o = HP_COLS[c * 4 + k]; buf[o] = kk_bar[o]; }
+    }
+    KK_DRAWN = cols;
+}
 #define BAR_COLS ((const u32 *)0x08071F40)
 #define ORANGE_BAR ((const u8 *)0x08713FD8)
 void ssj4_hud(const u8 *widget, u8 *buf) {
@@ -1966,6 +2042,7 @@ void ssj4_hud(const u8 *widget, u8 *buf) {
         for (c = 0; c < np; c++) for (k = 0; k < 3; k++) { u32 o = BAR_COLS[c * 4 + k]; buf[o] = ssj4_bar[o]; }
         for (; c < no; c++) for (k = 0; k < 3; k++) { u32 o = BAR_COLS[c * 4 + k]; buf[o] = ORANGE_BAR[o]; }
     }
+    kk_hud(widget, buf, rec);
     MemCopy((u8 *)0x06010000 + *(const u16 *)(widget + 12) * 32, buf, 0x500);
 }
 /* Against Super Saiyan's damage, Super Saiyan 2 hits 1.5x as hard and Super Saiyan 3 1.75x. hit[1] is the attack's damage scale (1024 = normal); team 2 is the player's side.
@@ -1995,7 +2072,8 @@ void combat_hook(void *defender, int *hit) {
         else if (is_kaioken(form)) {                 /* Kaioken: 1.25x, 1.5x mastered, 1.75x at its third level, from the fighter's own stats (its row is Super
                                                         Saiyan's class, which adds 5 to Strength and Power on the way in: taken off again, so Kaioken stays below Super Saiyan 2) */
             hit[1] = scale + (scale >> 2) * (1 + mastery_level(*(u8 *)0x03001068, KAIOKEN_SKILL));
-            if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
+            if (!(flags_of(form_table[form * 24 + 0x17]) & 1) && strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
+            /* (Super Saiyan Kaioken, down to Super Saiyan, keeps Super Saiyan's +5: 1.75x a Super Saiyan's hit) */
         }
         else if (is_ss2(form) || form == FORM_MAJUUB || form == FORM_ROSHI_MAX || form == FORM_S13 || form == FORM_S17 || form == FORM_ROSE) hit[1] = scale + (scale >> 1);
         else if ((form_table[form * 24] & 2) && strength > 10 && power > 10) {
@@ -2003,8 +2081,13 @@ void combat_hook(void *defender, int *hit) {
             stats[0] = strength - 10; stats[1] = power - 10;
         }
     }
-    if (mine && dragon4_live) hit[1] += hit[1] >> 2;      /* Super Saiyan 4's red Dragon Fist: 1.25x */
+    if (mine && dragon4_live) hit[1] += hit[1] >> 2;      /* Super Saiyan 4's Super Dragon Fist: 1.25x */
     combat_orig(defender, hit);
+    if (defender == PLAYER_OBJ && KK_ON && KK_GUARD && is_kaioken(form) && hit[6] > 0) {     /* hit[6]: the damage (1/1024ths); 0 means no damage and no stagger */
+        int dmg = (hit[6] + 0x3FF) >> 10;
+        if (dmg < KK_GUARD) { KK_GUARD -= dmg; hit[6] = 0; }
+        else { hit[6] -= KK_GUARD << 10; KK_GUARD = 0; if (!KK_EMPTY) KK_EMPTY = 1; }      /* it breaks: the rest comes through */
+    }
     hit[1] = scale; stats[0] = strength; stats[1] = power;
 }
 

@@ -66,5 +66,40 @@ check('the Gunman shoots, and his blasts hurt', seen0 > 0 and lost0 > 0 and not 
 check('a perfect guard sends the blasts back', back1 > 0 and not bad1)
 check('and takes less damage than standing there', lost1 < lost0)
 print('   the Gunman lost %d health to his own shots (a shot only ever hits the player\'s side: its hit is built with team 0, 0x08027562)' % hurt1)
+
+# Fully mastered Kaioken (Nov 9): its bar (0x0203F250) takes the Gunman's shots, health stays, and he isn't staggered: his animation never turns
+# to the hit (slot 9) one. Without mastery the shots hurt and stagger him.
+import struct
+MASTERY = 0x0203F000 + 20 + 20 * 22
+MASTERED = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12', 'poke8 %08X FA' % (MASTERY + 5)]
+GUARD = 0x0203F250
+rom = open(ROM, 'rb').read()
+def slot_anim(form, slot):
+    char = struct.unpack_from('<H', rom, 0x800000 + 24 * form + 0x0E)[0]
+    rec = struct.unpack_from('<I', rom, 0x840000 + 4 * (char - 9))[0] - 0x08000000
+    return struct.unpack_from('<I', rom, rec + 0x54 + 4 * slot)[0]
+def kk_fight(mastered, frames=900):
+    h = H(); h.send(*T.setup([7, 20, 37], None, (0,)))
+    if mastered: h.send(*MASTERED)
+    h.send('poke8 %08X 02' % (R + 0x15), *T.FULL, 'keys B', 'run 2', 'keys', 'run 240')          # Kaioken, its power-up over
+    pl = h.mem(PLAYER)[0]; px, py = h.mem(pl + 0x1A0, 2); e = h.mem(0x03001BB4)[0]
+    place = ['poke %08X %x' % (e + 0x1A0, px - (80 << 8)), 'poke %08X %x' % (e + 0x1A4, py)]
+    form = h.mem(R + 0x14)[0] & 255; hit_anim = slot_anim(form, 9)
+    log, staggered = [], False
+    for f in range(0, frames, 2):
+        h.send(*(place if f % 60 == 0 else []), 'poke8 %08X 02' % (pl + 0x10), 'poke8 %08X FF' % (R + 0x1E), 'run 2')
+        if h.mem(pl + 0x50)[0] == hit_anim: staggered = True
+        if f % 30 == 0: log.append((h.mem(R + 0x14)[0] >> 16, h.mem(GUARD)[0] & 0xFFFF, h.mem(R + 0x14)[0] & 255))
+    bad = h.bad; h.close()
+    return log, staggered, form, bad
+m, m_stag, m_form, bad_m = kk_fight(True)
+n, n_stag, n_form, bad_n = kk_fight(False)
+print('   mastered Kaioken (form %d) under fire: (health, bar, form) %s' % (m_form, m))
+print('   not mastered (form %d): %s' % (n_form, n[:4] + ['...'] + n[-2:]))
+on = [x for x in m if x[1] > 0 and x[2] == m_form]
+drops = [m[i - 1][1] - m[i][1] for i in range(1, len(m)) if m[i][2] == m_form]
+check('mastered Kaioken: the bar takes the shots (it drops by more than its own cost) and health stays', on and max(drops) > 4 and all(x[0] == m[0][0] for x in on) and not bad_m)
+check('and they don\'t stagger him', not m_stag)
+check('without mastery the shots hurt and stagger him', n[-1][0] < n[0][0] and n_stag and not bad_n)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

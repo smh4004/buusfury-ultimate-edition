@@ -69,8 +69,10 @@ GEAR_REFS = (0x2BFC, 0x453C, 0x4814, 0xD528, 0x13E28, 0x16FBC, 0x1D400, 0x1D5F0,
 ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
 # Kaioken: each base look that can use it -> (its form, owner, the actor its red copy is made from). Goku's three, Kid Goku's, and the humans'.
 KAIOKEN = {'goku': (0, 0, 106), 'goku_b': (1, 0, 107), 'goku_halo': (2, 0, 108), 'kid_goku': ('kid_goku', 0, 'kid_goku'),
+           'goku_ss': (3, 0, 109), 'goku_ss_b': (4, 0, 110), 'kid_goku_ssj': ('kid_goku_ssj', 0, 'kid_goku_ssj'),      # Super Saiyan Kaioken (Kaioken fully mastered)
            'krillin': ('krillin', 8, 'krillin'), 'tien': ('tien', 8, 'tien_player'), 'yamcha': ('yamcha', 8, 'yamcha_player'),
            'videl': ('videl', 8, 'videl_player'), 'hercule': ('hercule', 8, 'hercule_player')}
+SS_KAIOKEN = ('goku_ss', 'goku_ss_b', 'kid_goku_ssj')     # their rows go after Blue's, so the forms that were already there keep their numbers
 # Super Saiyan Blue for Goku and Vegeta (post-game mastery): each Super Saiyan form -> its Blue, a Super Saiyan 3 class copy whose hair is blue.
 SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
@@ -83,12 +85,12 @@ KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outl
 def kaioken_rows(clean):
     """Kaioken's forms: the base row's copy with the red actor, in the Super Saiyan class (drain, +5) with no form above, back down to the base.
     Then Super Saiyan Blue's: Super Saiyan 3's row (its class: the orange pool, +15) with the blue actor, the owner's portraits, down to base."""
-    rows = [{'id': n + '_kaioken', 'copy': base, 'actor': n + '_kaioken', 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base}
-            for n, (base, owner, _) in KAIOKEN.items()]
+    kk = lambda n, base, owner: {'id': n + '_kaioken', 'copy': base, 'actor': n + '_kaioken', 'owner': owner, 'flags': 0x51, 'up': 255, 'down': base}
+    rows = [kk(n, base, owner) for n, (base, owner, _) in KAIOKEN.items() if n not in SS_KAIOKEN]
     for n, (ss, row, owner, _, base) in SSB_LOOKS.items():
         portraits = list(clean[FORMS + FORM_SIZE * (ss if isinstance(ss, int) else 28) + 0x10:][:6])
         rows.append({'id': n, 'copy': row, 'actor': n, 'owner': owner, 'name': 1057, 'portrait': portraits, 'up': 255, 'down': base})
-    return rows
+    return rows + [kk(n, *KAIOKEN[n][:2]) for n in SS_KAIOKEN]
 
 
 def ssb_hair(one):
@@ -1106,6 +1108,26 @@ def ssj4_bar(rom):
     return bytes(SSJ4_PURPLE.get(b, b) for b in orange)
 
 
+# Mastered Kaioken's bar (outfit.c kk_hud): the HP bar's columns (41 x 3 pixel offsets into the HUD buffer at 0x71CB0) painted cyan over the red,
+# as Super Saiyan's pools are painted over the EP bar. The base bar image (0x7137D8) sits at buffer offset 0x200.
+HP_COLS, HP_BAR = 0x71CB0, 0x7137D8
+KK_CYAN = {3: (0, 216, 248), 32: (0, 104, 152), 33: (0, 152, 200), 34: (72, 232, 248), 35: (152, 248, 248)}
+
+
+def kk_bar(rom, clean):
+    offs = [struct.unpack_from('<I', rom, HP_COLS + 16 * c + 4 * k)[0] for c in range(41) for k in range(3)]
+    if not all(0x200 <= o < 0x500 for o in offs):
+        sys.exit('HP bar column table changed')
+    img = rom[HP_BAR:HP_BAR + 0x300]
+    if not {img[o - 0x200] for o in offs} <= set(KK_CYAN):
+        sys.exit('HP bar colours changed: %s' % sorted({img[o - 0x200] for o in offs}))
+    pal = np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3)
+    one = indexer([i for i in range(1, 256) if i not in artclean.MENU_SLOTS], pal)
+    out = bytearray(0x500)
+    for o in offs: out[o] = one(np.array(KK_CYAN[img[o - 0x200]]))
+    return bytes(out)
+
+
 def thumb_bl(at, to):
     off = to - (at + 4)
     return struct.pack('<HH', 0xF000 | (off >> 12) & 0x7FF, 0xF800 | (off >> 1) & 0x7FF)
@@ -1185,9 +1207,41 @@ def add_actors(rom, clean):
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
     cfg['roshi_player'] = {'roshi_of': 'krillin', 'head_of': 177, 'chin': [12, 11], 'high': True}     # Master Roshi: Krillin's frames, Roshi's head and clothes (lib/roshi.py)
-    cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss']
+    cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
-    return ids, end
+    return ids, powerup_frames(rom, ids, end)
+
+
+def powerup_frames(rom, ids, at):
+    """Kaioken and Blue power up on their new figure (outfit.c power_to), whose slot 10 is a recoloured copy of a transformation: Goku's base slot 10
+    turns his hair gold from its third frame, and his Super Saiyan's grows into Super Saiyan 3's on its last. Kaioken from base keeps his first two
+    frames (the crouch, then the shout with his own hair) and ends on his stance; Blue and Super Saiyan Kaioken end on their stance instead of the
+    long hair. 11 frames, as a retail power-up."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    def rec_of(name): return u(ACTORS_AT + 4 * ids[name]) - ROM_BASE
+    def put(data):
+        nonlocal at
+        at = (at + 3) & ~3; rom[at:at + len(data)] = data; at += len(data)
+        return ROM_BASE + at - len(data)
+    def frame(rec, slot, k):
+        a = u(rec + 0x54 + 4 * slot) - ROM_BASE
+        if k >= u(a): sys.exit('slot %d has no frame %d' % (slot, k))
+        return rom[a + 4 + 16 * k:a + 4 + 16 * k + 16]
+    def set10(name, frames):
+        rec = rec_of(name)
+        if rom[rec] <= 10: sys.exit('%s: no slot 10' % name)
+        struct.pack_into('<I', rom, rec + 0x54 + 40, put(struct.pack('<I', 11) + b''.join(frames)))
+    for n in ('goku', 'goku_halo'):
+        r = rec_of(n + '_kaioken')
+        if u(u(r + 0x54 + 40) - ROM_BASE) != 11: sys.exit('%s_kaioken: slot 10 is not an 11-frame power-up' % n)
+        set10(n + '_kaioken', [frame(r, 10, 0)] + [frame(r, 10, 1)] * 9 + [frame(r, 0, 0)])
+    # Goku's form 1 (a 16-slot figure, likely only for scenes) has no slot 10 at all: his Kaioken copy borrows the gi's power-up
+    struct.pack_into('<I', rom, rec_of('goku_b_kaioken') + 0x54 + 40, u(rec_of('goku_kaioken') + 0x54 + 40))
+    for n in ('goku_ss_kaioken', 'goku_ss_b_kaioken', 'goku_ssb', 'goku_ssb_b'):
+        r = rec_of(n)
+        if u(u(r + 0x54 + 40) - ROM_BASE) != 11: sys.exit('%s: slot 10 is not an 11-frame power-up' % n)
+        set10(n, [frame(r, 10, k) for k in range(10)] + [frame(r, 0, 0)])
+    return at
 
 
 def patch_forms(rom, clean, cfg, actors):
@@ -1309,6 +1363,7 @@ def add_outfits(rom, clean, at, art):
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
     c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
+    c += 'const u8 kk_bar[0x500] = {%s};\n' % ','.join(map(str, kk_bar(rom, clean)))
     c += 'const u8 map_marks[][2] = {%s};\nconst int map_mark_count = %d;\n' % (','.join('{%d,%d}' % m for m in map_marks(clean)), len(map_marks(clean)))
     c += 'const u8 skill_book[8][16] = {%s};\n' % ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (16 - len(SKILL_BOOK[k]))) for k in range(8))
     c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
@@ -1325,6 +1380,9 @@ def add_outfits(rom, clean, at, art):
     code = open(d + '/o.bin', 'rb').read()
     nm = subprocess.run(['arm-none-eabi-nm', d + '/o.elf'], capture_output=True, text=True, check=True).stdout
     sym = {l.split()[2]: int(l.split()[0], 16) for l in nm.splitlines() if len(l.split()) == 3}
+    writable = [l.split()[2] for l in nm.splitlines() if len(l.split()) == 3 and l.split()[1] in 'bBdD' and not l.split()[2].startswith('_')]
+    if writable:                                          # the code sits in ROM: a variable linked after it reads ROM and its writes go nowhere
+        sys.exit('outfit.c has writable statics (put them in work RAM): %s' % writable)
     if set(rom[at:at + len(code)]) != {0xFF}:
         sys.exit('outfit code space is not free')
     rom[at:at + len(code)] = code
@@ -1737,7 +1795,7 @@ def add_eraser(rom, clean, sym, at, art):
     red = shifted(0 / 360); cache = {}
     rom[sym['red_dragon'] - ROM_BASE:sym['red_dragon'] - ROM_BASE + 0xC0] = tinted_frames(ROM_BASE + DRAGON_ROWS, 16, *DRAGON_ART, red, cache)
     behaviour('dragon4_vt', DRAGON_VT, {2: 'dragon4_update', 3: 'dragon4_end'})
-    rows[DRAGON4_SKILL] = move_row(5, red, 'Dragon Fist', 'Super Saiyan 4 only. Hold the B Button to make a giant red dragon of energy; steer its head with the +Control Pad and release to bite. 1.25x as strong.', 'ssj4_dragon_can', 'dragon4_use')
+    rows[DRAGON4_SKILL] = move_row(5, red, 'Super Dragon Fist', 'Super Saiyan 4 only. Hold the B Button to make a giant red dragon of energy; steer its head with the +Control Pad and release to bite. 1.25x as strong.', 'ssj4_dragon_can', 'dragon4_use')
     # Solar Flare (Tien, Krillin): Big Bang's starburst (row 4's icon) bleached towards white; the flash and stun are outfit.c's.
     def paled(v):
         if v == 0: return 0
