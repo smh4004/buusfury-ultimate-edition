@@ -273,9 +273,12 @@ check('all four trials earn the Geromantium Bandana', zone26.TRIAL_GEAR in struc
 
 
 # Spirit Bomb: Goku has it in this build (skill 19). Select it, use it next to Super 13, and it should hurt him and spend energy.
+# Its slot: wherever he holds it (the skill book adds Kaioken to his skills, so the order varies)
+held = bytes.fromhex(''.join(int(v, 16).to_bytes(4, 'little').hex() for v in [l for l in run(route + ['run 30', 'mem 03001560 6']).splitlines() if l.startswith('mem 03001560')][-1].split(':')[1].split()))
+held = list(held[0x0D:0x0D + held[0x0C]]); print('   Goku holds', held)
 a13, x, y = boss(route + ['run 30'], 30000); hpa = a13
 sb = route + ['run 30', 'poke %08X %08X' % (BOSS_PL + 0x1A0, x), 'poke %08X %08X' % (BOSS_PL + 0x1A4, y + (64 << 8)), 'keys UP', 'run 4', 'keys', 'run 4',
-              'poke8 03001575 4', 'poke8 0300157B 00', 'poke8 0300157A 64', 'poke8 03001577 7F', 'mem 03001578 2', 'tap B 10', 'mem %08X 1' % hpa]
+              'poke8 03001575 %d' % held.index(19), 'poke8 0300157B 00', 'poke8 0300157A 64', 'poke8 03001577 7F', 'mem 03001578 2', 'tap B 10', 'mem %08X 1' % hpa]
 for i, n in enumerate((40, 40, 40, 30, 30, 20, 20, 30)):
     sb += ['poke8 03001577 7F', 'run %d' % n, 'shot sb%d' % i]
 sb += ['mem %08X 1' % hpa, 'mem 03001578 2', 'mem 0203FF40 1']
