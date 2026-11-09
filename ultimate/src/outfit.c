@@ -1979,13 +1979,15 @@ void combat_hook(void *defender, int *hit) {
 
 /* Markers on the flight map's mini-map (Nov 9; Black Star Odyssey's, bso/maps/worldmap_markers.py): every named place on Earth's map (0:50)
    gets a yellow diamond. The mini-map object's draw (vtable 0x0804D8A0 +0x10, 0x08027A75) draws the red player arrow; this runs it and adds
-   one 8x8 8bpp sprite per place, copying the marker to OBJ tile 150 (free on that map: the HUD starts at 154). build.py fills map_marks. */
+   one 8x8 8bpp sprite per place, copying the marker to OBJ tile 300. On Buu's Fury's map the controls bar takes tiles 86-213 (Black Star
+   Odyssey's tile 150 is in it), two more sprites 206-241, the arrow 242; 300 is free (read from OAM in flight). build.py fills map_marks. */
 extern const u8 map_marks[][2];
+#define MARK_TILE 300
 extern const int map_mark_count;
 static const char mark_shape[8][9] = {"...K....", "..KYK...", ".KYYYK..", "KYYWYYK.", ".KYYYK..", "..KYK...", "...K....", "........"};
 int minimap_draw(void *self, u32 *ctx) {
     int r = ((int (*)(void *, u32 *))0x08027A75)(self, ctx), i, j;
-    u8 *tile = (u8 *)(0x06010000 + 150 * 32);
+    u8 *tile = (u8 *)(0x06010000 + MARK_TILE * 32);
     if ((**(u16 **)0x03001980) != (0 | 50 << 8)) return r;
     for (i = 0; i < 8; i++)
         for (j = 0; j < 8; j += 2) {
@@ -1994,7 +1996,7 @@ int minimap_draw(void *self, u32 *ctx) {
         }
     for (i = 0; i < map_mark_count; i++) {
         u16 *oam = (u16 *)ctx[0];
-        oam[0] = map_marks[i][1] | 0x2000; oam[1] = map_marks[i][0]; oam[2] = 150;
+        oam[0] = map_marks[i][1] | 0x2000; oam[1] = map_marks[i][0]; oam[2] = MARK_TILE;
         ctx[0] += 8;
     }
     return r;
@@ -2006,25 +2008,32 @@ int minimap_draw(void *self, u32 *ctx) {
    (+0x60 the owner), as a punched one does. */
 #define PERFECT_FRAMES 10
 #define BLAST_VT 0x0804B454
+#define BULLET_VT 0x08049F0C      /* the shots of the gunmen and snipers (likely: seen from the Gunman) */
 #define ObjBox ((void (*)(int *, void *))0x0800FE79)
 int guard_msg(u8 *player, int msg, u8 *desc, int d) {
     if (msg == 0 && desc && (desc[0] == 0 || desc[0] == 2) && GUARD_AT && FRAMES - GUARD_AT <= PERFECT_FRAMES && IN_COMBAT) {
         u32 *blast = *(u32 **)(desc + 0x30);
         int box[4], *hr = (int *)(desc + 4);
-        if (blast && blast[0] == BLAST_VT && (desc[0x14] ^ 1) == player[0x10]) {
+        if (blast && (blast[0] == BLAST_VT || blast[0] == BULLET_VT) && (desc[0x14] ^ 1) == player[0x10]) {
             ObjBox(box, player);
             if (hr[0] < box[2] && box[0] < hr[2] && hr[1] < box[3] && box[1] < hr[3]) {
-                *((u8 *)blast + 0x58) = 1; *(void **)((u8 *)blast + 0x60) = player;
+                u8 *b = (u8 *)blast;
+                if (blast[0] == BLAST_VT) { b[0x58] = 1; *(void **)(b + 0x60) = player; }
+                else {                                     /* a gunman's shot: turned round and away (direction +0x10, owner +0x1C, velocity +0x40). It can't hurt its
+                                                              shooter: its update (0x08027562) builds every hit with team 0, the player's side */
+                    b[0x10] ^= 1; b[0x11] = 1; *(void **)(b + 0x1C) = player;
+                    *(int *)(b + 0x40) = -*(int *)(b + 0x40); *(int *)(b + 0x44) = -*(int *)(b + 0x44);
+                }
                 GUARD_AT = 0;
                 PlaySound((void *)0x03003E5C, (u8 *)SOUND_HIT + 0x30 * 12, 0x40, 0);
-                return 1;
+                return blast[0] == BLAST_VT;           /* a shot told "nothing hit" flies on, the other way */
             }
         }
     }
     return ((int (*)(u8 *, int, u8 *, int))0x08010DDF)(player, msg, desc, d);
 }
 
-/* New Game+ (Nov 9). Bulma's time machine takes the party back to the start of the story with everything they have earned: levels, stats,
+/* New Game+ (Nov 9). The dragon's wish to turn back time takes the party back to the start of the story with everything they have earned: levels, stats,
    skills and their mastery, equipment, the bag, Zenie, items, every post-game unlock (the mod's flags and the bench). What starts over:
    the story's flags 0-857 (its events and the rooms they open; 149 is the ending), the key items (25-82, the Dragon Balls among them),
    and the story's seven fighters' places in the party and their looks (from the start table, 0x086FDA4C: 18 bytes each, the form at

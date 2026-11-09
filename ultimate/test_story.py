@@ -3,9 +3,9 @@
 game's real ending from its last scene. Checks: beating Broly adds him to the party; the ending flies you out free and you can land in West City and be sent to Zone 26;
 the Super 13 reward adds Android 13, who can become Super 13, and DBS Gogeta, and keeps Broly's outfit if he had already joined."""
 import json, os, struct, subprocess, sys, tempfile
-H, ROM = 'tools/harness/harness', 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
+H, ROM = 'tools/harness/harness', os.environ.get('BFU_ZONE_ROM', 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba')      # BFU_ZONE_ROM: another build of it
 d = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix='story')
-forms = json.load(open('ultimate/out/BFU_debug_zone.map.json'))['forms']
+forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
 G, REC, SIZE = 0x03001068, 0x03001560, 0x68
 fails = []
 def check(n, ok):

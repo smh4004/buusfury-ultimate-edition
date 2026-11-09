@@ -57,16 +57,16 @@ drains slower. After the ending, Goku's mastered Super Saiyan 3 and Vegeta's Sup
 Kamehameha at level 3, used 100 times, the Super Kamehameha. Super Saiyan 4 moves and looks come with the GT unlock, never in the story.
 The skill book (record +0x22, `skill_book`): what a fighter knows beyond the six he holds; the pause menu's Skills tab swaps the
 highlighted skill with SELECT. Hold L and press a direction to pick the first to fourth skill at once. Pressing R just before an
-enemy ki blast lands, facing it, sends it back (a perfect guard). The flight map's mini-map marks every place you can land.
+enemy shot lands, facing it, takes no damage: a ki blast goes back at its shooter, a gunman's shot is turned away (a perfect guard). The flight map's mini-map marks every place you can land.
 
 Master Roshi joins at Kame House after the ending (`lib/roshi.py`: Krillin's LoG2 fighting frames with Roshi's head, beard and clothes
 from his Buu's Fury sprite; Max Power with a white aura, 1.5x). Post-game gear (rows 162-166 past the game's equipment table, which moves):
 Potara Earrings (transformations drain a third slower), Gravity Band (mastery twice as fast), King Kai's Shades (Kaioken costs half),
 Turtle Shell (Roshi's, twice the EXP, slow) and Senzu Pouch (health back in a fight). The dragon has a second page of wishes: Super Saiyan 2,
-a legendary treasure, hidden potential (75 mastery for every transformation). Bulma's time machine at Capsule Corporation starts New Game+:
+a legendary treasure, hidden potential (75 mastery for every transformation); a third page turns back time: New Game+,
 the story starts over with the party's levels, skills, gear and unlocks, and enemies hit half again as hard each round.
 Tests (`--debug --enemy`): `test_tiers.py`, `test_moves.py`, `test_guests.py`, `test_gear.py`, `test_mastery.py`, `test_loadout.py`;
-`test_dragon.py` (wishes, Roshi), `test_ngplus.py` (its own build: see the file).
+`test_dragon.py` (wishes, Roshi, New Game+, the flight map's marks), `test_guard.py` (its own rig: see the file).
 
 ## Zone 26 and Super 13
 

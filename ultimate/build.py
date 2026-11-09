@@ -181,7 +181,6 @@ HUB_NPC = 'assets/scripts/gUnknown_08783D30.evt'    # a Hercule City resident: p
 TOUR_NPC = 'assets/scripts/gUnknown_08785590.evt'   # the West City resident to the west
 QUEST_NPC = 'assets/scripts/gUnknown_08785580.evt'   # the West City resident outside the Z-Mart
 ROSHI_NPC = 'assets/scripts/gUnknown_08786C38.evt'   # Master Roshi on his island (5:1): after the ending he joins (Nov 9)
-BULMA_NPC = 'assets/scripts/gUnknown_08785744.evt'   # Bulma at Capsule Corporation (4:20): after the ending, New Game+ in the time machine (Nov 9)
 
 
 UI_EDITS = {1051: 'Press the B Button to transform into a Super Saiyan Blue. You must already be a Super Saiyan to use this technique.', 1052: 'Android 13', 1054: 'DBS Gogeta', 1055: 'SSB Gogeta', 1056: 'Super 13', 1057: 'Super Saiyan Blue'}
@@ -564,8 +563,15 @@ def popo_npc(src):
     steps.append(('wish_say', 'say 0x%02X "You who have gathered the Dragon Balls, speak your wish!"\n' % dragon))
     steps.append(('wish', 'say 0x%02X "- Greater power\\n- Riches\\n- New fighters\\n- More"\n' % dragon))
     choose('wish_go', ['w_power', 'w_rich', 'w_fighters', 'wish2'])
-    steps.append(('wish2', 'say 0x%02X "- Super Saiyan 2\\n- A legendary treasure\\n- Hidden potential\\n- Back"\n' % dragon))     # Nov 9: more wishes
-    choose('wish2_go', ['w_ss2', 'treasure', 'w_potential', 'wish'])
+    steps.append(('wish2', 'say 0x%02X "- Super Saiyan 2\\n- A legendary treasure\\n- Hidden potential\\n- More"\n' % dragon))     # Nov 9: more wishes
+    choose('wish2_go', ['w_ss2', 'treasure', 'w_potential', 'wish3'])
+    steps.append(('wish3', 'say 0x%02X "- Turn back time\\n- Back"\n' % dragon))
+    choose('wish3_go', ['w_time', 'wish'])
+    # New Game+ (outfit.c new_game_plus): the story from its opening (global script 38), with everything the party has
+    steps.append(('w_time', 'say 0x%02X "Time turns back to the day Goku returned. You keep your strength, but your foes grow stronger!"\n' % dragon))
+    code('w_time_go', ''.join('    call take_item(%d)\n' % (zone26.BALL_ITEM + k) for k in range(7)) + '    call 0x7A(30)\n    pushn 2\n    call 0x%X\n    call 0x95(0)\n    push {to_opening}\n    end\n' % zone26.WISH_NATIVE)
+    if 'step 19 raw 7 00 50 05 78 08' not in open(INTRO).read(): sys.exit("the intro's jump to the opening changed")
+    steps.append(('to_opening', 'raw 7 00 50 05 78 08\n'))      # as the intro's last step: a type 7 step goes on to another list, here the opening (0x08780550)
     steps.append(('treasure', 'say 0x%02X "- Potara Earrings\\n- Gravity Band\\n- King Kai\'s Shades\\n- Senzu Pouch"\n' % dragon))
     choose('treasure_go', ['w_gear%d' % k for k in range(4)])
     for k, row in enumerate((GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_POUCH)):
@@ -613,26 +619,6 @@ def roshi_npc(src):
     if not out.rstrip().endswith('    call set_flag(42)\n    end'): sys.exit("Roshi's script changed")
     out = out.rstrip()[:-len('end')] + 'push %d\n    end\n' % number['END']        # the story line's last step stops there, not in the new ones
     return out + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
-
-
-def bulma_npc(src):
-    """Bulma at Capsule Corporation. Her story line stays; after the ending she offers the time machine: New Game+ (outfit.c new_game_plus),
-    then the story's opening (global script 38) plays with the party as strong as it is."""
-    import zone26
-    if not src.rstrip().endswith('"Alright! Let me know when you\'re ready to leave!"') or 'step 1 say 0x11' not in src: sys.exit("Bulma's script changed")
-    steps = [('offer', 'say 0x11 "The time machine is fueled up! Go back to the day Goku came back? You keep all your strength."\n'),
-             ('menu', 'say 0x11 "- Go back in time\\n- Not yet"\n'),
-             ('menu_go', 'code\n    call 0x18\n    push 0\n    eq\n    jz L1\n    push {sure}\n    end\nL1:\n    push {END}\n    end\n'),
-             ('sure', 'say 0x00 "New Game+: the story starts over. Enemies hit harder each time round. Off you go!"\n'),
-             ('go', 'code\n    call 0x78(30)\n    pushn 2\n    call 0x%X\n    call 0x95(0)\n    pushn 38, 0, 0\n    call 0xD8\n    push {END}\n    end\n' % zone26.WISH_NATIVE)]
-    for _, t in steps:
-        for m in re.finditer(r'say 0x\w+ "([^"]*)"', t):
-            n = len(m.group(1).replace('\\n', ' ')); assert n < 100 and not 64 <= n <= 67, m.group(1)
-    head, rest = src.split('step 1 say 0x11', 1)
-    number = {n: k + 5 for k, (n, _) in enumerate(steps)}; number['END'] = len(steps) + 5     # her steps are 1-4 now (counted from 0), then a stop
-    first = 'step 1 code\n    call flag(149)\n    jz B1\n    push %d\n    end\nB1:\n    push 1\n    end\n' % number['offer']      # her old three steps follow, one later
-    rest = re.sub(r'(?m)^    push 4$', '    push %d' % number['END'], re.sub(r'(?m)^    push 2$', '    push 3', rest))     # 4 was past her last step
-    return head + first + 'step 2 say 0x11' + rest.replace('step 2 code', 'step 3 code', 1).replace('step 3 say', 'step 4 say', 1).rstrip('\n') + '\nstep 5 code\n    push %d\n    end\n' % number['END'] + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda m: str(number[m.group(1)]), t) for _, t in steps)
 
 
 def hub_npc(src):
@@ -1937,8 +1923,6 @@ def main():
         saved.setdefault(POPO_NPC, open(POPO_NPC).read())
         open(POPO_NPC, 'w').write(popo_npc(saved[POPO_NPC]))
         saved.setdefault(ROSHI_NPC, open(ROSHI_NPC).read())
-        saved.setdefault(BULMA_NPC, open(BULMA_NPC).read())
-        open(BULMA_NPC, 'w').write(bulma_npc(saved[BULMA_NPC]))
         open(ROSHI_NPC, 'w').write(roshi_npc(saved[ROSHI_NPC]))
         saved.setdefault(DEATH_SCRIPT, open(DEATH_SCRIPT).read())
         open(DEATH_SCRIPT, 'w').write(death_script(saved[DEATH_SCRIPT]))
