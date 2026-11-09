@@ -34,16 +34,21 @@ def setup(skills, form=None, presses=()):
         L += ['poke8 %08X %02X' % (R + 0x15, p)] + FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in AWAY + ['run 30']]
     return L
 
-def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=()):
-    """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in does nothing (test_build), so one goes first."""
+PLAYER_OBJ = 0x0202CC7C            # the player's object (0x03001C34 points here in this fight): +0x50 its animation, +0x11 the frame a move's code shows
+watched = []
+def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=(), watch=False):
+    """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in does nothing (test_build), so one goes first.
+    watch: also note (animation, frame shown) every 5 frames of the hold in `watched`."""
     L = setup(skills, form, presses) + list(extra) + AWAY + ['run 1', 'poke %s %x' % (ENEMY_HP, 9000 << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']
     o = run(L + ['mem %s 2' % PX], name); m = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o)[-1]
     near = ['poke %s %x' % (ENEMY_X, int(m[0], 16) - (40 << 8)), 'poke %s %x' % (ENEMY_Y, int(m[1], 16))]
     L += near + ['poke8 %08X %02X' % (R + 0x15, slot)] + FULL
     if level is not None: L += ['poke8 %08X %02X' % (R + 0x2E + 2 * slot, level)]
-    L += ['keys B'] + [v for k in range(hold // 5) for v in near + ['run 5'] + (['shot %s_hold' % name] if k == hold // 10 else [])]
+    look = ['mem %08X 1' % (PLAYER_OBJ + 0x50), 'mem %08X 1' % (PLAYER_OBJ + 0x10)] if watch else []
+    L += ['keys B'] + [v for k in range(hold // 5) for v in near + ['run 5'] + look + (['shot %s_hold' % name] if k == hold // 10 else [])]
     L += ['keys'] + [v for k in range(after // 5) for v in near + ['run 5'] + (['shot %s_fly' % name] if k == 2 else [])]
     o = run(L + ['mem %s 1' % ENEMY_HP, 'mem %08X 1' % (R + 0x14)], name)
+    if watch: watched[:] = list(zip(last(o, '%08X' % (PLAYER_OBJ + 0x50)), [v >> 8 & 255 for v in last(o, '%08X' % (PLAYER_OBJ + 0x10))]))
     hp = last(o, ENEMY_HP)[-1]; hp = hp - (1 << 32) if hp >= 1 << 31 else hp
     return 9000 - hp / 1024, last(o, '%08X' % (R + 0x14))[-1] & 255, 'bad pc' in o
 
@@ -68,6 +73,23 @@ if __name__ == '__main__':
     df, g1, _ = fire('dragon4', [7, 15, 20, 22, 41, 36], 4, forms['kid_goku'], (2, 2, 3, 5), hold=90, after=90)
     print('   Kid Goku Super Saiyan 4: red Dragon Fist %.1f (form %d)' % (df, g1))
     check('the red Dragon Fist hits in Super Saiyan 4', g1 == forms['kid_goku_ssj4'] and df > 0)
+    # Vegeta himself, the debug picker's fourth fighter (his own record and figures). The Kamehameha's code shows frames 0-2 of the pose it sets; his
+    # figures' slot 18 is his two-frame Big Bang, so they get a Galick Gun pose of their own (build.py beam_poses): no frame shown may be missing,
+    # since a missing one draws junk over other sprites' tiles. His Big Bang keeps its own pose.
+    import struct
+    rom = open(ROM, 'rb').read()
+    pick = [i for i, l in enumerate(base) if l == 'tap A 60'][-1]
+    base[pick:pick] = ['tap RIGHT 40'] * 3
+    R = 0x03001560 + 4 * 0x68
+    FULL = ['poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'poke8 %08X FF' % (R + 0x1C), 'poke8 %08X 03' % (R + 0x1D)]
+    for name, skills, slot, presses in (('vegeta_galick', [7, 2, 38], 2, (0,)), ('vegeta_ss_galick', [7, 20, 38], 2, (0, 1)),
+                                        ('vegeta_ss2_galick', [7, 20, 35, 38], 3, (0, 1, 2)), ('vegeta_blue_galick', [7, 20, 44, 38], 3, (0, 1, 2))):
+        g, f, b = fire(name, skills, slot, presses=presses, watch=True)
+        shown = [(fr, struct.unpack_from('<I', rom, a - 0x08000000)[0]) for a, fr in watched if 0x08000000 <= a < 0x0A000000]
+        print('   %s: %.1f damage in form %d; (frame shown, frames in the pose) %s' % (name, g, f, sorted(set(shown))))
+        check('%s: hits, and every frame its pose shows exists' % name, g > 0 and not b and shown and all(fr < n for fr, n in shown) and max(fr for fr, _ in shown) == 2)
+    bb, _, b = fire('vegeta_bigbang', [7, 2, 38], 1)
+    check("Vegeta's Big Bang still fires", bb > 0 and not b)
     print('screens in', D)
     if fails: sys.exit('FAILED: %s' % fails)
     print('ALL PASS')

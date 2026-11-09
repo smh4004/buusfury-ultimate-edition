@@ -49,7 +49,10 @@ blue). Super Saiyan 2's lightning aura, GT Gohan's Super Saiyan 2 and the Blue h
 Kaioken (Goku from the start, Krillin, Tien, Yamcha, Videl, Hercule): 1.25x, 1.5x and 1.75x by its mastery level, costing health as it goes.
 Solar Flare (Tien, Krillin): the power-up's white flash, and every ordinary enemy on screen gets the game's own stun (enemy state 1) for
 150 frames; bosses aren't fooled. Galick Gun (Vegeta, Future Trunks), 10x Kamehameha and the red Dragon Fist (Super Saiyan 4 Goku), Final
-Shine (Super Saiyan 4 Vegeta) and the Super Kamehameha reuse the base move's code with their own frames and strength.
+Shine (Super Saiyan 4 Vegeta) and the Super Kamehameha reuse the base move's code with their own frames and strength. The Kamehameha's code
+shows frames 0-2 of the fighter's slot 18; Vegeta's figures hold his two-frame Big Bang there, so they get a Galick Gun pose of their own in
+slot 31 (`build.py` `beam_poses`: his wind-up, then Final Flash's two-handed push), and the build stops if another of Vegeta's figures or a Kamehameha-using guest's
+would show a missing frame (it draws junk over other sprites' tiles).
 
 Mastery: each (character, tier) has a byte in the bench's last group (`MASTERY`). Time spent transformed raises it (Super Saiyan's
 class every 10 drain units, Super Saiyan 3's every 45); 100 is level 2, 250 level 3, shown as the skill's level, and a mastered tier

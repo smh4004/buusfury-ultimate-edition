@@ -1418,6 +1418,47 @@ def add_outfits(rom, clean, at, art):
     return end, art
 
 
+BEAM_POSE = 31                   # outfit.c BEAM_POSE: the actor slot a Kamehameha-code move uses when the fighter's slot 18 can't carry it
+KAME_CODE = (15, GALICK_SKILL, TENX_SKILL, SUPER_KAME_SKILL)
+KAME_GUESTS = ('krillin', 'tien', 'yamcha', 'krillin_kaioken', 'tien_kaioken', 'yamcha_kaioken', 'roshi', 'roshi_max', 'future_trunks', 'future_trunks_ss', 'goku_black', 'goku_rose')
+
+
+def beam_poses(rom, put):
+    """The Kamehameha's code (behaviour 0x0804D9F8) shows frames 0-2 of the fighter's slot 18: 0 while charging, then 1 and 2 by turns. Vegeta's figures
+    hold his Big Bang there, two frames, so his Galick Gun drew a third frame from past the animation: junk over other sprites' tiles. Each such figure
+    gets a pose of its own in slot BEAM_POSE (outfit.c beam_pose): his ki blast's wind-up (slot 3, frame 0), then Final Flash's push with both hands
+    (slot 19, frame 3). Then every form that can hold one of those moves is checked."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    fm = json.load(open(OUT + '/_forms.json')); total = max(fm.values()) + 1
+    def record(f):
+        char = struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0]
+        return (char, u(ACTORS_AT + 4 * (char - 9)) - ROM_BASE) if char >= 9 else (char, None)
+    def frames(rec, slot):
+        if slot >= rom[rec] or not u(rec + 0x54 + 4 * slot): return 0
+        return u(u(rec + 0x54 + 4 * slot) - ROM_BASE)
+    made = {}
+    for f in range(total):
+        char, rec = record(f)
+        if rec is None or rom[SPACE + FORM_SIZE * f + 0x0C] != 4 or frames(rec, 18) >= 3 or char in made: continue
+        if frames(rec, 3) < 1 or frames(rec, 19) < 4:
+            sys.exit('form %d: no ki blast or Final Flash frames for a Galick Gun pose' % f)
+        blast, flash = u(rec + 0x54 + 12) - ROM_BASE, u(rec + 0x54 + 76) - ROM_BASE
+        pose = put(struct.pack('<I', 3) + rom[blast + 4:blast + 20] + rom[flash + 4 + 48:flash + 4 + 64] * 2)
+        n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * (BEAM_POSE + 1 - n))
+        new[0] = BEAM_POSE + 1; struct.pack_into('<I', new, 0x54 + 4 * BEAM_POSE, pose)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put(bytes(new)))
+        made[char] = f
+    print('Galick Gun pose for figures', sorted(made))
+    books = {c: s for c, s in SKILL_BOOK.items() if set(s) & set(KAME_CODE)}
+    for f in range(total):
+        owner = rom[SPACE + FORM_SIZE * f + 0x0C]
+        if owner in books or f in [fm[g] for g in KAME_GUESTS if g in fm]:
+            char, rec = record(f)
+            # Goku's own figures all carry a three-frame Kamehameha but form 1, a 16-slot figure (likely only for scenes), which retail leaves as it is
+            if rec is not None and frames(rec, 18) < 3 and not frames(rec, BEAM_POSE) and owner != 0:
+                sys.exit('form %d (figure %d) can hold a Kamehameha-code move but its slot 18 has %d frames' % (f, char, frames(rec, 18)))
+
+
 def add_eraser(rom, clean, sym, at, art):
     """Eraser Cannon and SS Deadly Bomber: recoloured copies of Big Bang's two ball animations and icons, each move's parameter table (its last word scales the damage)
     and behaviour, new skill rows, and new UI strings."""
@@ -1655,6 +1696,7 @@ def add_eraser(rom, clean, sym, at, art):
         if skill == TENX_SKILL: struct.pack_into('<I', row, 16, sym['ssj4_kame_can'] | 1)
         struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
         rows[skill] = row
+    beam_poses(rom, put)
     def tinted_frames(rows_at, count, lo, hi, remap, cache):
         """A copy of `count` {header, attributes, tiles} rows whose tiles in [lo, hi) are recoloured (each block once)."""
         out = bytearray(clean[rows_at - ROM_BASE:rows_at - ROM_BASE + 12 * count])
@@ -1678,7 +1720,13 @@ def add_eraser(rom, clean, sym, at, art):
         return row
     # Final Shine: Final Flash's beam (rows 0x76174C: frames, 8, damage by level) green and 1.5x as strong. Vegeta as Super Saiyan 4.
     FLASH_PARAMS, FLASH_VT, FLASH_ART = 0x76174C, 0x4D9D4, (0x0875F000, 0x08761800)
-    green_shine = shifted(140 / 360); cache = {}; table = sym['shine_params'] - ROM_BASE
+    def shine_green(v):                       # Final Flash's white core goes light green and its pale edges a deeper green, so the beam reads green, not white
+        if v == 0: return 0
+        h, s, b = colorsys.rgb_to_hsv(*(pal[v] / 255.0))
+        if s < 0.12 and b > 0.9: return one((176, 248, 176))
+        if s < 0.12: return v
+        return one((np.array(colorsys.hsv_to_rgb(140 / 360, min(1.0, s * 2 + 0.3), b * 0.9)) * 255).astype(int))
+    green_shine = bytes(shine_green(v) for v in range(256)); cache = {}; table = sym['shine_params'] - ROM_BASE
     for i in range(3):
         frames_at, eight, damage = struct.unpack_from('<3I', clean, FLASH_PARAMS + 12 * i)
         struct.pack_into('<3I', rom, table + 12 * i, put(tinted_frames(frames_at, 8, *FLASH_ART, green_shine, cache)), eight, int(damage * 1.5))

@@ -1417,11 +1417,18 @@ static void kv_begin(u32 *self, void *player, const u32 *params) {
         MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (void *)((u32 *)mine[2])[2], 0x40);
     }
 }
+/* The Kamehameha's code shows frames 0-2 of the fighter's slot 18. Vegeta's figures hold his two-frame Big Bang there, so build.py gives them a pose
+   of their own in slot BEAM_POSE (beam_poses): his wind-up, then Final Flash's push with both hands. Any other figure uses slot 18 as the Kamehameha does. */
+#define BEAM_POSE 31
+static int beam_pose(void *sprite) {
+    const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
+    return actor && actor[0] > BEAM_POSE && *(const u32 *)(actor + 0x54 + 4 * BEAM_POSE) ? BEAM_POSE : 0x12;
+}
 static void kv_use(u8 *record, void *sprite, const int *vt) {
     int level = record[record[0x15] * 2 + 0x2E];
     u32 *b = Alloc(0x10);
     if (b) { b[0] = (u32)vt; b[1] = 0; b[3] = level; }
-    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetFacing(sprite, beam_pose(sprite));
     Sprite_SetBehaviour(sprite, b);
 }
 void galick_start(u32 *self, void *player) { kv_begin(self, player, kv_params[0]); }
