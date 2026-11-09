@@ -3,9 +3,10 @@
   python3 ultimate/test_cell.py [work dir]"""
 import json, os, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26
+import zone26, floorcheck
 from PIL import Image
 ROM = 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
+FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 D = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix='cell'); os.makedirs(D, exist_ok=True)
 G = 0x03001068; PLAYER = 0x03001C34; ENEMIES = 0x03001BB4; COUNT = 0x03001BB0; AT = 0x0300197C; REC0 = 0x03001560; ZENIE = 0x0300155C
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
@@ -30,6 +31,7 @@ flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n //
 flag = lambda n: mem(G + 0x55 + n // 8)[0] >> (n % 8) & 1
 at = lambda: mem(AT)[0] & 0xFFFF
 def talk(x, y):
+    FLOOR.guard(at(), x, y + 22, 'Goku')
     pl = mem(PLAYER)[0]
     send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 80')
 strong = lambda: ['poke8 %08X 96' % (REC0 + o) for o in (0x28, 0x29, 0x2A, 0x2B)] + ['poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17)]

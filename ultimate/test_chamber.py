@@ -5,10 +5,11 @@
 Talks to Mr. Popo after the ending, spars with every partner on the list in turn, and checks the fight, the reduced EXP, the way back and Broly's lock."""
 import json, os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26
+import zone26, floorcheck
 from PIL import Image
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='chamber'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
+FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 G = 0x03001068; PLAYER = 0x03001C34; ENEMIES = 0x03001BB4; AT = 0x0300197C; REC0 = 0x03001560
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
 fails = []
@@ -30,6 +31,7 @@ def mem(a, n=1):
         if l.startswith('mem %08x' % a): return [int(x, 16) for x in l.split(':')[1].split()]
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
 def talk(x, y):
+    FLOOR.guard(at(), x, y + 22, 'Goku')
     pl = mem(PLAYER)[0]
     send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 80')
 at = lambda: mem(AT)[0] & 0xFFFF

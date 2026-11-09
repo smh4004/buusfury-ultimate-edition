@@ -224,7 +224,7 @@ def build(rom, src, out):
         open(fn, 'wb').write(data)
         ov.append({'start': start, 'end': end, 'file': fn})
 
-    text = {'banks': None, 'offs': None, 'touched': set()}
+    text = {'banks': None, 'offs': None, 'touched': set(), 'extra': {}}
 
     def banks_loaded():
         if text['banks'] is None:
@@ -233,13 +233,19 @@ def build(rom, src, out):
             text['banks'] = [list(unpack(d, o)[0].decode('utf-16-le')) for o in a['banks']]
         return text['banks']
 
-    def new_text(s):
-        """Append a new dialogue line to the overflow bank; return its packed text ref."""
-        bt = banks_loaded()[OVERFLOW_BANK]
+    def new_text(s, bank=OVERFLOW_BANK):
+        """Append a new dialogue line to the overflow bank (or to an added bank, 7 and up); return its packed text
+        ref. The game unpacks a line's whole bank each time it shows the line (Text_LoadString2), so every line
+        added to bank 6 makes all bank-6 lines a little slower; new quests keep their lines in banks of their own."""
+        if bank >= NBANKS:
+            bt = text['extra'].setdefault(bank, [])
+        else:
+            assert bank == OVERFLOW_BANK, 'new lines go to the overflow bank or an added bank'
+            bt = banks_loaded()[OVERFLOW_BANK]
+            text['touched'].add(OVERFLOW_BANK)
         off = len(bt); bt.extend(s)
-        assert len(bt) < 0x7FFF and len(s) < 0x800, 'overflow bank full or line too long'
-        text['touched'].add(OVERFLOW_BANK)
-        return OVERFLOW_BANK | off << 6 | len(s) << 21
+        assert len(bt) < 0x7FFF and len(s) < 0x800, 'bank %d full or line too long' % bank
+        return bank | off << 6 | len(s) << 21
 
     names = bfscript.load_names()
     mctx = mapassets.Ctx(d, {o: (o, sz, e, t) for o, sz, e, t in wfz_blocks()}, out, ov)
@@ -307,6 +313,20 @@ def build(rom, src, out):
         raw = ''.join(text['banks'][b]).encode('utf-16-le')
         o = text['offs'][b]
         put(o, wfz[o], compress(raw), 'bank%d' % b)
+    if text['extra']:
+        # added banks: new objects in the appendix, and the bank table (gTextBankTable, read only by
+        # Text_LoadString2 through its literal at 0x123CC) grown by their entries, so it moves to the appendix too
+        top = max(text['extra'])
+        assert sorted(text['extra']) == list(range(NBANKS, top + 1)), 'added banks must be numbered 7, 8, ... in order'
+        tab = ['\t.4byte gUnknown_08%06X' % (u32(d, BANK_TABLE + 4 * i) - ROM) for i in range(NBANKS)]
+        for b in range(NBANKS, top + 1):
+            fn = os.path.join(out, 'new_bank%d.bin' % b)
+            open(fn, 'wb').write(compress(''.join(text['extra'][b]).encode('utf-16-le')))
+            ov.append({'new': 'gTextBank%d' % b, 'file': fn})
+            tab.append('\t.4byte gTextBank%d' % b)
+        fn = os.path.join(out, 'ov_%06X_banktable.s' % BANK_TABLE)
+        open(fn, 'w').write('\n'.join(tab) + '\n')
+        ov.append({'start': BANK_TABLE, 'end': BANK_TABLE + 4 * NBANKS, 'file': fn, 'size': 4 * (top + 1)})
     json.dump(ov, open(os.path.join(out, 'overrides.json'), 'w'), indent=1)
     print('changed assets: %s' % (', '.join(changed) or 'none'))
     print('%d overrides -> %s' % (len(ov), os.path.join(out, 'overrides.json')))

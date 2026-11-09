@@ -75,9 +75,12 @@ Potara Earrings (transformations drain a third slower), Gravity Band (mastery tw
 Turtle Shell (Roshi's, twice the EXP, slow) and Senzu Pouch (health back in a fight). The dragon has a second page of wishes: Super Saiyan 2,
 a legendary treasure, hidden potential (75 mastery for every transformation); a third page turns back time: New Game+,
 the story starts over with the party's levels, skills, gear and unlocks, and enemies hit half again as hard each round.
-Tests (`--debug --enemy`): `test_tiers.py`, `test_moves.py`, `test_guests.py`, `test_gear.py`, `test_mastery.py`, `test_loadout.py`;
+Tests (`--debug --enemy`): `test_tiers.py`, `test_moves.py`, `test_guests.py`, `test_gear.py`, `test_mastery.py`, `test_loadout.py`, `test_ssg.py`;
 `test_kaioken.py` (the mastered Kaioken),
 `test_dragon.py` (wishes, Roshi, New Game+, the flight map's marks), `test_guard.py` (its own rig: see the file; also the mastered Kaioken under fire).
+Tests teleport characters by writing their position, which skips collision. The route tests (`test_bog`, `test_cell`, `test_chamber`,
+`test_clash`, `test_ladder`) check each talk's teleport with `lib/floorcheck.py` (the built ROM's floor mask of the current area) and stop
+with a FAIL rather than put Goku inside scenery when a route has gone wrong (Nov 9: "don't allow this clipping").
 Variables added since Nov 9 live in work RAM from 0x0203F250 (the Kaioken bar, the power-up figure, the wheel's keys, the HUD widget) and are checked
 when used: `heap_init` is left alone, because even a few more stores there made the game drop a frame in fifteen. `outfit.c` can't have
 writable statics (they'd link into ROM); the build stops if one appears.
@@ -93,6 +96,38 @@ keep their colours. Kid Buu's slot 17 (dissolving, likely only his ending) becom
 `sprites.composed_actor`, which keeps each frame's own pieces (a boss frame can have two). Actor `beerus` is the last new actor, so no other
 actor's id moves; `<rom>.map.json` records its id (character = id + 9). Checked on a sheet and in the emulator (an enemy rig with
 `BFU_RIG_ENEMY="61 <character>"`: he walks, punches, fires Kid Buu's beam and is knocked down).
+
+## Battle of Gods and Super Saiyan God (Nov 9)
+The owner: "build the entire movie Battle of Gods and super saiyan god ritual into the post game and once completed grant access to SSG",
+Super Saiyan God "upon mastery of the super saiyan skill". `ultimate/bog.py` holds the quest; `test_bog.py` plays all of it (its rig's
+official warps to Capsule Corporation: `BFU_HUB_WARP="4, 20, 1, 192, 196"`).
+- After the ending, with Goku's Super Saiyan mastered and Goku playing, Whis waits at Capsule Corporation. King Kai calls; Whis takes Goku to
+  King Kai's planet (a zone 26 copy of Grand Kai's Planet), where Beerus asks about a Super Saiyan God and they fight. Beerus can't really be
+  beaten there; when Goku falls, the game's death script carries on to the party instead of the game over (`bog.death_branch`).
+- Bulma's party (a copy of Capsule Corporation, with Bulma, Vegeta, Gohan, Videl, Goten, Trunks, Beerus and Whis): the pudding, Bulma's
+  slap, Vegeta's fury; the Switch Character menu opens for his fight. Win or fall, the ritual follows.
+- The ritual: Shenron, five Saiyans and Videl's baby. Super Saiyan God is Goku's from here (outfit.c skills_sync). Then the god fight on a
+  copy of Kami's Lookout: lose, and it's back to the party to try again (or home); win, and Whis brings everyone home to Capsule Corporation,
+  where Beerus spares the Earth.
+- Every scene is a step of the West City resident's event list (`build.py quest_npc` appends them); its first step asks `more_get(251)`
+  where you are (room << 8 | world) and goes to the scene for that place; more flags 47-53 hold the story's progress. Natives 0xF8-0xFF are
+  all taken, so the quest asks `more_get` (251 area, 252 Goku playing, 253 the quest can start) instead of new natives.
+- Rooms: six after the challenges' (`zone26.bog_first`). Capsule Corporation's area record has +8 = 0 (no fighting at home): its fight copy
+  sets it. Beerus's rows are copies of Kid Buu's (row 61): 250000 HP on King Kai's planet (2,000,000 broke Kid Buu's behaviour: likely an
+  overflow in its health checks; he stopped attacking and the game crashed), 20000 at the party, 120000 for the god fight; they are never
+  made harmless in debug builds, since losing is part of the story.
+- Script constants above 255 need `pushn` (`push` keeps one byte).
+- Super Saiyan God (skill 46, a crimson Z): Goku's three base looks with crimson hair (`build.py ssg_hair`: his hair is the only big black
+  patch on him), from base with the red aura, 1.75x without Super Saiyan's +5, half Super Saiyan's drain (`ss_tick`), back to base; no other
+  tier from it. Form rows after Super Saiyan Kaioken's, so older forms keep their numbers. `test_ssg.py`.
+- Whis (`lib/whis.py`): Kibito's frames (actor 149) in Whis's colours: pale blue skin, burgundy robe, black cuirass, the turquoise ring at
+  his neck (Kibito's orange trims just under his chin), white hair.
+- Its 2,446 characters of lines are in dialogue bank 7, a bank of their own (`bog.TEXT_BANK`; an evt line `say 0x02 @7 "..."`). The game
+  unpacks a line's whole bank every time it shows the line (`Text_LoadString2`, no cache), so in bank 6 (7,613 characters of the mod's
+  other new lines) they made every bank-6 line slower and broke the fixed-timing test routes (residents had walked off by the time a route
+  talked to them).
+  `tools/assets/assets.py` adds banks 7 and up as new objects and grows the bank table (`gTextBankTable`, read only through the literal at
+  0x123CC), which moves it to the appendix. Later quests should do the same.
 
 ## Zone 26 and Super 13
 

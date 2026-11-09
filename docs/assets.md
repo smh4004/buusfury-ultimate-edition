@@ -10,7 +10,7 @@ With no edits, `make modern` reproduces the original ROM byte for byte (SHA-1 ch
 ## Asset kinds
 | File | Source in ROM | Edit rules |
 |---|---|---|
-| `assets/text/dialogue.txt` | 7 WFZ text banks (table `gTextBankTable` 0x087B5B64), 2,294 lines reached from dialogue step records | Edit the line under its `@bank:offset:length` header. Shorter or equal text is written in place. Longer text goes to the end of bank 6 (nearly empty, about 32k characters free) and every reference to that line is repointed. `{XX}` is a control character (`{08}` colour, `{0B}` page break) |
+| `assets/text/dialogue.txt` | 7 WFZ text banks (table `gTextBankTable` 0x087B5B64), 2,294 lines reached from dialogue step records | Edit the line under its `@bank:offset:length` header. Shorter or equal text is written in place. Longer text goes to the end of bank 6 (nearly empty, about 32k characters free) and every reference to that line is repointed. Event lists can also add lines to new banks 7, 8, ... (`say 0x02 @7 "..."`; docs/modding.md). `{XX}` is a control character (`{08}` colour, `{0B}` page break) |
 | `assets/text/ui_strings.txt` | 1,534 UTF-16 strings (`gUIStringPtrs` 0x0806BCE8) | Any length. A longer string moves to the appendix (see below) |
 | `assets/palette/master.txt` | `gMasterPalette` 0x080701B0, 512 x 24-bit (0-255 BG, 256-511 OBJ) | Edit values in place |
 | `assets/tables/exp.csv` | `gExpTable` 0x086B7084, 151 x u32 | Edit values. Keep 151 rows |

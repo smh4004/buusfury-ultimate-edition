@@ -82,6 +82,9 @@ def lines():
 
 BEERUS, WHIS, NARR, GOKU, KING_KAI, BULMA, VEGETA, GOHAN, VIDEL, SHENRON = 'BEERUS', 'WHIS', 0x00, 0x02, 0x57, 0x11, 0x93, 0x26, 0x99, 0x74
 SCENES_TEXT = []
+# The quest's lines live in a dialogue bank of their own (tools/assets/assets.py). The game unpacks a line's whole bank
+# to show it, so its 2,446 characters in bank 6 (7,613 before) made every bank-6 line slower and shifted old routes.
+TEXT_BANK = 7
 
 
 def steps(more_get, more_put, first):
@@ -91,7 +94,7 @@ def steps(more_get, more_put, first):
         if isinstance(who, str): who, text = 0x00, '%s: %s' % (who, text)
         n = len(text.replace('\\n', ' ')); assert n < 100 and not 64 <= n <= 67, (n, text)
         SCENES_TEXT.append((name, text))
-        out.append((name, 'say 0x%02X "%s"\n' % (who, text)))
+        out.append((name, 'say 0x%02X @%d "%s"\n' % (who, TEXT_BANK, text)))
     def code(name, text): out.append((name, 'code\n' + text))
     def area_is(world_area): return get(more_get, Q_AREA) + '    pushn %d\n    eq\n' % (world_area[1] << 8 | world_area[0])
     def room_is(name): return area_is((26, room_of(name, first)))

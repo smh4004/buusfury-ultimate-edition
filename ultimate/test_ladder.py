@@ -3,9 +3,10 @@
   python3 ultimate/test_ladder.py <work dir>"""
 import json, os, subprocess, sys
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26
+import zone26, floorcheck
 D = sys.argv[1]; os.makedirs(D, exist_ok=True)
 ROM = 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
+FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 G, AT, PLAYER, ENEMIES, REC0, ZENIE, BENCH_FLAGS = 0x03001068, 0x0300197C, 0x03001C34, 0x03001BB4, 0x03001560, 0x0300155C, 0x0203F00C
 HUB = 1 << 8 | 3
 fails = []
@@ -35,6 +36,7 @@ def more_poke(n, v):
 at = lambda: mem(AT)[0] & 0xFFFF
 zenie = lambda: mem(ZENIE)[0]
 def talk(x, y):
+    FLOOR.guard(at(), x, y + 22, 'Goku')
     pl = mem(PLAYER)[0]
     send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 80')
 strong = lambda: send(*['poke8 %08X 96' % (REC0 + o) for o in (0x28, 0x29, 0x2A, 0x2B)], 'poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17))

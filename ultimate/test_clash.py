@@ -9,7 +9,8 @@ H = 'tools/harness/harness'
 OUT = sys.argv[1]; d = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='clash'); os.makedirs(d, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26
+import zone26, floorcheck
+FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 G = 0x03001068; REC0 = 0x03001560; CL = 0x0203F200; PLAYER = 0x03001C34; ENEMIES = 0x03001BB4; PL = 0x0202E8E4
 SKILL = int(os.environ.get('CLASH_SKILL', '15'))
 FORM = int(os.environ.get('CLASH_FORM', '0'))      # a guest's form number: that fighter takes the beam instead of Goku, on the guest slot
@@ -42,6 +43,7 @@ class Game:
             if l.startswith('mem %08x' % addr): return [int(x, 16) for x in l.split(':')[1].split()]
     def sync(self): self.mem(G)
     def talk(self, x, y):
+        FLOOR.guard(self.mem(0x0300197C)[0] & 0xFFFF, x, y + 22, 'Goku')
         pl = self.mem(PLAYER)[0]
         self.send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 80')
     def close(self):

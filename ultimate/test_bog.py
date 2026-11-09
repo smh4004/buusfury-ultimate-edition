@@ -6,9 +6,10 @@ After the ending, with Goku's Super Saiyan mastered: Whis at Capsule Corporation
 and Vegeta's fight, the ritual (Super Saiyan God learned), the god fight lost (back to the party) and won (home, Beerus spares the Earth)."""
 import os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, bog
+import zone26, bog, floorcheck
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='bog'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
+FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 G = 0x03001068; PLAYER = 0x03001C34; AT = 0x0300197C; REC0 = 0x03001560
 MASTERY = 0x0203F000 + 20 + 20 * 22; FLAGS2 = 0x0203F000 + 20 + 21 * 22
 BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
@@ -39,6 +40,7 @@ def dump(a, n):
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
 more = lambda f: mem(FLAGS2 + (f - 32 >> 3))[0] >> ((f - 32) & 7) & 1
 def talk(x, y, presses=14, gap=60):
+    FLOOR.guard(at(), x, y + 22, 'Goku')
     pl = mem(PLAYER)[0]
     send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4')
     for _ in range(presses): send('tap A %d' % gap)
@@ -46,6 +48,7 @@ def talk(x, y, presses=14, gap=60):
 at = lambda: mem(AT)[0] & 0xFFFF
 def scene(x, y, want, presses=40, menu=False):
     """Talk to (x, y) and press A through the lines until the scene moves you to `want` (after the Switch Character menu: B)."""
+    FLOOR.guard(at(), x, y + 22, 'Goku')
     pl = mem(PLAYER)[0]
     send('poke %08X %08X' % (pl + 0x1A0, x << 8), 'poke %08X %08X' % (pl + 0x1A4, (y + 22) << 8), 'run 2', 'keys UP', 'run 6', 'keys', 'run 4')
     for k in range(presses):
@@ -80,6 +83,14 @@ def beat(hp, name, room):
 def full():
     send('poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17))
 
+# 0. Every place the quest puts someone (people, Beerus, Goku's arrivals, the spot below each person where you talk) is floor
+spots = [(26, bog.room_of(name, FIRST), who, x, y) for name, wa, npcs, foe, arrive in bog.ROOMS
+         for who, x, y in [(n, x, y) for n, x, y in npcs] + [('talk to ' + n, x, y + 22) for n, x, y in npcs]
+         + ([('Beerus', foe[1], foe[2])] if foe else []) + [('Goku arrives', arrive[0], arrive[1])]]
+spots += [(bog.CAPSULE[0], bog.CAPSULE[1], 'Whis', bog.WHIS_AT[0], bog.WHIS_AT[1]), (bog.CAPSULE[0], bog.CAPSULE[1], 'talk to Whis', bog.WHIS_AT[0], bog.WHIS_AT[1] + 22),
+          (bog.HOME[0], bog.HOME[1], 'home', bog.HOME[3], bog.HOME[4])]
+walls = [s for s in spots if not FLOOR.walkable(*s[:2], *s[3:])]
+check('all %d places the quest puts someone are on walkable floor%s' % (len(spots), (': not ' + str(walls)) if walls else ''), not walls)
 send('guardon 0x09000000', *start); mem(G)
 send(flag_on(149)); send(flag_on(862)); send(flag_on(883)); mem(G)
 door = [x for x in zone26.links(__import__('json').load(open('ultimate/zone26.json')), {a: zone26.floor_mask(open(os.environ['BFU_PROTO'], 'rb').read(), os.environ['BFU_PROTO'], a) for a in range(1, 16)})[1] if 'world' in x][0]

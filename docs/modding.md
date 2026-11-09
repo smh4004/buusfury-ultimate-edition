@@ -60,12 +60,18 @@ step 1 code                       ; a step of bytecode
     end
 step 2 say 0x00 @0:809:49         ; a dialogue box: speaker 0x00 (narrator), text reference bank:offset:length
 step 3 say 0x02 "Hi, I'm new!"    ; ...or write the text inline: it's added to the overflow text bank
+step 4 say 0x02 @7 "Hi again!"   ; ...or put it in an added bank (7, 8, ...): see the note below
 step 18 zcode                     ; bytecode stored compressed (same syntax)
 step 5 saycode 0x02 @3:100:20     ; dialogue followed by bytecode
 step 6 text "-Buy\n-Sell"         ; inline UTF-16 text (shop menus)
 step 7 raw 7 00 fc 51 79 08 ...   ; step kinds not decoded yet, kept as bytes
 step ref gUnknown_0877C5E8        ; reuse a step that's written out in another list
 ```
+* **Text banks.** The game unpacks a line's whole bank every time it shows the line (`Text_LoadString2`, no cache), so each
+  line added to the overflow bank (6) makes every bank-6 line a little slower to appear. That's harmless in play but moves
+  anything timed to the frame. Big additions can take a bank of their own: `say SPEAKER @7 "text"` puts the line in bank 7
+  (then 8, ... in order). The build adds those banks as new objects and moves the bank table (`gTextBankTable`, read
+  only through the literal at 0x080123CC) to the appendix with the extra entries.
 * **Add, remove or reorder steps** freely in normal lists (`step auto ...` for new ones). The game finds the next step by
   its id, so the build renumbers steps 1, 2, 3... by position. In those lists the number you write only tells the build which original step a
   line came from. A few lists (dialogue trees, ids not starting at 1) keep ids exactly as written. A few lists have no

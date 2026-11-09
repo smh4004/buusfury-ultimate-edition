@@ -233,9 +233,12 @@ def unquote(s):
 
 
 def parse_text_arg(rest):
-    """`0x02 @3:100:20` or `0x02 "Hello"` -> (speaker, ref tuple or str)."""
+    """`0x02 @3:100:20` or `0x02 "Hello"` -> (speaker, ref tuple or str). `0x02 @7 "Hello"` puts a new line in
+    dialogue bank 7 (a bank added after the game's own seven; see tools/assets/assets.py) -> (speaker, (7, str))."""
     m = re.match(r'^(\S+)\s+@(\d+):(\d+):(\d+)', rest)
     if m: return int(m.group(1), 0), tuple(int(x) for x in m.group(2, 3, 4))
+    m = re.match(r'^(\S+)\s+@(\d+)\s+(".*)$', rest)
+    if m: return int(m.group(1), 0), (int(m.group(2)), unquote(m.group(3)))
     m = re.match(r'^(\S+)\s+(".*)$', rest)
     if m: return int(m.group(1), 0), unquote(m.group(2))
     raise ValueError('expected SPEAKER @bank:off:len or SPEAKER "text": %r' % rest)
@@ -265,7 +268,9 @@ def step_bytes(step, names, new_text):
         if len(raw) > ZBUF: raise ValueError('zcode step longer than %d bytes' % ZBUF)
         return hdr + bytes([pad]) + compress_stream(raw)
     spk, ref = parse_text_arg(step['rest'])
-    r = new_text(ref) if isinstance(ref, str) else ref[0] | ref[1] << 6 | ref[2] << 21
+    if isinstance(ref, str): r = new_text(ref)
+    elif len(ref) == 2: r = new_text(ref[1], ref[0])
+    else: r = ref[0] | ref[1] << 6 | ref[2] << 21
     b = hdr + bytes([spk]) + struct.pack('<I', r)
     if k == 'saycode': b += B.asm('\n'.join(step['body']), names)
     return b
