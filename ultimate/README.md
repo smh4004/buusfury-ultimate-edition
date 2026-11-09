@@ -91,7 +91,9 @@ writable statics (they'd link into ROM); the build stops if one appears.
   story_sync` (in skills_sync) sets them all once the ending is seen, and earlier where the scene sets a story flag of its own
   (`build.py STORY_MARKS`). Checked on the owner's save: the flags come on, Super Saiyan 2 goes into free slots.
 - The guest slot shows on Switch Character only once someone has joined it (record +0 bit 0); the original game plays it without
-  joining, so an old save had Broly unlocked (flag 111) and no slot to pick him in. `story_sync` joins the first unlocked guest.
+  joining, so an old save had Broly unlocked (flag 111) and no slot to pick him in. `story_sync` joins him then. Only him: every other
+  guest's flag is set by the script that joins him, and when it joined any unlocked guest it got in ahead of Broly's own join after his
+  fight in a rig with post-game guests unlocked (`test_story.py`: wrong outfit, no shared stat points).
 - Battle of Gods had more flags 47-48, which are New Game+'s round count (`outfit.c NG_FLAG`): starting the quest would have made
   enemies hit 1.5x, and 2.5x after King Kai's planet. It uses 49-57 now (58-63 are free).
 - Trials and Trials II had party slots 3 and 4 the wrong way round ("Vegeta vs Majin Buu" played as Trunks); `test_zone26.py` now
@@ -108,6 +110,10 @@ writable statics (they'd link into ROM); the build stops if one appears.
   quarter (his Strength and Power on his hits, his Endurance on the boss's), and its hits grow with the fighter's health past 4000 (at most
   3x). In a Super 13 rig with stats 180 (a level 200 fighter): his hits on Super 13 a third, Super 13's about 6.7% of the fighter's health a
   hit (it was about 1.5%). The owner: "want post game bosses to be a bit more of a challenge". Below 110 and 4000 nothing changes.
+- Battle of Gods' Beerus runs on those rules too. His Strength sets his big hits: at 115-120 three floored that fighter (2400-2600 each,
+  measured by poking his object's stats, +0x1B0, in an enemy rig). The god fight's legs are 85/90/95 now: about 880, 1040 and 1220 a hit
+  (12/14/16%, measured the same way): the hardest fights in the game, above Super 13, as the owner wants Beerus to be the strongest
+  (Garlic Jr.'s planned quest comes before).
 
 ## Beerus (Nov 9, for the Battle of Gods post-game)
 Buu's Fury has no Beerus, so `lib/beerus.py` makes every frame from BF Kid Buu's (actor 38): the same 15 x 31 build as the owner's front sprite

@@ -94,7 +94,9 @@ def standing(x, y):
     """Is someone standing still at (x, y)? (an object's position words, +0x1A0, in work RAM)"""
     return dump(0x02000000, 0x40000).find(struct.pack('<ii', x << 8, y << 8)) >= 0
 def full():
-    send('poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17))
+    """Health 32767, and the most health too: the rig's Goku is a new game's (about 135 at most), and with only his health raised Beerus
+    floored him within about 70 frames (Nov 9, the desert, where the first punches missed and Beerus struck back)."""
+    send('poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17), 'poke8 %08X FF' % (REC0 + 0x18), 'poke8 %08X 7F' % (REC0 + 0x19))
 
 # 0. Every place the quest puts someone (people, Beerus, Goku's arrivals, the spot below each person where you talk) is floor
 spots = [(*wa, n, x, y) for wa, people, _ in bog.PEOPLE for n, x, y in people] + [(*wa, 'talk to ' + n, x, y + 22) for wa, people, _ in bog.PEOPLE for n, x, y in people]
@@ -140,6 +142,9 @@ send('shot ritual'); mem(G)
 check('beating him there leads on to the ritual, and fighting is off again', at() == CAPSULE and more(bog.MORE_BOG_PARTY) and mem(COMBAT)[0] == 0)
 # 3. The ritual: Super Saiyan God; the god fight starts in West City
 scene(104, 264, in_area(WEST), menu=True); send('shot god_west'); mem(G)
+for _ in range(5):          # skills_sync grants it within 64 frames of the ritual's flag (Nov 9: one run checked a few frames too soon)
+    if 46 in held(): break
+    send('run 16'); mem(G)
 check('the ritual makes Goku a Super Saiyan God (the skill is his)', more(bog.MORE_BOG_RITUAL) and 46 in held())
 a, _, _ = boss(bog.ROWS[2][0])
 check('then Goku faces Beerus in West City', at() == WEST and a is not None)

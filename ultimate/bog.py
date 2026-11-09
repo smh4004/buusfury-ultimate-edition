@@ -51,9 +51,12 @@ ASIDE = (WEST_CITY, DESERT)                      # areas whose own people and en
 CHARS = {'king_kai': 161, 'bulma': 41, 'vegeta': 279, 'gohan': 123, 'videl': 287, 'goten': 166, 'trunks': 269}
 # Beerus's rows (copies of Kid Buu's): HP and (level + 50, Strength, Power, Endurance). On King Kai's planet he can't really be beaten
 # (250000 HP and hits that floor Goku; 2,000,000 broke Kid Buu's behaviour: likely an overflow in its health checks, it stopped attacking and crashed).
-# The god fight is three legs, 125000 in all (it was one 120000 fight), a little stronger each time.
+# The god fight is three legs, 125000 in all (it was one 120000 fight), a little stronger each time. His Strength sets his big hits: the
+# post-game boss rules (outfit.c combat_hook) make those grow with the player's health, and at 115-120 three of them floored a Goku of
+# 7563 HP and 180 in every stat (2400-2600 each, Nov 9). At 85/90/95 they take 880/1040/1220 (12/14/16%), against Super 13's 7%:
+# the hardest fights in the game, still won by blocking and dodging. (Power, 125-130, only sets a light 1-2 HP a frame beside him.)
 ROWS = ((250000, (160, 140, 140, 200)), (20000, (152, 85, 85, 80)),
-        (35000, (160, 115, 125, 110)), (40000, (161, 118, 128, 112)), (50000, (162, 120, 130, 115)))
+        (35000, (160, 85, 125, 110)), (40000, (161, 90, 128, 112)), (50000, (162, 95, 130, 115)))
 GOD_LEGS = (2, 3, 4)
 
 

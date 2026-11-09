@@ -1843,12 +1843,13 @@ static void story_sync(int post) {
     for (i = 0; i < (int)(sizeof story_marks / sizeof *story_marks); i++)
         if (GetFlag(G_FLAGS, story_marks[i][1])) FLAG_BYTE(story_marks[i][0]) |= 1 << (story_marks[i][0] & 7);
     /* The guest slot shows on Switch Character only once someone has joined it (record +0 bit 0, party_join). The original game plays it
-       without joining (Broly's story fight), so such a save had guests unlocked (Broly beaten, flag 111; Master Roshi) and no slot to pick
-       them in. The first unlocked guest joins it. */
+       without joining (Broly's story fight), so such a save had Broly beaten (flag 111) and no slot to pick him in: he joins it. Only
+       Broly: every other guest's flag is set by the script that joins him (party_join), and Broly's own fight sets 111 just before its
+       join, which must stay the one that joins him (on his outfit, with the player's unspent stat points; test_story.py). */
     if (!(REC(8)[0] & 1)) {
         int first = outfit_index[8][0], n = outfit_index[8][1];
         for (i = 0; i < n; i++)
-            if (outfit_table[first + i].flag && outfit_open(&outfit_table[first + i])) {
+            if (outfit_table[first + i].flag == 111 && outfit_open(&outfit_table[first + i])) {
                 int st[3] = {2, 8, outfit_table[first + i].form};
                 party_join(st);
                 break;
