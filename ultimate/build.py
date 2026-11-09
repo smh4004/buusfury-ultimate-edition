@@ -1207,6 +1207,9 @@ def add_actors(rom, clean):
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
     cfg['roshi_player'] = {'roshi_of': 'krillin', 'head_of': 177, 'chin': [12, 11], 'high': True}     # Master Roshi: Krillin's frames, Roshi's head and clothes (lib/roshi.py)
+    # Beerus (Battle of Gods, post-game): every frame of Kid Buu (actor 38, the boss's own 19 slots) with Beerus's head, collar and clothes
+    # (lib/beerus.py). Slot 17 is Kid Buu's death by dissolving (likely only the ending plays it): Beerus's is a hit, then the knockdown.
+    cfg['beerus'] = {'beerus_of': 38, 'one': one, 'high': True, 'remap': {'17': [(9, 0), (9, 1), (9, 2)] + [(15, k) for k in range(4)] + [(15, 3)] * 4}}
     cfg['_powerup'] = [101, 104, 105, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, powerup_frames(rom, ids, end)
@@ -2085,7 +2088,7 @@ def main():
     open('%s/%s.bps' % (OUT, name), 'wb').write(bps.make(clean, out))
     open('%s/%s_PERSONAL_USE_ONLY.gba' % (OUT, name), 'wb').write(out)
     ss2_lists = {str(u['flag']): symbol(u['list']) - ROM_BASE for u in json.load(open('ultimate/outfits.json'))['unlocks'] if u['flag'] >= SS2_FLAG}
-    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
+    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists, 'actors': {k: actors[k] for k in ('beerus',)}}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
     print('%s: %d bytes, sha1 %s, patch %d bytes, forms %s' % (name, len(out), hashlib.sha1(out).hexdigest(),
           os.path.getsize('%s/%s.bps' % (OUT, name)), index))
 

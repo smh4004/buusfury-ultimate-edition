@@ -7,6 +7,7 @@ Pieces are placed relative to the actor origin, which sits 8 px right of the pie
 Tiles are stored uncompressed (WFZ type 0), 8bpp, 1D mapping order; colours are OBJ palette indices.
 """
 import struct
+import sys
 import numpy as np
 
 SHAPE = {(8, 8): (0, 0), (16, 16): (0, 1), (32, 32): (0, 2), (64, 64): (0, 3), (16, 8): (1, 0), (32, 8): (1, 1),
@@ -247,6 +248,17 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             conv = roshi.Roshi(kst, rst, a['chin'][0], a['chin'][1])
             rec = viewed_actor(ins, rom, srec, conv.apply); ids[name] = len(table); table.append(ins.put(bytes(rec)))
             print('%s: heads placed %d, missed %d, clothes %d' % (name, conv.hits, conv.misses, conv.dressed))
+            continue
+        if 'beerus_of' in a:                               # Beerus: Kid Buu's frames with Beerus's head, collar and clothes (lib/beerus.py)
+            import beerus
+            src = table[a['beerus_of']]; srec = src - BASE
+            stand = struct.unpack_from('<I', rom, srec + 0x54)[0]
+            kst = {v: frame_image(rom, struct.unpack_from('<I', rom, stand - BASE + 4 + 4 * v)[0]) for v in (0, 1, 2)}
+            conv = beerus.Beerus(kst, a['one'])
+            rec = composed_actor(ins, rom, srec, conv.apply, {int(k): v for k, v in a.get('remap', {}).items()})
+            ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            print('%s: heads placed %d (%d by hand), missed %d' % (name, conv.hits, conv.manual, conv.misses))
+            if conv.misses: sys.exit('%s: Kid Buu\'s head not found in %d frames (add them to beerus.MANUAL)' % (name, conv.misses))
             continue
         if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
             src = a['tint_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
@@ -544,6 +556,52 @@ def viewed_actor(ins, rom, rec_at, fn):
             ptrs = [frame(u(o + 4 + 4 * j), min(j % 4, 2)) if u(o + 4 + 4 * j) else 0 for j in range(4 * k)]
             anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
         struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
+    return rec
+
+
+def composed_actor(ins, rom, rec_at, fn, remap=None):
+    """A copy of an actor with every frame through fn(image, view) as a whole: a frame's pieces (a boss's can have two, e.g. Kid Buu's 32x32
+    over 32x16) are put together on the frame's box, changed, and cut back into the same pieces, so the layout, OAM attributes and OBJ
+    memory stay the actor's own. Frame = u32 count, box (s8 x, s8 y, u8 w, u8 h), then count x (box, OAM attr, tile container) of 12 bytes.
+    remap: {slot: [(slot, frame), ...]} builds that slot from other slots' frames (Beerus: no death by dissolving). Tiles are stored raw."""
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    n = u(rec_at) & 0xFF; rec = bytearray(rom[rec_at:rec_at + 0x54 + 4 * n])
+    tiles, frames, anims = {}, {}, {}
+    def piece(tp, w, h):
+        o = tp - BASE; t, size = u(o), u(o + 4)
+        raw = rom[o + 8:o + 8 + size] if t == 0 else bytes(decompress_stream(rom, o + 8, size)[0])
+        raw = bytes(raw[:w * h]).ljust(w * h, b'\0')
+        return np.frombuffer(raw, np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+    def frame(fp, view):
+        if (fp, view) in frames: return frames[fp, view]
+        o = fp - BASE; c = u(o); bx, by, bw, bh = struct.unpack_from('<bbBB', rom, o + 4)
+        img = np.zeros((bh, bw), np.uint8); boxes = []
+        for j in range(c):
+            x, y, w, h = struct.unpack_from('<bbBB', rom, o + 8 + 12 * j)
+            img[y - by:y - by + h, x - bx:x - bx + w] = piece(u(o + 16 + 12 * j), w, h); boxes.append((x, y, w, h))
+        out = np.asarray(fn(img, view), np.uint8)
+        body = bytearray(rom[o:o + 8 + 12 * c])
+        for j, (x, y, w, h) in enumerate(boxes):
+            data = out[y - by:y - by + h, x - bx:x - bx + w].reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+            if data not in tiles: tiles[data] = ins.put(struct.pack('<II', 0, len(data)) + data)
+            struct.pack_into('<I', body, 16 + 12 * j, tiles[data])
+        frames[fp, view] = ins.put(bytes(body))
+        return frames[fp, view]
+    for s in range(n):
+        ap = u(rec_at + 0x54 + 4 * s)
+        if not ap or s in (remap or {}): continue             # a remapped slot's own frames aren't needed
+        if ap not in anims:
+            o = ap - BASE; k = u(o)
+            ptrs = [frame(u(o + 4 + 4 * j), min(j % 4, 2)) if u(o + 4 + 4 * j) else 0 for j in range(4 * k)]
+            anims[ap] = (k, ptrs, ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs)))
+        struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap][2])
+    for s, seq in (remap or {}).items():
+        ptrs = []
+        for src, f in seq:
+            k, p, _ = anims[u(rec_at + 0x54 + 4 * src)]
+            ptrs += p[4 * f:4 * f + 4]
+        struct.pack_into('<I', rec, 0x54 + 4 * int(s), ins.put(struct.pack('<I', len(seq)) + struct.pack('<%dI' % len(ptrs), *ptrs)))
     return rec
 
 

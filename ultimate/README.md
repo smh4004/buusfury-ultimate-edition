@@ -82,6 +82,18 @@ Variables added since Nov 9 live in work RAM from 0x0203F250 (the Kaioken bar, t
 when used: `heap_init` is left alone, because even a few more stores there made the game drop a frame in fifteen. `outfit.c` can't have
 writable statics (they'd link into ROM); the build stops if one appears.
 
+## Beerus (Nov 9, for the Battle of Gods post-game)
+Buu's Fury has no Beerus, so `lib/beerus.py` makes every frame from BF Kid Buu's (actor 38): the same 15 x 31 build as the owner's front sprite
+(`art/beerus_reference.jpg`), a bare torso, baggy trousers, wristbands, and the boss's 19 slots, so a fight on Kid Buu's enemy row plays all
+of them. Kid Buu's head (antenna and all) is found by matching his standing heads (and turned or mirrored ones), cleared, and Beerus's is drawn
+chin on chin, facing the same way: the owner's sprite from the front, the same head from behind, a profile with the ear standing like
+Janemba's from the side. A few frames (a scream, the dash's blur) have their head placed by hand (`MANUAL`, keyed by the frame's pixels). Then
+the collar under the chin, purple skin, gold wristbands, dark blue trousers with a navy waist and an orange gem, a gold hem, brown shoes; effects
+keep their colours. Kid Buu's slot 17 (dissolving, likely only his ending) becomes a hit, then the knockdown. Frames go through
+`sprites.composed_actor`, which keeps each frame's own pieces (a boss frame can have two). Actor `beerus` is the last new actor, so no other
+actor's id moves; `<rom>.map.json` records its id (character = id + 9). Checked on a sheet and in the emulator (an enemy rig with
+`BFU_RIG_ENEMY="61 <character>"`: he walks, punches, fires Kid Buu's beam and is knocked down).
+
 ## Zone 26 and Super 13
 
 The build also needs Prototype D (`BFU_PROTO`), Legacy of Goku II USA (`BFU_LOG2`) and a `log2-decomp` checkout next to this repo (its map index locates the snow tiles). `ultimate/zone26.py` builds areas 26:1-15 from the prototype's layouts and collision with `ultimate/reskin.py`'s tiles; `ultimate/zone26.json` lists the doors. After `python3 ultimate/build.py --debug --zone` (walking down on Snake Way enters the zone), run `python3 ultimate/test_zone26.py`.
