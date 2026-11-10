@@ -221,11 +221,14 @@ FOR EXACT COLOR/SHADING", "Vegeta final shine is fine"):
     - Hair: `ssb.fill` turns the hair's shades left gold at its edge blue: a gap in the bangs, the hair's last row over the face, a side
       lock's end, and once, the hair's inner corner by the temple (these last two only within 4 pixels of an eye, so a running
       shoulder's top stays skin). `ssb.sideburns` turns blue a hair shade drawn over the base figure's skin with hair beside or above it
-      and no eye beside it, e.g. Goku's sideburn in front of his ear, seen from the side. The two repeat until nothing changes.
+      and no eye beside it, e.g. Goku's sideburn in front of his ear. It applies to Goku only, from the side only (one eye), and only behind
+      the eye on the eye's rows, because it put a blue pixel on Vegeta's cheek (the owner: "you put the blue pixel back in vegetas face
+      again"). The two repeat until nothing changes.
     - Pixels touching the face's skin or an eye at their left, right or top stay skin. A blue stub cut off from the hair (under
       Vegeta's ear) is dropped.
     - The armour's Blue Vegeta has no base figure to check against, so it keeps the old rule (with the eye fix).
-  - Check: test_frames 7, against the retail ROM's base figures: no skin pixel blue, and no gold left in the hair (no gap, no sideburn).
+  - Check: test_frames 7, against the retail ROM's base figures: no skin pixel blue, no face outline blue (except Goku's sideburn), no
+    gap left gold, and Goku's sideburn blue.
     It fails on the builds the owner screenshotted.
   - Vegeta's glove and boot highlights are white too and still turn pale blue. That is unchanged and was not asked for; the owner was
     asked.

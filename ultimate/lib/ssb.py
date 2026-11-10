@@ -91,7 +91,7 @@ def old_rule(img, ramp):
     return np.isin(img, ramp) & ~ew & (dh < df) & (dh <= 3)
 
 
-def hair_mask(img, under, ramp):
+def hair_mask(img, under, ramp, sides=False):
     """The Super Saiyan hair in one piece `img` (see the note above); `under` the base figure's pixels under it, or None (the old rule
     alone). A pixel only the base figure makes hair that has the figure's body (not hair, not empty) to its left, its right or above it is
     the face's or the neck's outline where the base figure's hair hung over it (Vegeta's brow and jaw, Goku's cheeks; Nov 10, the owner:
@@ -114,7 +114,7 @@ def hair_mask(img, under, ramp):
     hair = np.isin(lab, list(set(np.unique(lab[old | (hair & np.isin(img, LIGHTS))]).tolist()) - {0}))
     hair = fill(img, hair, under, ramp, same)
     for _ in range(4):                                                            # (each closes gaps for the other)
-        more = fill(img, sideburns(img, hair, under, ramp, same), under, ramp, same)
+        more = fill(img, sideburns(img, hair, under, ramp, same) if sides else hair, under, ramp, same)
         if (more == hair).all(): break
         hair = more
     hair &= ~same
@@ -126,12 +126,23 @@ def hair_mask(img, under, ramp):
 
 
 def sideburns(img, hair, under, ramp, same):
-    """Hair the Super Saiyan figure draws where the base figure has skin (his sideburns in front of his ear, seen from the side; Nov 10,
-    the owner: "THE SIDES OF GOKUS HAIR AROUND HIS EARS ARE YELLOW STILL"): a ramp pixel drawn differently from the base figure, not
-    beside an eye, with hair at its left, its right or above it, is hair; repeated."""
-    eyes = np.isin(img, IRIS + (117, 118)) | eye_whites(img)
+    """Hair the Super Saiyan figure draws where the base figure has skin: Goku's sideburn in front of his ear, and the hair down the back
+    of his head, seen from the side (Nov 10, the owner: "THE SIDES OF GOKUS HAIR AROUND HIS EARS ARE YELLOW STILL"). Seen from the side
+    only (one eye), on the eye's rows (and the one above), behind the eye only (away from his face), not beside an eye: a ramp pixel
+    drawn differently from the base figure with hair at its left, its right or above it is hair; repeated. Never his face: Vegeta's cheek
+    and forehead (Nov 10, the owner: "you put the blue pixel back in vegetas face again")."""
+    from scipy import ndimage
+    iris = np.isin(img, IRIS)
+    lab, n = ndimage.label(iris, np.ones((3, 3)))
+    if n != 1: return hair                                                        # facing us (or no face): nothing
+    rows, cols = np.nonzero(iris)
+    figure = np.nonzero(img[rows.min():rows.max() + 1].any(0))[0]
+    zone = np.zeros(img.shape, bool)
+    if cols.min() - figure.min() < figure.max() - cols.max(): zone[rows.min() - 1:rows.max() + 1, cols.max() + 2:] = True   # facing left
+    else: zone[rows.min() - 1:rows.max() + 1, :max(0, cols.min() - 1)] = True                                               # facing right
+    eyes = iris | np.isin(img, (117, 118)) | eye_whites(img)
     p = np.pad(eyes, 1); by_eye = p[1:-1, :-2] | p[1:-1, 2:] | p[:-2, 1:-1] | p[2:, 1:-1]
-    cand = np.isin(img, ramp) & ~eye_whites(img) & ~same & ~by_eye & ~np.isin(under, BASE_HAIR)
+    cand = zone & np.isin(img, ramp) & ~eye_whites(img) & ~same & ~by_eye & ~np.isin(under, BASE_HAIR)
     for _ in range(8):
         h = np.pad(hair, 1)
         add = cand & ~hair & (h[1:-1, :-2] | h[1:-1, 2:] | h[:-2, 1:-1])
@@ -169,13 +180,14 @@ def fill(img, hair, under, ramp, same=None):
     return hair
 
 
-def tint(rom, ss, base, to):
+def tint(rom, ss, base, to, sides=False):
     """A tint function (sprites.tinted_actor) turning Super Saiyan figure `ss`'s hair blue: {ramp index: blue index} `to`, the hair found
-    against base figure `base` (or the old rule alone when base is None)."""
+    against base figure `base` (or the old rule alone when base is None); `sides`: the hair round his ears seen from the side (sideburns;
+    Goku only)."""
     under = base_under(rom, ss, base) if base is not None else {}
     ramp = list(to)
     def fn(img):
-        hair = hair_mask(img, under.get((img.shape, img.tobytes())), ramp)
+        hair = hair_mask(img, under.get((img.shape, img.tobytes())), ramp, sides)
         out = img.copy()
         for k, v in to.items(): out[hair & (img == k)] = v
         return out

@@ -204,16 +204,28 @@ for name in ('goku_ssb', 'goku_ssb_b', 'vegeta_ssb', 'vegeta_ssb_b'):
                 if pure or tips: yellow.append((name, slot, i, d, int(pure), int(tips)))
 check('Blue Goku\'s and Blue Vegeta\'s hair has no gold left (none of 28, 29, 246; standing, walking or running, no gold shade in the spikes\' top 4 rows)%s' % ((': %s' % yellow[:6]) if yellow else ''), not yellow)
 from scipy import ndimage
-# ... and only their hair changed (Nov 10, the owner: "Fix some of SSB Goku and vegetas face pixels being blue", then "DONT MAKE THEIR
-# FUCKING FOREHEAD SKIN BLUE OR THEIR EARS EITHER JUST THE HAIR"): every frame against the Super Saiyan figure it's made from, and that
-# against the base figure laid under it (lib/ssb.base_under, the retail ROM's frames): the eyes' whites (white beside an eye's green) are
-# unchanged, and no pixel the Super Saiyan figure draws exactly as the base figure does (his skin, forehead, ears) turned blue, unless
-# blue walls it in on all four sides. And no gold left at the hair's edge ("YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB", "THE
-# SIDES OF GOKUS HAIR AROUND HIS EARS ARE YELLOW STILL"): no hair shade the Super Saiyan figure draws differently from the base figure,
-# not beside an eye, left gold with blue on three sides, or (where the base figure has skin: his sideburns) with blue beside or above it.
+# ... and only their hair changed (Nov 10, the owner: "Fix some of SSB Goku and vegetas face pixels being blue", "DONT MAKE THEIR FUCKING
+# FOREHEAD SKIN BLUE OR THEIR EARS EITHER JUST THE HAIR", "you put the blue pixel back in vegetas face again"): every frame against the
+# Super Saiyan figure it's made from, and that against the base figure laid under it (lib/ssb.base_under, the retail ROM's frames):
+# - the eyes' whites (white beside an eye's green) are unchanged;
+# - no pixel the Super Saiyan figure draws exactly as the base figure does (his skin, forehead, ears) turned blue, unless blue walls it
+#   in on all sides (a speck of up to 3);
+# - no skin shade with the face's skin (200, 203) or an eye directly left or right of it turned blue, but for Goku's sideburn: seen from
+#   the side, on the eye's rows (and the one above), behind the eye.
+# And no gold left in the hair ("YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB", "THE SIDES OF GOKUS HAIR AROUND HIS EARS ARE
+# YELLOW STILL"): no hair shade the Super Saiyan figure draws differently from the base figure, not beside the face or an eye, left gold
+# with blue on three sides; and Goku's sideburn blue (there, a shade drawn differently from the base figure's skin, next to the blue).
 import ssb
 retail = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'baserom.gba'), 'rb').read()
 SKIN_SHADES = (16, 201, 202)
+def behind_eye(b):
+    """Seen from the side (one eye): the eye's rows and the one above, behind the eye (away from where he looks)."""
+    iris = np.isin(b, (215, 216)); zone = np.zeros(b.shape, bool)
+    if ndimage.label(iris, np.ones((3, 3)))[1] != 1: return zone
+    rows, cols = np.nonzero(iris); fig = np.nonzero(b[rows.min():rows.max() + 1].any(0))[0]
+    if cols.min() - fig.min() < fig.max() - cols.max(): zone[rows.min() - 1:rows.max() + 1, cols.max() + 2:] = True
+    else: zone[rows.min() - 1:rows.max() + 1, :max(0, cols.min() - 1)] = True
+    return zone
 face_blue, edge_gold = [], []
 for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 28, 26), ('vegeta_ssb_b', 29, 27), ('vegeta_armor_ssb', forms['vegeta_armor_ss'], None)):
     under = ssb.base_under(retail, actor_of(ss), actor_of(base)) if base is not None else {}
@@ -228,22 +240,26 @@ for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 
                 h = np.pad(blue, 1); nh = h[:-2, 1:-1].astype(int) + h[2:, 1:-1] + h[1:-1, :-2] + h[1:-1, 2:]
                 ub = under.get((b.shape, b.tobytes()))
                 same = (b == ub) & np.isin(b, SKIN_SHADES) if ub is not None else np.zeros(b.shape, bool)
-                skin_blue = same & blue                                     # (a speck of up to 3 the blue walls in on every side is allowed)
+                skin_blue = same & blue
                 lab, nl = ndimage.label(skin_blue)
                 for k in range(1, nl + 1):
                     m = lab == k
                     if m.sum() <= 3 and blue[ndimage.binary_dilation(m) & ~m].all(): skin_blue &= ~m
-                n = int((ew & blue).sum() + skin_blue.sum())
+                q = np.pad(np.isin(b, (200, 203, 215, 216)) | ew, 1)
+                zone = behind_eye(b) if name.startswith('goku') else np.zeros(b.shape, bool)
+                outline = blue & np.isin(b, SKIN_SHADES) & (q[1:-1, :-2] | q[1:-1, 2:]) & ~zone
+                n = int((ew & blue).sum() + skin_blue.sum() + outline.sum())
                 if n: face_blue.append((name, slot, i, d, n))
                 if ub is None: continue
                 e = np.pad(np.isin(b, (215, 216, 117, 118)) | ew, 1)
                 by_eye = e[1:-1, :-2] | e[1:-1, 2:] | e[:-2, 1:-1] | e[2:, 1:-1]
-                fc = np.pad(np.isin(b, ssb.FACE) | ew, 1)                   # (the face's own outline: its skin or an eye at its left, right or top)
-                drawn = np.isin(b, SKIN_SHADES) & ~same & ~by_eye & ~blue & ~(fc[1:-1, :-2] | fc[1:-1, 2:] | fc[:-2, 1:-1])
-                gold = drawn & ((nh >= 3) | (~np.isin(ub, ssb.BASE_HAIR) & (h[1:-1, :-2] | h[1:-1, 2:] | h[:-2, 1:-1])))
+                fc = np.pad(np.isin(b, ssb.FACE) | ew, 1)
+                drawn = np.isin(b, SKIN_SHADES) & ~same & ~by_eye & ~blue
+                gold = (drawn & ~(fc[1:-1, :-2] | fc[1:-1, 2:] | fc[:-2, 1:-1]) & (nh >= 3)) | \
+                       (drawn & zone & ~np.isin(ub, ssb.BASE_HAIR) & (h[1:-1, :-2] | h[1:-1, 2:] | h[:-2, 1:-1]))
                 if gold.any(): edge_gold.append((name, slot, i, d, int(gold.sum())))
-check('Blue Goku\'s and Blue Vegeta\'s faces aren\'t blue (the eyes\' whites, and all the base figure\'s skin: face, forehead, ears)%s' % ((': %s' % face_blue[:6]) if face_blue else ''), not face_blue)
-check('no gold left in their hair (no gap in it, no sideburn left gold)%s' % ((': %s' % edge_gold[:6]) if edge_gold else ''), not edge_gold)
+check('Blue Goku\'s and Blue Vegeta\'s faces aren\'t blue (the eyes\' whites, the base figure\'s skin: face, forehead, ears, and the face\'s outline)%s' % ((': %s' % face_blue[:6]) if face_blue else ''), not face_blue)
+check('no gold left in their hair (no gap in it; Goku\'s sideburns blue)%s' % ((': %s' % edge_gold[:6]) if edge_gold else ''), not edge_gold)
 eyes = []                                  # his base and Super Saiyan looks: the sheet's eyes were dropped as background (gogeta.frame)
 for name in ('gogeta_dbs', 'gogeta_dbs_ss'):
     for slot in range(22):

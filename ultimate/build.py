@@ -1358,7 +1358,7 @@ def add_actors(rom, clean):
     to = {k: one(np.array(v)) for k, v in SSB_HAIR.items()}
     for n, (_, _, _, src, base) in SSB_LOOKS.items():
         under = struct.unpack_from('<H', clean, FORMS + FORM_SIZE * base + 0x0E)[0] - 9 if isinstance(src, int) and isinstance(base, int) else None
-        cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to), 'high': True}
+        cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to, sides=n.startswith('goku')), 'high': True}   # (his sideburns)
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
