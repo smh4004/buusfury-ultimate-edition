@@ -274,6 +274,11 @@ like the kamehameha frames do. Why the fuck is super android 13s beam attack fra
   slot 10 is BSO's change into him from base Gogeta (black hair); this look never changes form, so it is left out and his power-up stands
   in if a skill plays it.
 - Shown to the owner as before/now sheets from the build before any reshoot. `test_frames.py` 6 checks the GT Vegeta changes.
+- Approved figures are locked (16:08, "Reshoot it all and lock changes"): `ultimate/locked.json` lists the forms with a fingerprint of all
+  their frames (`lib/lock.py`: every slot, frame and view, each piece's box, attributes and pixels, not where they sit in the ROM), and
+  every build stops with LOCKED FRAMES CHANGED if one differs. Locked: GT Vegeta's looks, Broly Full Power, the four armour Vegetas,
+  Super 13, SSJ4 Gogeta, and the Blue looks approved earlier that day (Goku's two, Vegeta's two, Gogeta). A listed form with no
+  fingerprint gets one on the next build; `BFU_RELOCK=<form>[,...]` records a change the owner asked for.
 
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The

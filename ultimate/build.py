@@ -2364,6 +2364,8 @@ def main():
         size = rom32.SIZE
     else:
         size = (actors_end + 0xFFFFF) & ~0xFFFFF
+    import lock                                       # approved figures (locked.json): the build stops if one changed
+    lock.check(rom, index, lambda f: struct.unpack_from('<I', rom, ACTORS_AT + 4 * (struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] - 9))[0] - ROM_BASE)
     out = bytes(rom[:size])
     if bps.apply(clean, bps.make(clean, out)) != out:
         sys.exit('BPS round trip failed')
