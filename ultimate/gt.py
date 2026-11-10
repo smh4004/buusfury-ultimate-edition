@@ -52,11 +52,90 @@ def template_slots(rom, actor):
     return [s for s in range(n) if u(rec + 0x54 + 4 * s)], n
 
 
+# Uub's and Majuub's flying (slot 15; Nov 9, the owner: "Those flying frames are super fucked for Uub/Majuub fix that too"). The sheet draws Uub's
+# on kid Goten's flying (as BSO's tools/uub.py does for every Goten-based move) and Majuub's on base Gotenks', whose torso his big hair covers:
+# with Uub's smaller head on it Majuub flew as a head with a strip of trousers trailing behind (side), a head on two hands (front). Majuub's
+# is now Uub's flying in Majuub's outfit, as the sheet itself does for every move it builds on Goten for both (8, 13, 16, 18-21: Uub's frames,
+# his colours swapped); and seen from the front both lose what Goten's legs and boot soles left round the smaller head (a green tuft and grey
+# specks above his hair).
+GREENS = {216: 0, 251: 1, 252: 2}                 # Uub's tunic and trousers, dark -> light (BFU indices; the sheet's green ramp)
+GOLD = {25, 250, 110}                             # sash and wristbands (both looks)
+MAJUUB_VEST = 70                                  # Majuub's navy vest (all the sheet's vest shades come out as this one)
+MAJUUB_PANTS = {0: 117, 1: 119, 2: 120}           # his white trousers (the sheet's Uub -> Majuub frames: 216 -> 117/118, 251 -> 119/120)
+HAIR, SKIN = {1}, {77, 78, 79, 16, 17, 202}
+EYE_WHITE = {2}                                   # the eye whites (front views: two eyes on one row)
+GOTEN_NAVY = 157                                  # Goten's flickering navy sleeves, left in a few of Uub's frames as dark purple specks
+
+
+def eye_at(c):
+    """(row, column) of the eyes: the eye whites within the figure's top 18 rows."""
+    top = np.nonzero(c.any(1))[0].min()
+    e = np.argwhere(c[:top + 18] == 2)
+    return (int(e[:, 0].min()), int(round(e[:, 1].mean()))) if len(e) else None
+
+
+def flying_front(c, ref, first):
+    """A front flying frame. Its head is his standing head (the sheet pastes the same one), so above the eyes it becomes exactly what the
+    standing front frame `ref` has there (lined up by the eyes): Goten's legs and boot soles behind it, and the grey and green specks they
+    left in the hair, go. Goten's sleeve flicker (GOTEN_NAVY) takes the first frame's colour at that spot (the frames are the same but for it)."""
+    c = c.copy(); e, r = eye_at(c), eye_at(ref)
+    if e and r:
+        dy, dx = e[0] - r[0], e[1] - r[1]
+        moved = np.zeros_like(c)
+        ys, xs = np.nonzero(ref)
+        ok = (ys + dy >= 0) & (ys + dy < c.shape[0]) & (xs + dx >= 0) & (xs + dx < c.shape[1])
+        moved[ys[ok] + dy, xs[ok] + dx] = ref[ys[ok], xs[ok]]
+        c[:e[0]] = moved[:e[0]]
+    fix = (c == GOTEN_NAVY) & (first != GOTEN_NAVY)
+    c[fix] = first[fix]
+    return c
+
+
+def despeck(c):
+    """Any GOTEN_NAVY speck left: the commonest colour round it."""
+    c = c.copy()
+    for y, x in np.argwhere(c == GOTEN_NAVY):
+        near = [int(v) for v in c[max(0, y - 1):y + 2, max(0, x - 1):x + 2].ravel() if v and v != GOTEN_NAVY]
+        c[y, x] = max(set(near), key=near.count) if near else 0
+    return c
+
+
+def majuub_dress(c, view):
+    """Uub's flying frame in Majuub's outfit: the tunic -> his navy vest, the trousers -> his white ones. Seen from the front or behind only his
+    back and shoulders show; from the side the trousers start at the sash (its gold in the body's lower rows, behind the fist's wristband)."""
+    c = c.copy(); g = np.isin(c, list(GREENS))
+    legs = np.zeros(c.shape, bool)
+    if view == 2:
+        ys, xs = np.nonzero(c); body = np.zeros(c.shape, bool); body[ys.max() - 3:] = True
+        fist = np.nonzero(np.isin(c, list(SKIN)) & body)[1]
+        gold = np.argwhere(np.isin(c, list(GOLD)) & body)
+        gold = gold[gold[:, 1] > (fist.max() + 2 if len(fist) else 0)]
+        if len(gold): legs[:, gold[:, 1].min() - 1:] = True
+    for y, x in zip(*np.nonzero(g)):
+        c[y, x] = MAJUUB_PANTS[GREENS[c[y, x]]] if legs[y, x] else MAJUUB_VEST
+    return c
+
+
+def repair(frames):
+    """Uub's and Majuub's flying (above), in place; then no Goten navy specks left in either."""
+    if 'uub' not in frames: return
+    uub = frames['uub'][15]
+    first = uub[0][0]
+    uub[0] = [flying_front(c, frames['uub'][0][0][0], first) for c in uub[0]]
+    if 'majuub' in frames:
+        frames['majuub'][15] = [[majuub_dress(c, v) for c in uub[v]] for v in range(3)]
+    for name in ('uub', 'majuub'):
+        for views in frames.get(name, {}).values():
+            for v in range(3): views[v] = [despeck(c) for c in views[v]]
+
+
 def actors(clean, pal, lengths):
     """{name: build_actors cfg} for every GT actor."""
     sys.path.insert(0, HERE)
     import bso_import
     frames, info = bso_import.load_all(clean, pal, list(ACTORS))
+    frames = {k: {s: [list(v) for v in views] for s, views in f.items()} for k, f in frames.items()}    # (a copy: load_all's is cached)
+    repair(frames)
     out = {}
     for name, tpl in ACTORS.items():
         have = dict(frames[name]); slots, n = template_slots(clean, tpl)

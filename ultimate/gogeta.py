@@ -8,13 +8,15 @@ SHEET = 'ultimate/art/gogeta_sheet.jpg'
 # or ('x', n) for a cell on the fourth row, which only has a side view. VIEWS overrides an animation on one view, whose cell numbers differ.
 ANIMS = {
     'idle': [0, 1], 'walk': [2, 3, 4, 5], 'run': [6, 7, 8, 9], 'combo1': [10, 11, 12, 13], 'combo2': [14, 15, 17, 18], 'combo3': [21, 22, 23, 24],
-    'blast': [19, 20, 19], 'kick': [26, 27, 28], 'powerup': [38, 39], 'hurt': [34],
+    'blast': [19, 20, 19], 'fire': [19, 20, 20], 'kick': [26, 27, 28], 'powerup': [38, 39], 'hurt': [34],
     'tumble': [('x', 5), ('x', 6), ('x', 7), ('x', 8)], 'down': [('x', 9), ('x', 10), ('x', 11), ('x', 12)], 'rise': [('x', 13), ('x', 14), ('x', 15)],
 }
-VIEWS = {('powerup', 2): [36, 37], ('combo1', 1): [11, 12, 13, 14], ('combo2', 1): [15, 16, 17, 18], ('blast', 1): [18, 19, 18]}
+VIEWS = {('powerup', 2): [36, 37], ('combo1', 1): [11, 12, 13, 14], ('combo2', 1): [15, 16, 17, 18], ('blast', 1): [18, 19, 18], ('fire', 1): [18, 19, 19]}
 # Animation slots, following the order in actors.json: 0 idle, 1 walk, 2 run, 3 and 10 and 13 charge, 4-6 melee, 7 and 15 hurt, 8 9 21 ki, 14 and 20 strikes, 16-17 knocked down, 18 the pose held while firing a skill.
+# Slot 18 is 'fire', not 'blast': the Kamehameha holds frame 0 and then shows frames 1 and 2 in turn while the beam is out (sprites.INDEXED), so
+# blast's third cell (the wind-up again) put Gogeta back into the wind-up every few frames while firing (test_frames.py).
 SLOTS = {0: 'idle', 1: 'walk', 2: 'run', 3: 'powerup', 4: 'combo1', 5: 'combo2', 6: 'combo3', 7: 'hurt', 8: 'blast', 9: 'blast', 10: 'powerup', 11: 'idle',
-         12: 'idle', 13: 'powerup', 14: 'kick', 15: 'hurt', 16: 'tumble', 17: 'down', 18: 'blast', 19: 'idle', 20: 'kick', 21: 'blast'}
+         12: 'idle', 13: 'powerup', 14: 'kick', 15: 'hurt', 16: 'tumble', 17: 'down', 18: 'fire', 19: 'idle', 20: 'kick', 21: 'blast'}
 FORMS = {'ssb': 0, 'ssj': 4, 'base': 8}     # first band of each form
 
 

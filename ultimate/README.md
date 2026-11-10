@@ -141,6 +141,23 @@ writable statics (they'd link into ROM); the build stops if one appears.
   measured by poking his object's stats, +0x1B0, in an enemy rig). The god fight's legs are 85/90/95 now: about 880, 1040 and 1220 a hit
   (12/14/16%, measured the same way): the hardest fights in the game, above Super 13, as the owner wants Beerus to be the strongest
   (Garlic Jr.'s planned quest comes before).
+- The firing pose (the owner, on the trailer: "Don't know wtf is going on with Uubs head after the kamehameha", "the head is way too far
+  back in that one side view"). The Kamehameha holds frame 0 of slot 18 (the charge, hands at the hip), then shows frames 1 and 2 in turn
+  while the beam is out (logged in the emulator). A playable form's animations are made as long as a retail player's, and slot 18 was
+  spread out ([0,0,1,1,2,2] for three frames), so frame 1 was the charge again: every GT fighter dropped back into it every few frames
+  while firing. `sprites.INDEXED` slots keep each frame at its number and repeat the last. DBS Gogeta's own firing cells ended on the
+  wind-up (`gogeta.py` 'fire').
+- Uub's and Majuub's flying (slot 15; "Those flying frames are super fucked for Uub/Majuub"): the sheet draws Majuub's on base Gotenks',
+  whose torso his big hair covers, so he flew as a head with a strip of trousers. `gt.repair` gives him Uub's flying (kid Goten's) in his
+  own colours, as the sheet does for every move it builds on Goten for both, and clears what Goten's legs and boot soles left round their
+  smaller head seen from the front (a green tuft, grey specks), and Goten's sleeve flicker (dark purple specks) everywhere.
+- Broly Full Power floated over his shadow ("fix Broly looking like he's floating"): BF's Broly record puts the feet 15 rows under the
+  origin, a fighter's 7, and the sheet's frames were lined up like a fighter's; they are drawn 8 rows lower (`origin_dy`). Then "Remove
+  the shadow beneath Broly's feet too cause it looks off": an actor record's +0xA/+0xB is its shadow's size, looked up in 0x086B759C
+  (4x2, 10x4, 16x6, 24x10) when the object is made; both Brolys (actor 29, the story's too, and Full Power) get a size not in it, so the
+  draw (sub_0800EF94) has no shadow piece (`sprites` `_no_shadow`; checked in the emulator's OAM).
+- `test_frames.py` reads every one of these from a built ROM: firing poses in order for every added actor, Majuub's and Uub's flying,
+  no specks, feet on the same row for forms on the same template, no shadow under either Broly.
 
 ## Beerus (Nov 9, for the Battle of Gods post-game)
 Buu's Fury has no Beerus, so `lib/beerus.py` makes every frame from BF Kid Buu's (actor 38): the same 15 x 31 build as the owner's front sprite

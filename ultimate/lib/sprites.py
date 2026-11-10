@@ -212,11 +212,23 @@ def slot_frames(clean_dir, spec):
     return [d[sl] for d in dirs] if sl else dirs
 
 
-def stretch(dirs, n):
-    """Repeat frames evenly so each direction has n frames (the replaced slot's own count: fight code may time hits
-    and effects by frame index)."""
+# Slots whose frames a skill picks by number rather than plays in order: the Kamehameha holds frame 0 of slot 18 (the charge, hands at the hip) and
+# then shows frames 1 and 2 in turn while the beam is out (test_moves.fire(watch=True) logged 18:0 x12, then 18:2 / 18:1 alternating). Spreading a
+# 3-frame slot over 6 ([0,0,1,1,2,2]) made frame 1 the charge again, so every GT fighter dropped back into the charge pose every few frames while
+# firing (Nov 9, the owner on Majuub: "the head is way too far back in that one side view"). Made longer, these keep every frame at its own
+# number and repeat the last one.
+INDEXED = {18}
+
+
+def longer(k, n, slot=None):
+    """Frame indices that make a k-frame animation n frames long: spread evenly, or for an INDEXED slot each in place and then the last."""
+    return [min(i, k - 1) if slot in INDEXED else i * k // n for i in range(n)]
+
+
+def stretch(dirs, n, slot=None):
+    """Repeat frames so each direction has n frames (the replaced slot's own count: fight code may time hits and effects by frame index)."""
     if not n or len(dirs[0]) >= n: return dirs
-    k = len(dirs[0]); idx = [i * k // n for i in range(n)]
+    idx = longer(len(dirs[0]), n, slot)
     return [[d[i] for i in idx] for d in dirs]
 
 
@@ -337,15 +349,17 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             ins.oy = 0
         for d, box in a.get('boxes', {}).items():          # per-direction (x, y, w, h) box override
             struct.pack_into('<4i', rec, 0x14 + 16 * int(d), *box)
+        ins.oy = a.get('origin_dy', 0)                     # sheet frames drawn lower than the cell's bottom (Broly Full Power: see build.py)
         for slot, spec in a.get('slots', {}).items():
             if int(slot) >= n: continue                    # the template has fewer slots
             old = struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]
             want = struct.unpack_from('<I', rom, old - BASE)[0] if (target is not None or a.get('stretch')) and old else 0
-            key = (spec, want)
+            key = (spec, want, int(slot) in INDEXED, ins.oy)
             if key not in anims:
                 dirs = slot_frames(clean_dir, spec)
-                anims[key] = ins.anim(stretch(dirs, want)) if dirs else None
+                anims[key] = ins.anim(stretch(dirs, want, int(slot))) if dirs else None
             if anims[key]: struct.pack_into('<I', rec, 0x54 + 4 * int(slot), anims[key])
+        ins.oy = 0
         if 'proto_actor' not in a:
             for slot, src in a.get('fill', {}).items():    # a retail actor that never played these: its own frames stand in, as on the prototype's bosses
                 if int(slot) < rec[0] and not struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]:
@@ -357,7 +371,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             k = struct.unpack_from('<I', rom, ap - BASE)[0]
             if k >= want: continue
             old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
-            grown = [old[(i * k // want) * 4 + d] for i in range(want) for d in range(4)]
+            grown = [old[j * 4 + d] for j in longer(k, want, int(slot)) for d in range(4)]
             struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.put(struct.pack('<I', want) + struct.pack('<%dI' % len(grown), *grown)))
         if a.get('stance_back'):                           # slot 11 is the change back: an animation as long as a retail one takes four seconds, the stance one
             struct.pack_into('<I', rec, 0x54 + 44, struct.unpack_from('<I', rec, 0x54)[0])
@@ -377,6 +391,14 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         k = struct.unpack_from('<I', rom, ap - BASE)[0]; old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
         grown = [old[(i * k // 11) * 4 + d] for i in range(11) for d in range(4)]
         struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', 11) + struct.pack('<44I', *grown)))
+        table[at_] = ins.put(bytes(rec))
+    # Actors drawn with no ground shadow (cfg '_no_shadow': ids or names). Record bytes +0xA/+0xB are the shadow's size, looked up when the
+    # object is made (sub_08013E38 in 0x086B759C: 4x2, 10x4, 16x6, 24x10); a size not in the table gives none, and the draw (sub_0800EF94)
+    # skips the piece. The record is copied, so nothing else changes.
+    for key in cfg.get('_no_shadow', ()):
+        at_ = key if isinstance(key, int) else ids[key]
+        o = table[at_] - BASE; n = struct.unpack_from('<I', rom, o)[0] & 0xFF; rec = bytearray(rom[o:o + 0x54 + 4 * n])
+        rec[0xA] = rec[0xB] = 0
         table[at_] = ins.put(bytes(rec))
     rom[at:at + 4 * len(table)] = struct.pack('<%dI' % len(table), *table)
     for lit in ACTOR_LITERALS:

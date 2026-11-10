@@ -1292,7 +1292,12 @@ def add_actors(rom, clean):
     android13_frames(clean_dir, usable, pal)
     cfg['android13'] = {'template': 157, 'slots': ANDROID13_SLOTS}
     broly_frames(clean_dir, usable, pal)
-    cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True}
+    # origin_dy 8: BF's Broly (actor 29, whose record this one copies, shadow and all) stands with his feet 15 rows under his origin, a normal fighter 7;
+    # the sheet's frames were lined up like a fighter's, so he hovered over his shadow (Nov 9, the owner: "fix Broly looking like he's floating")
+    cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True, 'origin_dy': 8}
+    # and no ground shadow for either Broly (the owner, same day: "Remove the shadow beneath Broly's feet too cause it looks off"): BF's
+    # 24x10 oval, the biggest the game has, sat out past his boots in every pose. The story's Broly is the same record (actor 29).
+    cfg['_no_shadow'] = [29, 'broly_fp']
     one = indexer(usable, pal); lengths = player_anim_lengths(clean)
     cfg['broly_fp']['grow'] = lengths
     for actor, form in (('gogeta_dbs', 'base'), ('gogeta_dbs_ss', 'ssj')):
