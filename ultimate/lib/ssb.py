@@ -14,6 +14,8 @@ BASE, ACTOR_LIST = 0x08000000, 0x6B6BD8
 LIGHTS = (28, 29, 2)            # the hair's highlights
 FACE = (200, 203, 215, 216, 117)  # the face's own colours (its light skin, the eyes)
 IRIS = (215, 216)               # the eyes' green
+SKIN = (16, 202, 201)           # the skin's shades, which the hair's ramp shares
+ISLAND = 3                      # hair_mask: a speck of skin shades this small that the hair walls in is hair
 HEAD = 4                        # fill: the hairline and the temples are this near an eye
 BASE_HAIR = (0, 1, 112)         # nothing, or the base figure's black hair (and its grey shine)
 O = 48                          # canvas margin
@@ -90,13 +92,17 @@ def old_rule(img, ramp):
 
 
 def hair_mask(img, under, ramp):
-    """The Super Saiyan hair in one piece `img` (see the note above); `under` the base figure's pixels under it, or None. A pixel only the
-    base figure makes hair that has the figure's body (not hair, not empty) to its left, its right or above it is the face's or the neck's
-    outline where the base figure's hair hung over it (Vegeta's brow and jaw, Goku's cheeks; Nov 10, the owner: "Fix some of SSB Goku and
-    vegetas face pixels being blue"); with the body only below it, it is the hairline and stays hair."""
+    """The Super Saiyan hair in one piece `img` (see the note above); `under` the base figure's pixels under it, or None (the old rule
+    alone). A pixel only the base figure makes hair that has the figure's body (not hair, not empty) to its left, its right or above it is
+    the face's or the neck's outline where the base figure's hair hung over it (Vegeta's brow and jaw, Goku's cheeks; Nov 10, the owner:
+    "Fix some of SSB Goku and vegetas face pixels being blue"); with the body only below it, it is the hairline and stays hair. Then
+    `fill` and `sideburns`. Last, nothing drawn exactly as on the base figure is hair: that is his skin, his forehead between the bangs
+    and his ears (Nov 10, the owner: "DONT MAKE THEIR FUCKING FOREHEAD SKIN BLUE OR THEIR EARS EITHER JUST THE HAIR"), unless it is in a
+    speck of up to ISLAND pixels the hair walls in on every side."""
     from scipy import ndimage
     old = old_rule(img, ramp)
-    if under is None: return fill(img, old, None, ramp)
+    if under is None: return old
+    same = (img == under) & np.isin(img, SKIN)                                   # (his skin's shades only: a ki blast stays as it was)
     cand = np.isin(img, ramp) & ~eye_whites(img) & (np.isin(under, BASE_HAIR) | old)
     lab, n = ndimage.label(cand, np.ones((3, 3)))
     keep = set(np.unique(lab[old | (cand & np.isin(img, LIGHTS))]).tolist()) - {0}
@@ -106,10 +112,35 @@ def hair_mask(img, under, ramp):
     hair = old | (add & ~side)
     lab, n = ndimage.label(hair, np.ones((3, 3)))                                 # what that cut off from the hair (a stub under Vegeta's ear)
     hair = np.isin(lab, list(set(np.unique(lab[old | (hair & np.isin(img, LIGHTS))]).tolist()) - {0}))
-    return fill(img, hair, under, ramp)
+    hair = fill(img, hair, under, ramp, same)
+    for _ in range(4):                                                            # (each closes gaps for the other)
+        more = fill(img, sideburns(img, hair, under, ramp, same), under, ramp, same)
+        if (more == hair).all(): break
+        hair = more
+    hair &= ~same
+    lab, n = ndimage.label(np.isin(img, ramp) & ~hair)                            # (but a speck of up to ISLAND pixels the hair walls in
+    for k in range(1, n + 1):                                                     # on every side is the hair's: no skin shows there)
+        m = lab == k
+        if m.sum() <= ISLAND and hair[ndimage.binary_dilation(m) & ~m].all(): hair = hair | m
+    return hair
 
 
-def fill(img, hair, under, ramp):
+def sideburns(img, hair, under, ramp, same):
+    """Hair the Super Saiyan figure draws where the base figure has skin (his sideburns in front of his ear, seen from the side; Nov 10,
+    the owner: "THE SIDES OF GOKUS HAIR AROUND HIS EARS ARE YELLOW STILL"): a ramp pixel drawn differently from the base figure, not
+    beside an eye, with hair at its left, its right or above it, is hair; repeated."""
+    eyes = np.isin(img, IRIS + (117, 118)) | eye_whites(img)
+    p = np.pad(eyes, 1); by_eye = p[1:-1, :-2] | p[1:-1, 2:] | p[:-2, 1:-1] | p[2:, 1:-1]
+    cand = np.isin(img, ramp) & ~eye_whites(img) & ~same & ~by_eye & ~np.isin(under, BASE_HAIR)
+    for _ in range(8):
+        h = np.pad(hair, 1)
+        add = cand & ~hair & (h[1:-1, :-2] | h[1:-1, 2:] | h[:-2, 1:-1])
+        if not add.any(): break
+        hair = hair | add
+    return hair
+
+
+def fill(img, hair, under, ramp, same=None):
     """The hair's shades the rules above left gold at its edge (Nov 10, the owner: "YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB"):
     a ramp pixel with no skin or eye to its left, its right or above it is hair if hair is on three of its sides (a gap in the bangs), if
     hair is above it and the face below it (the hair's last row over the face), if hair is above it and on one side and the base figure
@@ -122,7 +153,7 @@ def fill(img, hair, under, ramp):
     from scipy import ndimage
     head = ndimage.binary_dilation(np.isin(img, IRIS) | eye_whites(img), np.ones((2 * HEAD + 1, 2 * HEAD + 1), bool))
     below = face[2:, 1:-1] & head                                                # (the face's skin, not an arm's or a shoulder's)
-    shade = np.isin(img, ramp) & ~eye_whites(img) & ~beside
+    shade = np.isin(img, ramp) & ~eye_whites(img) & ~beside & (~same if same is not None else True)
     based = np.isin(under, BASE_HAIR) if under is not None else np.zeros(img.shape, bool)
     e = np.pad(img == 0, 1); ne = e[:-2, 1:-1].astype(int) + e[2:, 1:-1] + e[1:-1, :-2] + e[1:-1, 2:]
     def grow(hair):
@@ -134,7 +165,8 @@ def fill(img, hair, under, ramp):
         return hair
     hair = grow(hair)
     h = np.pad(hair, 1)                                                           # then, once, the hair's inner corners: hair above it and
-    return grow(hair | (shade & head & h[:-2, 1:-1] & (h[1:-1, :-2] | h[1:-1, 2:])))   # beside it (where his hair wraps the temple), again
+    hair = grow(hair | (shade & head & h[:-2, 1:-1] & (h[1:-1, :-2] | h[1:-1, 2:])))   # beside it (where his hair wraps the temple), again
+    return hair
 
 
 def tint(rom, ss, base, to):

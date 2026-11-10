@@ -212,12 +212,21 @@ FOR EXACT COLOR/SHADING", "Vegeta final shine is fine"):
     figure makes hair stays skin if the body is to its left, its right or above it. The hairline, with the face only below it, stays
     hair.
   - Check: test_frames 7 (no eye white changed, no changed skin shade beside the face).
-  - Then (the owner: "YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB") `ssb.fill` turns the hair's shades left gold at its edge blue.
-    That covers a gap in the bangs (hair on 3 sides), the hair's last row over the face, a side lock's end where the base figure has hair,
-    and once, the hair's inner corner by the temple. The last two only within 4 pixels of an eye, so a running shoulder's top stays skin.
-    Pixels touching the face's skin or an eye at their left, right or top stay skin. A blue stub cut off from the hair (under Vegeta's
-    ear) is dropped.
-  - Check: test_frames 7 (no gold left at the hair's edge). It fails on the build the owner screenshotted.
+  - Then (the owner: "YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB", "THE SIDES OF GOKUS HAIR AROUND HIS EARS ARE YELLOW STILL",
+    "DONT MAKE THEIR FUCKING FOREHEAD SKIN BLUE OR THEIR EARS EITHER JUST THE HAIR"), the base figure, lined up under each frame, settles
+    hair against skin:
+    - Skin: a skin shade (16, 202, 201) the Super Saiyan figure draws exactly as the base figure does is never blue. That covers his face,
+      his forehead between the bangs, his ears, and Vegeta's forehead under his widow's peak. The one exception is a pixel walled in by
+      hair on all four sides.
+    - Hair: `ssb.fill` turns the hair's shades left gold at its edge blue: a gap in the bangs, the hair's last row over the face, a side
+      lock's end, and once, the hair's inner corner by the temple (these last two only within 4 pixels of an eye, so a running
+      shoulder's top stays skin). `ssb.sideburns` turns blue a hair shade drawn over the base figure's skin with hair beside or above it
+      and no eye beside it, e.g. Goku's sideburn in front of his ear, seen from the side. The two repeat until nothing changes.
+    - Pixels touching the face's skin or an eye at their left, right or top stay skin. A blue stub cut off from the hair (under
+      Vegeta's ear) is dropped.
+    - The armour's Blue Vegeta has no base figure to check against, so it keeps the old rule (with the eye fix).
+  - Check: test_frames 7, against the retail ROM's base figures: no skin pixel blue, and no gold left in the hair (no gap, no sideburn).
+    It fails on the builds the owner screenshotted.
   - Vegeta's glove and boot highlights are white too and still turn pale blue. That is unchanged and was not asked for; the owner was
     asked.
 - Super Saiyan 4 Vegeta's Final Shine wind-up (`gt.shine_charge`, approved): seen from the side, slot 19's frames 0-2 (charging, then the
