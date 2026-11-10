@@ -274,6 +274,19 @@ like the kamehameha frames do. Why the fuck is super android 13s beam attack fra
   slot 10 is BSO's change into him from base Gogeta (black hair); this look never changes form, so it is left out and his power-up stands
   in if a skill plays it.
 - Shown to the owner as before/now sheets from the build before any reshoot. `test_frames.py` 6 checks the GT Vegeta changes.
+- From the owner's 16:28 notes ("fix roshis kamehameha frames too", "make sure SSJ4 vegeta transformation frames all match the front view,
+  that "side view" one is missing the arms still and they should all be the same anyways", "make sure Super 13 beam actually comes out of
+  his hands not below it"):
+  - GT Vegeta's changes: every view of slot 10 is the front view, frame for frame (relocked with `BFU_RELOCK`).
+  - Master Roshi's figure is Krillin's (LoG2 r73: animation 5, the ki throw, in slot 18) with his head and clothes, so his Kamehameha
+    charged with a hand up behind his head and fired one-handed. He gets a pose of his own in slot 31 (`build.py` `roshi_pose`): from the
+    side, the throw's frame with the thrown arm off and both hands cupped at his back hip (`ROSHI_HANDS`), then both pushed out (the far
+    arm under the near one, as the armour Vegeta's); from the front, the throw's crouch; from behind, his back with his arms down.
+    `outfit.c` `kame_use` plays it for him, and gives his behaviour `kame_vt` (the Kamehameha's, with its update wrapped:
+    `kame_update`) so the beam starts at his hands (the game places it for Goku's reach, 5 pixels past his: `ROSHI_BEAM`).
+  - Super 13's beam: the wave's update (0x0801AE32) places the beam on its 24th frame at the fighter's place plus a step per facing
+    (0x0871DEC4), set for a normal fighter; his thrust holds his hands higher and further out. `outfit.c` `wave_update` moves it there
+    for him (`S13_BEAM`: left 14 back and 9 up, right 18 and 9 up; measured in the emulator, both ways).
 - Approved figures are locked (16:08, "Reshoot it all and lock changes"): `ultimate/locked.json` lists the forms with a fingerprint of all
   their frames (`lib/lock.py`: every slot, frame and view, each piece's box, attributes and pixels, not where they sit in the ROM), and
   every build stops with LOCKED FRAMES CHANGED if one differs. Locked: GT Vegeta's looks, Broly Full Power, the four armour Vegetas,

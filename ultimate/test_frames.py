@@ -137,7 +137,8 @@ else:
 # 6. GT Vegeta (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not transformation frames", "his final shine frames
 # are broken", then "Why doesn't SSJ4 vegeta have transformation frames", "why are vegetas arms disappearing on transforming"). His change
 # (slot 10) is a power-up's crouch (slot 13 frame 0) in his own figure for two frames, then in the form he changes into (gt.GT_NEXT; none: his
-# own) for eight, and its stance, as BF's own changes go (not the shout, slot 13 frame 1, whose arms the sheet's hair covers); none of
+# own) for eight, and its stance, as BF's own changes go (not the shout, slot 13 frame 1, whose arms the sheet's hair covers), every view the
+# front's (16:28: "they should all be the same anyways"); none of
 # the sheet's "special" (slot 21, the arms flung out). Final Flash's code (Final Shine's too) shows slot 19's frames by number, 0-1 charging,
 # 3-4 firing: frames 3 and 4 are the push, never frame 0, 1 or 2 again.
 GT_NEXT = {'vegeta_gt': 'vegeta_gt_ssj', 'vegeta_gt_tank': 'vegeta_gt_tank_ssj', 'vegeta_gt_ssj': 'vegeta_gt_ssj4', 'vegeta_gt_tank_ssj': 'vegeta_gt_tank_ssj4'}
@@ -146,9 +147,9 @@ for name in ('vegeta_gt', 'vegeta_gt_tank', 'vegeta_gt_mustache', 'vegeta_gt_ssj
     nx = actor_of(forms[GT_NEXT.get(name, name)]); npw, nst = anim(nx, 13), anim(nx, 0)
     imgs = lambda fr: [[image(fp).tobytes() if image(fp) is not None else None for fp in f] for f in fr]
     C, P, SP, NP, NST = imgs(ch), imgs(pw), imgs(sp) if sp else [], imgs(npw), imgs(nst)
-    ok = len(C) == 11 and all(C[k][d] == P[0][d] for k in range(2) for d in range(3)) and all(C[k][d] == NP[0][d] for k in range(2, 10) for d in range(3)) \
-         and C[10] == NST[0] and not any(C[k][d] == x[d] for k in range(10) for x in SP for d in range(3))
-    check('%s changes on a power-up (his crouch, then %s\'s crouch and stance), not the sheet\'s "special"' % (name, GT_NEXT.get(name, 'his own')), ok)
+    ok = len(C) == 11 and all(C[k][d] == P[0][0] for k in range(2) for d in range(3)) and all(C[k][d] == NP[0][0] for k in range(2, 10) for d in range(3)) \
+         and all(C[10][d] == NST[0][0] for d in range(3)) and not any(C[k][d] == x[d] for k in range(10) for x in SP for d in range(3))
+    check('%s changes on a power-up facing front (his crouch, then %s\'s crouch and stance), not the sheet\'s "special"' % (name, GT_NEXT.get(name, 'his own')), ok)
     F = imgs(fl)
     check('%s\'s Final Flash / Final Shine pushes the beam out: slot 19 frames 3 and 4 are none of 0, 1, 2' % name,
           len(F) >= 5 and all(F[k][d] not in (F[0][d], F[1][d], F[2][d]) for k in (3, 4) for d in range(3)))

@@ -1739,6 +1739,52 @@ def armour_pose(rom, rec, base, put):
     return put(struct.pack('<I', 3) + struct.pack('<12I', *charge, *push, *push))
 
 
+# Master Roshi's Kamehameha (16:28, the owner: "fix roshis kamehameha frames too"): his figure is Krillin's (LoG2 animation 5, the ki throw, in
+# slot 18) with his head and clothes, so he charged with a hand up behind his head and fired one-handed, his other hand thrown back. He gets a
+# Kamehameha pose of his own (slot 31; outfit.c kame_use plays it): side, both hands cupped at his back hip, then both pushed out; front, the
+# throw's crouch with his hands at his belly; back, his back with his arms down (the throw's back raises an arm). (y, x) in slot 18 frame 2's
+# side view, checked pixel by pixel: the build stops if the frame differs.
+ROSHI_KAME = ('roshi', 'roshi_max')
+ROSHI_NEAR = (14, 21, 0, 14)        # the near arm, thrown out in front: rows 14-20, columns 0-13
+ROSHI_BACK = {(16, 26): 16, (17, 26): 16, (18, 24): 213, (18, 25): 212, (18, 26): 16, (19, 24): 16, (19, 25): 16}    # the far hand behind him
+ROSHI_HANDS = ((18, 22, (16, 212, 213, 212, 16)), (19, 22, (16, 213, 214, 213, 16)), (20, 22, (16, 212, 213, 212, 16)), (21, 23, (16, 16, 16)))   # cupped at his hip
+ROSHI_FAR = (1, 2)                  # the far arm laid under the near one, as the armour Vegeta's (ARMOUR_DARK)
+
+
+def roshi_pose(rom, rec, put):
+    """Master Roshi's Kamehameha pose (3 frames: the charge, then the push twice), from his own slot 18 (see ROSHI_KAME)."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    def fp(slot, i, v):
+        a = u(rec + 0x54 + 4 * slot) - ROM_BASE
+        return u(a + 4 + 16 * i + 4 * v)
+    if u(fp(18, 2, 2) - ROM_BASE) != 1: sys.exit('Roshi Kamehameha pose: a frame of more than one piece')
+    base = sprites.frame_image(rom, fp(18, 2, 2)).copy()
+    for (y, x), was in ROSHI_BACK.items():
+        if base[y, x] != was: sys.exit('Roshi Kamehameha pose: slot 18 frame 2 is not as drawn at (%d, %d): %d' % (y, x, base[y, x]))
+    base[[y for y, _ in ROSHI_BACK], [x for _, x in ROSHI_BACK]] = 0
+    y0, y1, x0, x1 = ROSHI_NEAR
+    charge = base.copy(); charge[y0:y1, x0:x1] = 0
+    for y, x, row in ROSHI_HANDS: charge[y, x:x + len(row)] = row
+    push = base.copy(); dx, dy = ROSHI_FAR; far = np.zeros(push.shape, bool)
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if base[y, x] and y + dy < push.shape[0] and not push[y + dy, x + dx]:
+                push[y + dy, x + dx] = ARMOUR_DARK.get(int(base[y, x]), base[y, x]); far[y + dy, x + dx] = True
+    t = np.pad(push == 0, 1)
+    edge = far & (t[:-2, 1:-1] | t[2:, 1:-1] | t[1:-1, :-2] | t[1:-1, 2:])
+    push[edge] = 16
+    def side(img):                                 # views 2 and 3 (3: the same tiles flipped), on slot 18 frame 2's piece
+        o = fp(18, 2, 2) - ROM_BASE; h, w = img.shape
+        data = img.reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes(); tiles = put(struct.pack('<II', 0, len(data)) + data)
+        out = []
+        for v in (2, 3):
+            b = bytearray(rom[fp(18, 2, v) - ROM_BASE:fp(18, 2, v) - ROM_BASE + 20]); struct.pack_into('<I', b, 16, tiles); out.append(put(bytes(b)))
+        return out
+    c = [fp(18, 1, 0), fp(18, 0, 1), *side(charge)]
+    p = [fp(18, 2, 0), fp(18, 0, 1), *side(push)]
+    return put(struct.pack('<I', 3) + struct.pack('<12I', *c, *p, *p))
+
+
 def beam_poses(rom, put, put_art):
     """The Kamehameha's code (behaviour 0x0804D9F8) shows frames 0-2 of the fighter's slot 18: 0 while charging, then 1 and 2 by turns. Vegeta's figures
     hold his Big Bang there, two frames, so his Galick Gun drew a third frame from past the animation: junk over other sprites' tiles. Each such figure
@@ -1775,6 +1821,13 @@ def beam_poses(rom, put, put_art):
         struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
         armour[char] = name
     made.update(armour)
+    char, rec = record(fm[ROSHI_KAME[0]])
+    if any(record(fm[n])[0] != char for n in ROSHI_KAME): sys.exit('Roshi Kamehameha pose: his forms are on different figures')
+    pose = roshi_pose(rom, rec, put_art)
+    n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * (BEAM_POSE + 1 - n))
+    new[0] = BEAM_POSE + 1; struct.pack_into('<I', new, 0x54 + 4 * BEAM_POSE, pose)
+    struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
+    made[char] = fm[ROSHI_KAME[0]]
     print('Galick Gun pose for figures', sorted(made))
     books = {c: s for c, s in SKILL_BOOK.items() if set(s) & set(KAME_CODE)}
     for f in range(total):
@@ -1913,7 +1966,7 @@ def add_eraser(rom, clean, sym, at, art):
     vt = sym['wave_vt'] - ROM_BASE
     for k in range(9):
         fn = ROM_BASE + WAVE_VT + struct.unpack_from('<i', clean, WAVE_VT + 4 * k)[0]
-        struct.pack_into('<i', rom, vt + 4 * k, ((sym['wave_start'] | 1) if k == 0 else fn) - (ROM_BASE + vt))
+        struct.pack_into('<i', rom, vt + 4 * k, ((sym['wave_start'] | 1) if k == 0 else (sym['wave_update'] | 1) if k == 2 else fn) - (ROM_BASE + vt))   # (2: the update, outfit.c wave_update)
     row = bytearray(clean[SKILL_ROWS + 24 * 6:SKILL_ROWS + 24 * 7])
     struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], green)) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 6 + 4)])
     struct.pack_into('<HH', row, 12, ERASER_UI + len(strings), ERASER_UI + len(strings) + 1)
@@ -2009,6 +2062,10 @@ def add_eraser(rom, clean, sym, at, art):
         struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
         rows[skill] = row
     beam_poses(rom, put, put_art)
+    vt = sym['kame_vt'] - ROM_BASE                       # Master Roshi's Kamehameha: the Kamehameha's behaviour with its update wrapped (outfit.c kame_update)
+    for k in range(9):
+        fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * k)[0]
+        struct.pack_into('<i', rom, vt + 4 * k, ((sym['kame_update'] | 1) if k == 2 else fn) - (ROM_BASE + vt))
     def tinted_frames(rows_at, count, lo, hi, remap, cache):
         """A copy of `count` {header, attributes, tiles} rows whose tiles in [lo, hi) are recoloured (each block once)."""
         out = bytearray(clean[rows_at - ROM_BASE:rows_at - ROM_BASE + 12 * count])

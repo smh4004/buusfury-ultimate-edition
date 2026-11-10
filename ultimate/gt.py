@@ -301,9 +301,11 @@ def actors(clean, pal, lengths):
             # and stance (Nov 10, the owner: "Why doesn't SSJ4 vegeta have transformation frames": they were all still his gold hair). Not the
             # shout (slot 13 frame 1): BF Vegeta's fists are up over his head there, and the sheet's bigger hair covers his arms, so they
             # vanished (the owner, 16:04: "why are vegetas arms disappearing on transforming").
+            # Every view is the front's (16:28: "make sure SSJ4 vegeta transformation frames all match the front view, that "side view" one is
+            # missing the arms still and they should all be the same anyways"), as BF's own changes face front whichever way he stood.
             nxt = haves.get(GT_NEXT.get(name), have)
             p13, n13, n0 = have[13], nxt[13], nxt[0]
-            have[10] = [[p13[v][0]] * 2 + [n13[v][0]] * 8 + [n0[v][0]] for v in range(3)]
+            have[10] = [[p13[0][0]] * 2 + [n13[0][0]] * 8 + [n0[0][0]] for v in range(3)]
             gaps[name] = [m for m in gaps[name] if m[0] != 10]
     out = {}
     for name, tpl in ACTORS.items():

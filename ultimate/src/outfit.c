@@ -1540,9 +1540,29 @@ void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]);
 /* Goku's Kamehameha counts its uses at its top level towards the Super Kamehameha (skills_sync) */
 static int derived_level(int c, int skill);
 #define MASTERY_BYTES ((u8 *)BENCH.e[GROUPS - 1].gear)
+/* Master Roshi's Kamehameha: his own pose (slot BEAM_POSE, build.py roshi_pose), and the beam from his hands. The Kamehameha's update (0x0801BE40)
+   places the beam on its 24th frame at the fighter's place plus a step per facing (0x0871E128), set for Goku's reach; Roshi's arms are
+   shorter, so it started a few pixels past his hands. His behaviour gets kame_vt (build.py: the Kamehameha's, with this update), which then
+   moves the beam (its place: +0x20, +0x24, sub_080207D2) by ROSHI_BEAM per facing (down, up, left, right; measured in the emulator). */
+const int kame_vt[9] = {1};
+#define Kame_Update ((void (*)(u32 *, u8 *))0x0801BE41)
+static const signed char ROSHI_BEAM[4][2] = {{0, 0}, {0, 0}, {5, 0}, {-5, 0}};
+void kame_update(u32 *self, u8 *player) {
+    Kame_Update(self, player);
+    if (*(u16 *)(player + 0x12) == 0x18 && self[2]) {
+        u8 *beam = (u8 *)self[2]; int f = player[0x10] & 3;
+        *(int *)(beam + 0x20) += ROSHI_BEAM[f][0];
+        *(int *)(beam + 0x24) += ROSHI_BEAM[f][1];
+    }
+}
 void kame_use(u8 *record, void *sprite) {
     if (record == RECORDS && derived_level(0, 15) == 2 && MASTERY_BYTES[21] < 255) { bench_mine(1); MASTERY_BYTES[21]++; }
     ((void (*)(u8 *, void *))0x0801A35B)(record, sprite);
+    if (record[0x14] == FORM_ROSHI || record[0x14] == FORM_ROSHI_MAX) {
+        u32 *state = *(u32 **)((u8 *)sprite + 0x14);
+        if (beam_pose(sprite) == BEAM_POSE) Sprite_SetFacing(sprite, BEAM_POSE);
+        if (state && state[0] == 0x0804D9F8) state[0] = (u32)kame_vt;
+    }
 }
 static int is_ssj4(int form);
 /* Final Shine: Final Flash's code (behaviour 0x0804D9D4) firing a green beam. Its update (0x0801B4EC) makes the beam on its 24th frame
@@ -1623,6 +1643,20 @@ void wave_start(u32 *self, void *player) {
         beam[0x40 / 4] = (u32)mine;
         beam[0x44 / 4] = beam[0x48 / 4] = beam[0x4C / 4] = mine[2];
         MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (void *)((u32 *)mine[2])[2], 0x40);
+    }
+}
+/* Super 13's beam comes out of his hands (Nov 10, the owner: "make sure Super 13 beam actually comes out of his hands not below it"). The wave's
+   update (0x0801AE32) places the beam on its 24th frame at the fighter's place plus a step per facing (0x0871DEC4), set for a normal fighter's
+   hands; his thrust holds them higher and further forward. Then it is moved there: the beam's place is +0x20, +0x24 (sub_080207D2).
+   Measured in the emulator: S13_BEAM, per facing (down, up, left, right). */
+#define Wave_Update ((void (*)(u32 *, u8 *))0x0801AE33)
+static const signed char S13_BEAM[4][2] = {{0, 0}, {0, 0}, {-14, -9}, {18, -9}};
+void wave_update(u32 *self, u8 *player) {
+    Wave_Update(self, player);
+    if (*(u16 *)(player + 0x12) == 0x18 && *(u8 *)0x03001068 == 8 && FORM_OF(8) == FORM_S13 && self[2]) {
+        u8 *beam = (u8 *)self[2]; int f = player[0x10] & 3;
+        *(int *)(beam + 0x20) += S13_BEAM[f][0];
+        *(int *)(beam + 0x24) += S13_BEAM[f][1];
     }
 }
 void wave_use(u8 *record, void *sprite) {
