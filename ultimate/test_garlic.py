@@ -51,8 +51,11 @@ more = lambda f: mem(FLAGS2 + (f - 32 >> 3))[0] >> ((f - 32) & 7) & 1
 at = lambda: mem(AT)[0] & 0xFFFF
 in_area = lambda a: lambda: at() == a
 def standing(x, y):
-    """Is someone standing still at (x, y)? (an object's position words, +0x1A0, in work RAM)"""
-    return dump(0x02000000, 0x40000).find(struct.pack('<ii', x << 8, y << 8)) >= 0
+    """Is someone standing still at (x, y)? A live object (the game's object list at 0x03001C4C: count at +4, pointers from +8) whose
+    position words (+0x1A0) are (x, y). (Searching all of work RAM for the words found a freed object's: after the Garlic Jr. quest a
+    copy of the Lookout's foe, at Garlic Jr.'s spot, was still in memory.)"""
+    n = min(mem(0x03001C50)[0], 96)
+    return any(o and mem(o + 0x1A0, 2) == [x << 8, y << 8] for o in (mem(0x03001C54, n) if n else []))
 RIG = None                                        # fightrig.Rig: a level 150 Goku, heal(), spar() (set once the harness runs)
 def heal(): RIG.heal()
 def scene(x, y, until, presses=40):
@@ -249,7 +252,8 @@ check('pushed into the Dead Zone: the quest is done, home on the Lookout', more(
 check('Garlic Jr.\'s Necklace (gear %d) is Goku\'s' % garlic.GEAR_NECKLACE, garlic.GEAR_NECKLACE in bag)
 check('and %d Zenie' % garlic.ZENIE, mem(ZENIE)[0] - z0 == garlic.ZENIE)
 send('run 120'); mem(G)
-check('Dende and Mr. Popo are back at their spots; Garlic Jr. is gone', standing(*garlic.DENDE_AT) and standing(*garlic.POPO_AT) and not standing(*garlic.GARLIC_AT))
+seen = (standing(*garlic.DENDE_AT), standing(*garlic.POPO_AT), standing(*garlic.GARLIC_AT))
+check('Dende and Mr. Popo are back at their spots; Garlic Jr. is gone (Dende, Mr. Popo, Garlic Jr. standing: %s)' % (seen,), seen == (True, True, False))
 # 6. The balance, on a level 150 Goku (the owner, Nov 9: "Test these with a level 150 Goku or something so he doesnt die so much and has
 # some balancing"; garlic.FIGHTS): from each real exchange (fightrig.spar), the hits he needs and the share of his health each of theirs takes
 B = RIG.BAL

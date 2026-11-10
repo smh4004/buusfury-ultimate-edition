@@ -259,6 +259,71 @@ The owner: "adapt the Garlic Jr Dead Zone movie a bit ... condense it like how t
 - Found on the way: a defeat script waits while a level-up box is open (the Makyans' count looked broken in the tests until the box was
   closed), and a test that poked Goku to 1 HP after the game had already revived him walked him into the next fight at 1 HP.
 
+## The Great Ape (Nov 9, post-game: a raid boss, and the transformation it unlocks)
+The owner: "Oozaru raid boss" from his sheets in `ultimate/art/oozaru/` (mouths filled dark red, never see-through), "Transformation
+ONLY for GT Kid Goku and GT Vegeta", "Raid-boss fight in a large wasteland map; beating it unlocks the transformation"; then "a custom
+oozaru icon to distinguish from SSJ icon", "make that aura white not pink", and "a new mouth beam ability for the great ape form ONLY ...
+call it the Chou whatever from the lore ... a yellow beam ... clean up all the ape frames ... big as possible ... but still able to land
+a mouth beam on any size target", then "make it wide like the final flash". `ultimate/great_ape.py` holds the raid (37 steps, text bank
+9); `test_great_ape.py` plays it (its rig's official warps to Dr. Brief's Lab: `BFU_HUB_WARP="4, 31, 1, 328, 448"`), `test_ape_form.py`
+the form in the enemy rig.
+- The story, after the ending once the GT looks are open: in Dr. Brief's Lab (4-1F) Bulma has rebuilt her Blutz Wave Generator (in GT the
+  machine that turns a Saiyan into a Great Ape without the moon or a tail: Baby used it, and Bulma later used it on Vegeta), and GT Vegeta
+  wants the Great Ape's power back. Bulma asks the player along in case he loses control; playing as Vegeta, she asks for someone else
+  (he's the one who changes: `more_get(250)`). At the Giant Crater (an old Saiyan space pod at its heart) Vegeta changes and loses himself
+  (two scene rooms: a scene can add a figure but not take one away). The raid is two rounds, as a raid boss's phases: brought down, the ape
+  gets back up enraged (a scene) for the second, with no rest between. Lose either and it's back to the lab with the quest kept (the second
+  round again once the first is won). Won: Vegeta is himself, Bulma retunes the waves to follow a Saiyan's will, and Goku (Old Kai gave
+  him his tail back in GT) can use it too: the skill, and 250,000 Zenie. More flags 64-67, in the bench's first four spare bytes
+  (`outfit.c more_byte`; older saves read zero). The crater's six copies are zone 26 rooms 170-175; everyone stands on the open ground
+  below the bowl's rim (the pod's rubble in the middle is drawn over figures: the first run had the ape behind it).
+- The frames (`lib/oozaru.py`): the sheets cut at 1x (each 3x3 block's middle pixel), the tile labels and their specks removed. Colours are
+  the game's own palette, nothing added or changed: the fur is the red-brown ramp 62/208/207/211/212 one step a tone (the nearest-colour
+  match had put the outline and the shadow on one entry and the light fur on a grey-green tan), the rest nearest; the power-up's pink
+  aura is white with a cool edge. The sheet draws attacks from the side only: they play in every view, as BF's big bosses' do (front and
+  back attack frames would need new art). Cleaned (`oozaru.clean`, twice over): a pixel takes the colour that holds three of its four
+  neighbours when both are fur shades or both tan (the generator's one-pixel flecks), a dark speck in tan (fists, feet, muzzle) or a tan
+  dot in fur takes its surroundings, a fur pixel takes a fur shade holding six of its eight neighbours, and a white fleck with no mouth, eye
+  or outline beside it (not a tooth or a glint) goes; lines (a finger crease, a muscle edge, the mouth's outline) keep two like neighbours
+  and stay. The change's two small-Saiyan frames are left as drawn.
+- Twice the size, all three figures (`outfit.c big_check`, `big_matrix_hook`; `lib/sprites.py 'scale2'`): 104 rows tall against a
+  fighter's 32-40. The draw (sub_0800EF94) sends a figure in `big_actors` down its rotation path (0x0800F030), whose matrix maker
+  (0x0803FCF4) then halves the steps (and mirrors the matrix for his facing, since that path drops the flip bit): each 64x64 piece shows
+  at 2x about its centre in a double-size box. His frames are built with each piece's centre twice as far from the feet, so the whole
+  figure is 2x about his feet: they stand where they did (`test_frames.py` measures the drawn feet), and his collision boxes, hits and
+  shadow are the record's as before. The fight camera (sub_080077EC, `cam_follow`) centres a twice-size player 36 rows higher, or his
+  head left the screen. The game allows 16 matrices a frame; he takes one.
+- The raid's boss is BF Broly's record and fighting row (10, behaviour 51; every slot Broly has, frame for frame): stance, walk, the
+  mouth blast, swipes, the overhead slam, guard, hit, the fall (down, and stays down), the power aura (19), the ground slam (20), the roar
+  blast (21). Feet 15 rows under the origin and no shadow, as Broly Full Power. Rounds: 90,000 and 100,000 HP at Strength 62
+  and 66: a level 150 Goku needs about 42 and 58 hits, and its hits take 8-10% of his health (at Strength 70-86 its heavy punch took
+  up to 18-19%; `test_great_ape.py` checks 35-80 hits and at most 16% a hit, Beerus's hardest).
+- The form: `kid_goku_ape`, `vegeta_gt_ape`, `vegeta_gt_tank_ape` (not the moustached look: the sheet's change starts on the clean-shaven
+  GT Vegeta) on figures built on BF Goku's and BF Vegeta's records (every player slot; 64x64 frames, 4 KB each, as Super 13's playable
+  figure; no shadow). Skill 48, in Goku's and Vegeta's books, learned when the raid is won (`skills_sync`); only from those base looks
+  (`ape_map`, `ape_can`). It changes on the ape's own figure (`power_to`, slot 10 = the sheet's change: the Saiyan, his tail out, half
+  grown, the roar, fists high, settling; slot 11 the same backwards), with the power-up's sound and a quake but no aura (`ape_vt`). A
+  Super Saiyan class row (its ki drain): hits 2x as hard (Super Saiyan's +5 taken off), a quarter less damage taken; no other tier from it,
+  and pressed again it changes back. Blasts and beams start where a fighter's hands are (about 13 rows up, in front of the feet: the first
+  build's mouth-glow pose fired a Kamehameha out of his knees), so he fires from the ground: fists up, then pounded down in front of him.
+- The Chou Makouhou (skill 49): the Great Ape's mouth energy wave (the series' Chou Makouhou, "Super Demon Mouth Cannon"; Great Apes are
+  the most constant users of the mouth wave). Final Flash's code and Final Flash's own beam, which is yellow in this game (white core,
+  yellow and gold edges), as Final Shine is (`apeflash_update`, `apeflash_params`: its rows with 1.5x the damage); always at the top
+  level, no mastery; only in a Great Ape form (`apeflash_can`). His slot 19, where Final Flash's code looks, is the sheet's mouth blast
+  (the roar and the glow by turns as it gathers, then the blast leaving his mouth by turns as it fires). Its look (`flash_draw`, on every
+  Final Flash beam fired by a twice-size figure, so GT Vegeta's own Final Flash as a Great Ape too): drawn at full width with no matrix
+  of its own, then each piece twice as wide across the beam (64 rows) and moved 34 rows up and 12 out, so it leaves his mouth and reaches
+  to about 8 rows over the ground; down the screen it is 2x both ways from his chest (it comes at the viewer). Its hits are Final
+  Flash's, along the ground: it lands on a target of any size, the same in every direction. A first try on the Kamehameha's code drew a
+  thin beam angled down from his mouth (the owner: "looks bad rn"). Known with the Great Ape: Goku's book is full (16, the record's mask is
+  16 bits), so `book_skill` adds a 17th entry for Goku and Vegeta with no bit of its own, known when the Great Ape is; it goes into a free
+  slot as the raid is won (`ape_learn`), else the Skills tab swaps it in.
+- The icons: the Great Ape's roaring head (red eyes, fangs, tan muzzle) and the full moon in the HUD icon's 16x9 picture on Super Saiyan's
+  frame (`icons.drawn`, `oozaru.ICON`), and a greyed copy a step darker, as the game's own; the Chou Makouhou's, his head side on with
+  jaws open and the yellow beam leaving them (`oozaru.BEAM_ICON`), in the same colours.
+- Room: the code area (to 0x08840000) had 2-3 KB left, so the Nov 9 moves' names and descriptions moved to the art area (`put_art`):
+  5 KB free after this.
+
 ## Zone 26 and Super 13
 
 The build also needs Prototype D (`BFU_PROTO`), Legacy of Goku II USA (`BFU_LOG2`) and a `log2-decomp` checkout next to this repo (its map index locates the snow tiles). `ultimate/zone26.py` builds areas 26:1-15 from the prototype's layouts and collision with `ultimate/reskin.py`'s tiles; `ultimate/zone26.json` lists the doors. After `python3 ultimate/build.py --debug --zone` (walking down on Snake Way enters the zone), run `python3 ultimate/test_zone26.py`.

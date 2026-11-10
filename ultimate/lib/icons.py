@@ -53,3 +53,16 @@ def recolour(icon, remap):
     a = decode(icon); w = a[WINDOW]
     a[WINDOW] = np.frombuffer(bytes(remap), np.uint8)[w]
     return encode(a)
+
+
+def drawn(icon, art, colours):
+    """An icon (bytes) with its picture replaced by `art`: rows of characters drawn from the window's top left (x 3, y 2: its black is
+    rows 2-10, columns 3-18, and on rows 3-10 columns 2 and 19 as well), each character a key of `colours` (an OBJ palette index); '.'
+    is the window's black. The frame and gauge keep theirs."""
+    a = decode(icon)
+    a[2:11, 3:19] = BG; a[3:11, 2] = BG; a[3:11, 19] = BG
+    assert len(art) <= 9 and all(len(r) <= 16 for r in art), 'the picture is 16 x 9 at most'
+    for y, row in enumerate(art):
+        for x, c in enumerate(row):
+            if c != '.': a[2 + y, 3 + x] = colours[c]
+    return encode(a)

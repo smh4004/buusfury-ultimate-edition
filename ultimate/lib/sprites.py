@@ -83,7 +83,7 @@ class Inserter:
     def frame(self, img, mirror=False):
         """Crop the cell to its art and cover it with as few/small OBJ pieces as possible (VRAM budget per frame).
         The cell's bottom-centre stays the actor origin. Identical frames are written once (frame cache)."""
-        key = (img.shape, img.tobytes(), mirror, getattr(self, 'oy', 0))
+        key = (img.shape, img.tobytes(), mirror, getattr(self, 'oy', 0), getattr(self, 'big', False))
         cache = self.__dict__.setdefault('_frames', {})
         if key not in cache: cache[key] = self._frame(img, mirror)
         return cache[key]
@@ -112,6 +112,12 @@ class Inserter:
             if mirror:                                   # mirror the whole layout, not just each piece
                 x = 16 - w - ((x0 + px) - (cw // 2 - 8))
                 pc = struct.pack('<bbBB', x, pc[1] if pc[1] < 128 else pc[1] - 256, w, h) * 2 + pc[8:]
+            if getattr(self, 'big', False):              # drawn at twice the size (outfit.c big_check): the game scales a piece about its own
+                x, y = struct.unpack_from('<bb', pc, 0)  # centre, so move that centre twice as far from the feet (x 8, y 8 + oy), and the
+                ax, ay = 8, 8 + getattr(self, 'oy', 0)   # sprite grows from the ground up
+                x, y = x + (x + w // 2 - ax), y + (y + h // 2 - ay)
+                assert -128 <= x < 128 and -128 <= y < 128, 'a twice-size piece is out of reach of its byte offsets: %d, %d' % (x, y)
+                pc = struct.pack('<bbBB', x, y, w, h) * 2 + pc[8:]
             out.append(pc)
         self.budget_max = max(getattr(self, 'budget_max', 0), sum(w * h for _, _, w, h in pieces))
         return self.put(struct.pack('<I', len(out)) + b''.join(out))
@@ -347,10 +353,11 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
             ins.oy = a.get('origin_dy', 0)                 # map door regions already draw with the BF OBJ palette)
+            ins.big = a.get('scale2', False)
             for slot, dirs in a['raw_frames'].items():
                 if int(slot) >= n: continue
                 struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.anim(dirs))
-            ins.oy = 0
+            ins.oy = 0; ins.big = False
         for d, box in a.get('boxes', {}).items():          # per-direction (x, y, w, h) box override
             struct.pack_into('<4i', rec, 0x14 + 16 * int(d), *box)
         ins.oy = a.get('origin_dy', 0)                     # sheet frames drawn lower than the cell's bottom (Broly Full Power: see build.py)

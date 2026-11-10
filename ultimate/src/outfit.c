@@ -213,7 +213,9 @@ static void bench_bump(void) {
    with no bench yet gets a generation, so the save keeps it (a game that never swapped a guest has none, and bench_ready would clear it again). */
 static void bench_mine(int writing) { bench_ready(); if (writing && !BENCH.gen) bench_bump(); }
 /* Saved flags past the story's, kept with the bench. The story's flag array has no room left. */
-static u8 *more_byte(int f) { return f < 32 ? &BENCH.flags[f >> 3] : &BENCH.flags2[(f - 32) >> 3]; }   /* 0-31, then 32-63 */
+static u8 *more_byte(int f) {      /* 0-31, then 32-63, then 64-95 in the first four spare bytes (older saves: zero; the Great Ape raid's) */
+    return f < 32 ? &BENCH.flags[f >> 3] : f < 64 ? &BENCH.flags2[(f - 32) >> 3] : &BENCH.spare[(f - 64) >> 3];
+}
 int more_flag(int f) { bench_ready(); return *more_byte(f) >> (f & 7) & 1; }
 static void more_flag_set(int f, int on) {
     bench_ready();
@@ -225,10 +227,12 @@ static void more_flag_set(int f, int on) {
 #define MORE_POINTS 255
 int mastery_level(int c, int skill);
 /* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (area << 8 | world), 252 Goku playing, 253 the quest can start
-   (after the ending and the Garlic Jr. quest (garlic.py: it comes first, the owner's choice), Goku's Super Saiyan mastered, Goku playing) */
+   (after the ending and the Garlic Jr. quest (garlic.py: it comes first, the owner's choice), Goku's Super Saiyan mastered, Goku playing);
+   the Great Ape raid (great_ape.py) 250, Vegeta playing (he is the one who changes, so someone else has to come) */
 void more_get(int *sp) {
     int n = *sp, f = sp[n], me = *(u8 *)0x03001068;
     if (f == 251) sp[n] = *(volatile u16 *)0x0300197C;
+    else if (f == 250) sp[n] = me == 4;
     else if (f == 252) sp[n] = me == 0;
     else if (f == 253) sp[n] = GetFlag((void *)0x03001068, 149) && more_flag(MORE_GJ_DONE) && mastery_level(0, 20) == 2 && me == 0;
     else sp[n] = more_flag(f);
@@ -353,6 +357,7 @@ void heap_init(void) {
     BENCH.magic = 0;
     CL.active = 0; CL.cool = 0; CL.surge = 0; CL.p_at = 0; CL.e_at = 0;
     *(u32 *)0x0203F300 = 0;                /* no bomb sprite */
+    *(u32 *)0x0203F270 = 0;                /* no twice-size figure drawing (big_now) */
     ENDLESS_ON = 0; ENDLESS_WINS = 0;
     *(u32 *)0x03003488 = (u32)block;
     block[0] = 0; block[1] = HEAP_WORDS; block[2] = 0;
@@ -1134,6 +1139,8 @@ const int ssj4_vt[14] = {1};
 /* Super Saiyan Blue: the same power-up with the aura blue */
 const u32 ssb_aura_field[9] = {1}, ssb_aura_other[21] = {1};
 const int ssb_vt[14] = {1};
+/* The Great Ape: the power-up with no aura (the figure's own change shows it), its sound and the ground shaking */
+const int ape_vt[14] = {1};
 #define SpriteBox ((void (*)(int *, void *))0x0800FDFB)
 #define VecOp ((void (*)(int *, const int *, const int *))0x08052FB5)
 #define AURA_MODE (*(volatile u8 *)0x03002BB0)
@@ -1157,6 +1164,12 @@ static void tinted_start(u32 *state, void *sprite, const u32 *aura_field, const 
 void rose_start(u32 *state, void *sprite) { tinted_start(state, sprite, rose_aura_field, rose_aura_other); }
 void ssj4_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssj4_aura_field, ssj4_aura_other); }
 void ssb_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssb_aura_field, ssb_aura_other); }
+void ape_start(u32 *state, void *sprite) {
+    state[2] = 0; state[3] = 0;
+    ((void (*)(void *, void *))0x0800DE61)(state, sprite);
+    PlaySound((void *)0x03003E5C, (u8 *)SOUND_HIT + 0x288, 0x40, 0);
+    Quake(0x20, 0x4B);
+}
 void rose_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) {
         u32 *state = Alloc(0x10);
@@ -1557,6 +1570,88 @@ void shine_use(u8 *record, void *sprite) {
 }
 #define FlashCan ((int (*)(u8 *))0x0801A0AB)
 int ssj4_flash_can(u8 *record) { return is_ssj4(record[0x14]) && FlashCan(record); }       /* Final Shine: Super Saiyan 4 only */
+/* The Chou Makouhou (Nov 9; the owner: "a new mouth beam ability for the great ape form ONLY and no mastery or anything needed, call it
+   the Chou whatever from the lore ... a yellow beam", then "make it wide like the final flash"): the Great Ape's mouth energy wave, the
+   series' Chou Makouhou ("Super Demon Mouth Cannon"), on Final Flash's code and its own yellow beam, as Final Shine is (apeflash_update:
+   apeflash_params, Final Flash's rows with 1.5x the damage). Always at the top level (there is no level to earn), only in a Great Ape form,
+   and shown in his own pose: his slot 19, where Final Flash's code looks, holds the roar and the blast leaving his mouth (lib/oozaru.py).
+   Its look is flash_draw's: twice as thick, and up at his mouth (as is GT Vegeta's Final Flash when he fires it as a Great Ape). */
+const u32 apeflash_params[9] = {1};
+const int apeflash_vt[9] = {1};
+void apeflash_update(u32 *self, int *player) {
+    u32 *beam;
+    FinalFlash_Update(self, player);
+    beam = (u32 *)self[1];
+    if (beam && !self[4]) {
+        const u32 *mine = &apeflash_params[self[3] * 3];
+        beam[0x10] = (u32)mine; beam[0xF] = mine[0] + beam[0xE] * 0x18;
+        Beam_Frame(beam);
+        self[4] = 1;
+    }
+}
+void apeflash_use(u8 *record, void *sprite) {
+    u32 *b = Alloc(0x14);
+    if (b) { b[0] = (u32)apeflash_vt; b[1] = b[2] = b[4] = 0; b[3] = 2; }
+    Sprite_SetFacing(sprite, 0x13);
+    Sprite_SetBehaviour(sprite, b);
+}
+static int is_ape(int form);
+int apeflash_can(u8 *record) { return is_ape(record[0x14]) && FlashCan(record); }
+int big_figure(const u8 *obj);
+/* Its look. Every Final Flash beam's draw (vtable 0x0804AF24 slot 4: flash_draw) runs as it was; for a twice-size figure's beam (+0x44, who
+   fired it: the Chou Makouhou, or GT Vegeta's Final Flash as a Great Ape) it is drawn at full
+   width (+0x18, the width as it opens and closes, set to 0x100 for the call, so no matrix of its own and the pieces keep their flips), then
+   each piece is given a matrix of ours: twice as wide across the beam (times its opening width), and the pieces are moved up (APE_LIFT) and
+   out (APE_FWD) so the beam leaves the twice-size ape's mouth and reaches down to the ground, where its hits are (Final Flash's, along the
+   ground): it lands on a target of any size. Fired down the screen it is twice the size both ways, as it comes at the viewer, and starts at
+   his chest, so it still reaches as far down as its hits do. */
+#define Flash_Draw ((int (*)(u8 *, u32 *))0x08037377)       /* (beam, draw context: OAM cursor, next matrix, matrices used) */
+#define APE_LIFT 34
+#define APE_LIFT_V 48
+#define APE_FWD 12
+static void ape_flash_shape(u8 *b, u32 *ctx, u32 *from, int width) {
+    static const u8 sizes[3][4][2] = {{{8, 8}, {16, 16}, {32, 32}, {64, 64}}, {{16, 8}, {32, 8}, {32, 16}, {64, 32}}, {{8, 16}, {8, 32}, {16, 32}, {32, 64}}};
+    int side = *(int *)(b + 0x38) >= 2, g = *(int *)(b + 0x2C), down = !side && *(int *)(b + 0x30) > 0, oy = *(int *)(b + 0x28), across, n = 0, i;
+    short key[4]; signed char idx[4];
+    u32 *e;
+    if (width < 0x20) width = 0x20;
+    across = 0x8000 / width;                 /* half the texture step of Final Flash's own matrix (0x10000 / width): twice as wide */
+    for (e = from; e < (u32 *)ctx[0]; e += 2) {
+        u16 *o = (u16 *)e, *mt;
+        int a0 = o[0], a1 = o[1], sh = a0 >> 14, sz = a1 >> 14, w, h, x, y, k, mi = -1;
+        if (sh > 2 || a0 & 0x300) continue;
+        w = sizes[sh][sz][0]; h = sizes[sh][sz][1];
+        x = a1 & 0x1FF; if (x >= 256) x -= 512;
+        y = a0 & 0xFF; if (y >= 160) y -= 256;
+        k = (a1 >> 12) & 3;                  /* its flips */
+        for (i = 0; i < n; i++) if (key[i] == k) mi = idx[i];
+        if (mi < 0 && n < 4 && ctx[2] < 16) {
+            int fx = k & 1 ? -1 : 1, fy = k & 2 ? -1 : 1;
+            mt = (u16 *)ctx[1];
+            mt[3] = fx * (side ? 0x100 : across); mt[7] = 0; mt[11] = 0; mt[15] = fy * (side ? across : down ? 0x80 : 0x100);
+            key[n] = k; idx[n] = mi = ctx[2]; n++;
+            ctx[1] += 0x20; ctx[2]++;
+        }
+        if (side) { y -= APE_LIFT; x += g * APE_FWD; }
+        else if (down) y = oy + 2 * (y + h / 2 - oy) - APE_LIFT_V - h / 2;     /* twice as far from where it starts, from his chest */
+        else y -= APE_LIFT_V;
+        if (mi < 0) { o[0] = (a0 & ~0xFF) | (y & 0xFF); o[1] = (a1 & ~0x1FF) | (x & 0x1FF); continue; }     /* no matrix left: only moved */
+        x -= w / 2; y -= h / 2;              /* a double-size box about the piece's centre */
+        o[0] = (a0 & ~0xFF) | 0x300 | (y & 0xFF);
+        o[1] = (a1 & ~0x1FF & ~0x3E00) | (x & 0x1FF) | mi << 9;
+    }
+}
+int flash_draw(u8 *b, u32 *ctx) {
+    u32 *from = (u32 *)ctx[0];
+    int r, width;
+    if (!big_figure(*(u8 **)(b + 0x44))) return Flash_Draw(b, ctx);
+    width = *(int *)(b + 0x18);
+    *(int *)(b + 0x18) = 0x100;
+    r = Flash_Draw(b, ctx);
+    *(int *)(b + 0x18) = width;
+    ape_flash_shape(b, ctx, from, width);
+    return r;
+}
 /* Super Saiyan 4's Dragon Fist: Dragon Fist's code (behaviour 0x0804D9B0) with a red dragon, hitting 1.25x as hard. Its update
    (0x0801ABBE) makes the dragon on its 16th frame (0x08038AD8: a head and five segments chained through +0x48, each showing its rows of
    0x0877AD10 through +0x5C and +0x18); ours moves each segment onto the red rows. +0x10 marks it done (0x14 bytes allocated). */
@@ -1703,6 +1798,7 @@ static int can_step(u8 *record) { return IN_COMBAT && CanAfford(record, 10); }  
 static int can_start(u8 *record) { return can_step(record) && *(u32 *)(record + 4) == 0; }   /* from base, as retail Super Saiyan: no cool-down either */
 static int is_ssg(int form);
 static int is_fp(int form);
+static int is_ape(int form);
 /* Super Saiyan 2 follows Super Saiyan in its own skill (Nov 9, the owner: "make it so SS2 follows SS1 and precedes SS3 so it doesn't have
    to be swapped for SS1 in the skill menu"): pressed in a Super Saiyan whose next form is Super Saiyan 2, once the story has opened it, Super
    Saiyan goes up to it; pressed in Super Saiyan 2 (or without the energy to go up) it powers down as before. Super Saiyan 3 then goes up
@@ -1711,7 +1807,7 @@ static int ss_to_ss2(u8 *record) {
     int form = record[0x14], f = flags_of(form);
     return (f & 1) && !(f & 2) && !is_kaioken(form) && up_of(form) != 255 && is_ss2(up_of(form)) && ss2_open(record, form_table[form * 24 + 0x0C]) && can_step(record);
 }
-int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) || is_fp(record[0x14]) ? 0 : ss_to_ss2(record) || SS_Can(record); }
+int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) || is_fp(record[0x14]) || is_ape(record[0x14]) ? 0 : ss_to_ss2(record) || SS_Can(record); }
 void ss_use(u8 *record, void *sprite) {
     XFORM = 0;
     if (ss_to_ss2(record)) SS3_Use(record, sprite);       /* the form's up: Super Saiyan 2, as its own skill goes (ss2_use) */
@@ -1739,7 +1835,7 @@ static int ss3_direct(u8 *record) {
 }
 int ss3_can(u8 *record) {       /* Super Saiyan 3 starts from Super Saiyan 2 where a form has one and it is held */
     int form = record[0x14], d = ss3_direct(record);
-    if (is_kaioken(form) || is_ssj4(form) || is_ssg(form) || is_fp(form)) return 0;
+    if (is_kaioken(form) || is_ssj4(form) || is_ssg(form) || is_fp(form) || is_ape(form)) return 0;
     if (d == -2) return 0;
     if (d >= 0) return SS3_Can(record);
     if ((flags_of(form) & 2) && up_of(form) != 255 && is_ssj4(up_of(form))) return 1;        /* Kid Goku's Super Saiyan 3: powers down */
@@ -1834,6 +1930,84 @@ void ssg_use(u8 *record, void *sprite) {
     if (is_ssg(form)) SS_Use(record, sprite);
     else power_to(record, sprite, mapped(ssg_map, form), ssj4_vt);
 }
+/* The Great Ape (Nov 9; the owner: "Transformation ONLY for GT Kid Goku and GT Vegeta ... beating it unlocks the transformation"): from GT Kid
+   Goku's or GT Vegeta's base look to its Great Ape (ape_map), a Super Saiyan class row (its drain; Super Saiyan's +5 taken off in combat_hook)
+   on the ape's own figure, which plays the change on itself (power_to: lib/oozaru.py's frames, the Saiyan growing into the ape) with no aura
+   (ape_vt). Hits 2x as hard and takes a quarter less; no other tier goes up from it; pressed again it changes back (the change played
+   backwards). Learned when the Great Ape raid is won (great_ape.py, more flag MORE_APE_DONE). */
+extern const u8 ape_map[][2];
+static int is_ape(int form) {
+    int i;
+    for (i = 0; ape_map[i][0] != 255; i++) if (ape_map[i][1] == form) return 1;
+    return 0;
+}
+int ape_can(u8 *record) {
+    int form = record[0x14];
+    if (is_ape(form)) return 1;
+    return mapped(ape_map, form) != 255 && !(flags_of(form) & 3) && can_start(record);
+}
+void ape_use(u8 *record, void *sprite) {
+    int form = record[0x14];
+    XFORM = 0;
+    if (is_ape(form)) SS_Use(record, sprite);
+    else power_to(record, sprite, mapped(ape_map, form), ape_vt);
+}
+/* The Great Ape drawn twice the size (Nov 9, the owner: "big as possible too to convey accurate size and power within the lore"): the
+   figures in big_actors (build.py: the raid's ape and the two player apes) go through the draw's rotation path (sub_0800EF94: an affine
+   matrix, double-size boxes, each piece centred where it was) with half steps, so each piece shows 2x about its centre. Their frames are
+   built with each piece's centre twice as far from the feet (lib/sprites.py 'scale2'), so the whole figure is 2x about the feet: the
+   ground, collisions and shadows stay where they were. big_check runs where the draw tests the rotation angle (0x0800F030): an ape takes
+   that path too. big_matrix_fix runs after the matrix is made (sub_0803FCF4, from big_matrix_hook): half steps, and his facing (the
+   rotation path has no flip bit: retail's mirrored pieces would face the wrong way, so the matrix mirrors instead). */
+const volatile u32 big_actors[3] = {1}; /* build.py fills it: the three figures' records (volatile: or the compiler reads {1, 0, 0}) */
+#define big_now (*(u8 * volatile *)0x0203F270)     /* the object big_check sent down the rotation path: the next matrix is his */
+int big_figure(const u8 *obj) {
+    int i;
+    if ((u32)obj < 0x02000000 || (u32)obj >= 0x03008000) return 0;
+    for (i = 0; i < 3; i++) if (big_actors[i] && *(const u32 *)(obj + 0x58) == big_actors[i]) return 1;
+    return 0;
+}
+int big_flag(u8 *obj) {
+    big_now = 0;
+    if (!big_figure(obj)) return 0;
+    big_now = obj;
+    return 1;
+}
+void big_matrix_fix(int *out, const u8 *angle) {
+    u8 *obj = big_now;
+    big_now = 0;
+    if (!obj || angle != obj + 0x180) return;
+    out[0] /= 2; out[1] /= 2; out[2] /= 2; out[3] /= 2;
+    if (*(u32 *)(*(u8 **)(obj + 0x54) + 0xC) & 1 << 28) { out[0] = -out[0]; out[2] = -out[2]; }
+}
+void big_check(void);
+void big_matrix_hook(void);
+/* The fight camera (sub_080077EC, the follow behaviour: 0x080077EC jumps here) centres the box of the one it follows (sub_0800FDFA) 120 and 84
+   pixels in, and eases there (3/64 of the way across, 9/128 down, each frame). A twice-size ape stands 104 pixels tall from that box, so his
+   head left the top of the screen: for him it centres APE_CAM pixels higher. Everything else as it was. */
+#define BoxOf ((void (*)(int *, void *))0x0800FDFB)
+#define Cam_Set ((int (*)(void *, int *))0x08009745)
+#define APE_CAM 36
+void cam_follow(u32 *self) {
+    int box[4], at[2], wx, wy;
+    int *cam = *(int **)0x080707E8;
+    BoxOf(box, (void *)self[1]);
+    at[0] = cam[0]; at[1] = cam[1];
+    wx = ((box[0] + box[2]) / 2 - 0x78) << 10;
+    wy = ((box[1] + box[3]) / 2 - 0x54 - (big_figure((u8 *)self[1]) ? APE_CAM : 0)) << 10;
+    at[0] += (wx - at[0]) * 3 >> 6;
+    at[1] += (wy - at[1]) * 9 >> 7;
+    Cam_Set(cam, at);
+}
+__asm__(".syntax unified\n.thumb\n.thumb_func\n.global big_check\nbig_check:\n"
+        "add r3, sp\nldr r1, [r3, #0x3c]\nldr r1, [r1]\n"          /* the replaced code: the angle */
+        "push {r0, r1, r2, r3}\nadds r0, r4, #0\nbl big_flag\nadds r2, r0, #0\npop {r0, r1}\n"
+        "orrs r1, r2\npop {r2, r3}\ncmp r1, #0\nbne 1f\nldr r1, =0x0800F08F\nbx r1\n"   /* not turned, not big: the plain path */
+        "1:\nldr r1, =0x0800F03B\nbx r1\n.ltorg\n"
+        ".thumb_func\n.global big_matrix_hook\nbig_matrix_hook:\n"
+        "push {r0, r1, lr}\nbl big_matrix_orig\npop {r0, r1}\nbl big_matrix_fix\npop {r3}\nbx r3\n"
+        ".thumb_func\nbig_matrix_orig:\n"
+        "push {r4, r5, r6, r7}\nldr r1, [r1]\nasrs r3, r1, #10\nadds r4, r3, #0\nldr r2, =0x0803FCFD\nbx r2\n.ltorg\n");
 /* Skills beyond the six a fighter can hold (Nov 9). Each party character has a book (skill_book, build.py) of up to 16 skills the
    loadout can hold; record +0x22 is a mask over it of the ones they know. Equipped skills sit in the record as always (+0x0D, levels
    +0x2E). The story's natives add (0xA4), remove (0xA5) and replace (0xA6) skills: ours do the same on the record and keep the book's
@@ -1849,10 +2023,14 @@ static int ss2_open(const u8 *record, int owner);
 #define G_FLAGS ((void *)0x03001068)
 #define MASTERY ((u8 *)BENCH.e[GROUPS - 1].gear)           /* 22 bytes: one per (character, tier) in mastery_slot order, then Goku's Kamehameha count */
 static u8 *rec_of(int c) { return RECORDS + c * RECORD_SIZE; }
+/* Past the 16: skills known with another, with no bit of their own (Goku's book is full). The Chou Makouhou (APEBEAM_SKILL) is known with
+   the Great Ape, for the two who have it. */
+#define BOOK_SIZE 17
+static int book_skill(int c, int b) { return b < 16 ? skill_book[c][b] : c == 0 || c == 4 ? APEBEAM_SKILL : 255; }
 static int book_at(int c, int skill) {
     int i;
     if (c > 7) return -1;
-    for (i = 0; i < 16; i++) if (skill_book[c][i] == skill) return i;
+    for (i = 0; i < BOOK_SIZE; i++) if (book_skill(c, i) == skill) return i;
     return -1;
 }
 static int slot_of(const u8 *rec, int skill) {
@@ -1860,10 +2038,14 @@ static int slot_of(const u8 *rec, int skill) {
     for (i = 0; i < rec[0x0C]; i++) if (rec[0x0D + i] == skill) return i;
     return -1;
 }
-static int knows(int c, int skill) { int b = book_at(c, skill); return b >= 0 && KNOWN(rec_of(c)) >> b & 1; }
+static int knows(int c, int skill) {
+    int b = book_at(c, skill);
+    if (b >= 16) return knows(c, APE_SKILL);
+    return b >= 0 && KNOWN(rec_of(c)) >> b & 1;
+}
 static void set_known(int c, int skill, int on) {
     int b = book_at(c, skill);
-    if (b < 0) return;
+    if (b < 0 || b >= 16) return;
     if (on) KNOWN(rec_of(c)) |= 1 << b; else KNOWN(rec_of(c)) &= ~(1 << b);
 }
 /* the tiers whose level is mastery, and where each character's byte is */
@@ -1917,6 +2099,12 @@ static void learn(int c, int skill, int ok) {
     set_known(c, skill, 1);
     if (rec[0x0C] < MAX_HELD) equip(c, rec, rec[0x0C], skill);
 }
+static void ape_learn(int c) {         /* the Great Ape raid won: the Great Ape, and its Chou Makouhou in a free slot as it is learned */
+    u8 *rec = rec_of(c);
+    int had = knows(c, APE_SKILL) || slot_of(rec, APE_SKILL) >= 0;
+    learn(c, APE_SKILL, more_flag(MORE_APE_DONE));
+    if (!had && more_flag(MORE_APE_DONE) && slot_of(rec, APEBEAM_SKILL) < 0 && rec[0x0C] < MAX_HELD) equip(c, rec, rec[0x0C], APEBEAM_SKILL);
+}
 /* A save from the original game (Nov 9: the owner's 100% Buu's Fury save) went through the story scenes that unlock outfits and Super Saiyan 2
    (outfits.json "unlocks", build.py) before the mod could set its flags there. Once the ending is seen they are all past; a few scenes also
    set a story flag of their own (STORY_MARKS: the unlock's flag, the scene's), which tells it earlier. */
@@ -1960,18 +2148,20 @@ void skills_sync(int c) {
         learn(c, SSB_SKILL, post && mastery_level(0, 22) == 2);
         learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && (more_flag(MORE_BOG_RITUAL) || more_flag(MORE_BOG_DONE)));     /* from the ritual on */
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
+        ape_learn(c);
     }
     if (c == 1) learn(c, FP_SKILL, GetFlag(G_FLAGS, MYSTIC_FLAG));      /* Full Power: with the orange gi */
     if (c == 4) {
         learn(c, GALICK_SKILL, 1);
         learn(c, 36, gt); learn(c, FINAL_SHINE_SKILL, gt);
         learn(c, SSB_SKILL, post && mastery_level(4, 35) == 2);
+        ape_learn(c);
     }
 }
 static int can_swap(int c) {                          /* does he know a skill he isn't holding? */
     u8 *rec = rec_of(c);
     int b;
-    for (b = 0; b < 16; b++) if (skill_book[c][b] != 255 && KNOWN(rec) >> b & 1 && slot_of(rec, skill_book[c][b]) < 0) return 1;
+    for (b = 0; b < BOOK_SIZE; b++) if (book_skill(c, b) != 255 && knows(c, book_skill(c, b)) && slot_of(rec, book_skill(c, b)) < 0) return 1;
     return 0;
 }
 /* the Skills tab (vtable 0x0804B024): SELECT swaps the chosen skill for the next one the fighter knows but isn't holding */
@@ -1980,9 +2170,9 @@ void skills_swap(int c, int at) {
     int i, b0, cur;
     if (c > 7 || at < 0 || at >= rec[0x0C]) return;
     cur = rec[0x0D + at]; b0 = book_at(c, cur);
-    for (i = 1; i <= 16; i++) {
-        int b = ((b0 < 0 ? -1 : b0) + i) & 15, s = skill_book[c][b];
-        if (s == 255 || !(KNOWN(rec) >> b & 1) || slot_of(rec, s) >= 0) continue;
+    for (i = 1; i <= BOOK_SIZE; i++) {
+        int b = ((b0 < 0 ? -1 : b0) + i) % BOOK_SIZE, s = book_skill(c, b);
+        if (s == 255 || !knows(c, s) || slot_of(rec, s) >= 0) continue;
         set_known(c, cur, 1);
         equip(c, rec, at, s);
         return;
@@ -2041,7 +2231,7 @@ void kk_track(void) {
     if (EARLY) {
         u32 *state = me ? *(u32 **)(me + 0x14) : 0;
         if (!me || (u16)(FRAMES - XFORM_AT) >= 600) EARLY = 0;
-        else if (!state || (state[0] != (u32)ssb_vt && state[0] != (u32)ssj4_vt)) {
+        else if (!state || (state[0] != (u32)ssb_vt && state[0] != (u32)ssj4_vt && state[0] != (u32)ape_vt)) {
             if (form == EARLY - 1) Sprite_SetCharacter(me, Form_Sprite((void *)(form_table + form * 24)));
             EARLY = 0;
         }
@@ -2299,6 +2489,10 @@ void combat_hook(void *defender, int *hit) {
             if (!(flags_of(form_table[form * 24 + 0x17]) & 1) && strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
             /* (Super Saiyan Kaioken, down to Super Saiyan, keeps Super Saiyan's +5: 1.75x a Super Saiyan's hit) */
         }
+        else if (is_ape(form)) {                     /* the Great Ape: 2x, without Super Saiyan's +5 */
+            hit[1] = scale * 2;
+            if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
+        }
         else if (is_ssg(form) || is_fp(form)) {      /* Super Saiyan God and Full Power: 1.75x, without Super Saiyan's +5 */
             hit[1] = scale + (scale >> 1) + (scale >> 2);
             if (strength > 5 && power > 5) { stats[0] = strength - 5; stats[1] = power - 5; }
@@ -2316,6 +2510,7 @@ void combat_hook(void *defender, int *hit) {
         guard = (u16 *)((u8 *)defender + 0x1B0) + 2; endurance = *guard; *guard = boss_stat(endurance);
         if (top > BOSS_HP) hit[1] = hit[1] * (top < 3 * BOSS_HP ? top : 3 * BOSS_HP) / BOSS_HP;     /* and in step with his health */
     }
+    if (hit[3] && !mine && defender == PLAYER_OBJ && is_ape(form)) hit[1] -= hit[1] >> 2;     /* the Great Ape's hide: a quarter less */
     combat_orig(defender, hit);
     if (guard) *guard = endurance;
     if (defender == PLAYER_OBJ && KK_ON && KK_GUARD && is_kaioken(form) && hit[6] > 0) {     /* hit[6]: the damage (1/1024ths); 0 means no damage and no stagger */

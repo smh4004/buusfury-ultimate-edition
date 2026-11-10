@@ -65,16 +65,19 @@ class Rig:
         hp, ki = self.mem(REC0 + 0x18)[0] & 0xFFFF, self.mem(REC0 + 0x1C)[0] & 0xFFFF
         self.send('poke %08X %08X' % (REC0 + 0x14, (self.mem(REC0 + 0x14)[0] & 0xFFFF) | hp << 16), 'poke %08X %08X' % (REC0 + 0x18, ki << 16 | hp))
 
-    def spar(self, name, row=None, secs=12):
+    def spar(self, name, row=None, secs=12, spot=None):
+        """spot(x, y) -> (x, y, facing) of Goku beside a foe at (x, y) (positions <<8; facing 0 down, 1 up, 2 left, 3 right); default just
+        below it, facing up."""
         self.heal(); pl = self.mem(PLAYER)[0]
+        spot = spot or (lambda x, y: (x, y + (20 << 8), 1))
         f = [x for x in self.foes(row) if x[1] > 0]
         if not f: return None
         foe, fhp = f[0]; mx = self.mem(REC0 + 0x18)[0] & 0xFFFF
         gp, fp, mine, theirs, frames = mx, fhp, [], [], 0
         for k in range(secs * 6):
             if k % 4 == 0:
-                x, y = self.mem(foe + 0x1A0, 2)
-                self.send('poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (20 << 8)), 'poke8 %08X 01' % (pl + 0x10))
+                x, y, facing = spot(*self.mem(foe + 0x1A0, 2))
+                self.send('poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y), 'poke8 %08X %02X' % (pl + 0x10, facing))
             self.send('tap A 10'); frames += 11
             if foe not in [e for e, _ in self.foes(row)]: mine.append(fp); break       # he fell: his object is gone
             g, h = self.mem(REC0 + 0x16)[0] & 0xFFFF, self.mem(foe + 0x28C)[0] >> 10
