@@ -71,7 +71,7 @@ Solar Flare (Tien, Krillin): the power-up's white flash, and every ordinary enem
 150 frames; bosses aren't fooled. Galick Gun (Vegeta, Future Trunks), 10x Kamehameha and the Super Dragon Fist (Super Saiyan 4 Goku), Final
 Shine (Super Saiyan 4 Vegeta) and the Super Kamehameha reuse the base move's code with their own frames and strength. The Kamehameha's code
 shows frames 0-2 of the fighter's slot 18; Vegeta's figures hold his two-frame Big Bang there, so they get a Galick Gun pose of their own in
-slot 31 (`build.py` `beam_poses`: his wind-up, then Final Flash's two-handed push), and the build stops if another of Vegeta's figures or a Kamehameha-using guest's
+slot 31 (`build.py` `beam_poses`: his wind-up, then Final Flash's two-handed push; in Saiyan armour, `armour_pose`), and the build stops if another of Vegeta's figures or a Kamehameha-using guest's
 would show a missing frame (it draws junk over other sprites' tiles).
 
 Mastery: each (character, tier) has a byte in the bench's last group (`MASTERY`). Time spent transformed raises it (Super Saiyan's
@@ -163,7 +163,8 @@ writable statics (they'd link into ROM); the build stops if one appears.
 - GT Vegeta's change ("his ssj4 transformation he did was the fusion dance not transformation frames"): the BSO sheet draws no change
   (slot 10) for him, and `gt.FILL`'s first choice is his slot 21, the sheet's "special", which starts with the arms flung out to one side
   and then the other. Every GT Vegeta look (base, tank top, moustache, Super Saiyan, Super Saiyan 4) now changes on his own power-up
-  (slot 13): the crouch twice, the shout eight times, his stance, a retail change's 11 frames (`gt.actors`).
+  (slot 13): the crouch twice, the shout eight times, his stance, a retail change's 11 frames (`gt.actors`). (Third pass: the shout and
+  stance are the next form's.)
 - Final Shine ("his final shine frames are broken"): Final Flash's code (Final Shine's too) shows slot 19's frames by number: 0 and 1 by
   turns while charging, 2, then 3 and 4 by turns while the beam is out (sub_0801B4EC). The sheet's five frames, grown to a retail
   player's ten by spreading, put the charge (sheet 1 and 2) at 3 and 4, so GT Vegeta never pushed his Final Flash or Final Shine out.
@@ -244,6 +245,33 @@ FOR EXACT COLOR/SHADING", "Vegeta final shine is fine"):
   in the page's own colour for that BF colour. The glow is still Final Flash's yellow (the frames are shared with his Final Flash). The
   other GT Vegeta pages lose a few neck pixels the same way, too few to show: left as they are.
   `test_frames.py` 7-9 check all of these on the built ROM.
+
+Third pass, from the owner's notes on cut 4 (15:16: "Why doesn't SSJ4 vegeta have transformation frames. Why doesn't Broly have attack
+frames for shooting his eraser cannon. Why is vegeta fucking punching while shooting the galick gun and not holding his hands out normally
+like the kamehameha frames do. Why the fuck is super android 13s beam attack frames so glitched out", "PREVIEW BEFORE RESHOOT"), and 15:40
+("Also replace the SSJ4 Gogeta with this one"):
+- GT Vegeta's changes show the new form: slot 10 is his crouch for two frames, then the form he changes into (`gt.GT_NEXT`: Super Saiyan,
+  then Super Saiyan 4; the tank top's the same) shouting for eight and its stance, as BF's own changes go (Goku 106: the old hair for two
+  frames, the new form from the third). Before, all eleven were his own figure, so the hair changed only when the change ended. The
+  moustache look and Super Saiyan 4 (no next form) keep their own.
+- Broly Full Power fires with his hand out: slots 3 (ki blast) and 18 (the pose Eraser Cannon's Big Bang code holds) were his idle. Both
+  are now the sheet's strike, the wind-up then the open hand thrust, each frame kept at its number (`sprites` `indexed`, now also for
+  `slots` sheets), so the hand is out from the second frame on.
+- Vegeta in Saiyan armour (LoG2's figures: base, Super Saiyan, 2, Blue) fired the Galick Gun with slot 18, LoG2's own firing animation,
+  a slash with arcs: the Kamehameha code's frames 1 and 2 were the arcs by turns. Each gets a Galick Gun pose in slot 31 as BF's Vegeta
+  does (`build.py` `armour_pose`, from his own frames): side, his ki blast's wind-up, then its arm out with the far arm laid under it (a
+  shade darker, where nothing is in front) and the far fist taken off his back (`ARMOUR_FIST`, checked pixel by pixel: the build stops if
+  the frame differs); front, LoG2's ki charge (animation 14, base Vegeta's new slot 24: LoG2's Super Saiyan has none) under each figure's
+  own head, hands together, then at his chest with the ki in them; back, the wind-up, then the power-up's back, arms out of sight. These go
+  with the sprites (the code area is full).
+- Super Android 13's beam (the Electric Kamehameha's code: frame 0 charging, then 1 and 2 by turns): the prototype's slot 18 is the
+  charge, the thrust, then four frames of him flexing with his arms up, so the thrust and a flex flickered by turns. The playable figure's
+  slot 18 is the charge, then the thrust held (`sprites` `reframe`). The boss keeps the prototype's.
+- Super Saiyan 4 Gogeta is BSO's finished one, from the owner's four "every frame" sheets (`bso_import.SHEETS`: a folder
+  `gogeta_ssj4_v2` in `BFU_BSO`, p1.png to p4.png, 4x on the green field, never committed; every slot's frame count is checked). Their
+  slot 10 is BSO's change into him from base Gogeta (black hair); this look never changes form, so it is left out and his power-up stands
+  in if a skill plays it.
+- Shown to the owner as before/now sheets from the build before any reshoot. `test_frames.py` 6 checks the GT Vegeta changes.
 
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The

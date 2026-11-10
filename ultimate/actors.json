@@ -1,5 +1,5 @@
 {
- "_note": "LoG2 Saiyan armor actors. Slots: BF animation slot -> LoG2 animation (0 idle, 1 walk, 2 run, 3 hurt and fall, 4 charge, 5 ki, 6-8 melee). Beams and energy moves (18, 19) use the ki pose: LoG2's only arm-out frames, and the only ones that face the way the move goes. Moves LoG2 lacks reuse the nearest animation until art exists. extra_slots: 22 = charge pose (LoG2 animation 13), 23 = charged hit (LoG2 animation 16). Without them a character uses slot 13 and a normal melee animation.",
+ "_note": "LoG2 Saiyan armor actors. Slots: BF animation slot -> LoG2 animation (0 idle, 1 walk, 2 run, 3 hurt and fall, 4 charge, 5 ki, 6-8 melee). Beams and energy moves (18, 19) use the ki pose: LoG2's only arm-out frames, and the only ones that face the way the move goes. Moves LoG2 lacks reuse the nearest animation until art exists. extra_slots: 22 = charge pose (LoG2 animation 13), 23 = charged hit (LoG2 animation 16); Vegeta's 24 = LoG2's ki charge, hands together (animation 14; the Super Saiyan record has none), for the armour Vegetas' Galick Gun pose (build.py armour_pose). Without them a character uses slot 13 and a normal melee animation.",
  "_slots": {
   "0": 0,
   "1": 1,
@@ -29,7 +29,8 @@
   "stretch": true,
   "extra_slots": {
    "22": "r134:13",
-   "23": "r134:16"
+   "23": "r134:16",
+   "24": "r134:14"
   }
  },
  "vegeta_armor_ss": {

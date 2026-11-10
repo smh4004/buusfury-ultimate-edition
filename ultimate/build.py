@@ -1164,6 +1164,11 @@ BROLY_FRAMES = {
 }
 BROLY_SLOTS = {str(s): 'bfp_idle' for s in range(22)}
 BROLY_SLOTS.update({'1': 'bfp_walk', '2': 'bfp_walk', '4': 'bfp_combo', '5': 'bfp_strike', '6': 'bfp_slam', '8': 'bfp_slam', '9': 'bfp_strike', '10': 'bfp_slam', '13': 'bfp_slam', '14': 'bfp_strike', '20': 'bfp_strike', '21': 'bfp_slam'})
+# Firing: the strike's wind-up, then his open hand thrust out, held (Nov 10, the owner: "Why doesn't Broly have attack frames for shooting his eraser
+# cannon": slots 3, the ki blast, and 18, the pose Eraser Cannon's Big Bang code holds, were his idle). Each keeps its frame numbers, the hand
+# out from the second frame on (cfg 'indexed'), as a retail ki blast's.
+BROLY_SLOTS.update({'3': 'bfp_strike', '18': 'bfp_strike'})
+BROLY_INDEXED = [3, 18]
 
 
 def indexer(usable, pal):
@@ -1299,7 +1304,7 @@ def add_actors(rom, clean):
     broly_frames(clean_dir, usable, pal)
     # origin_dy 8: BF's Broly (actor 29, whose record this one copies, shadow and all) stands with his feet 15 rows under his origin, a normal fighter 7;
     # the sheet's frames were lined up like a fighter's, so he hovered over his shadow (Nov 9, the owner: "fix Broly looking like he's floating")
-    cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True, 'origin_dy': 8}
+    cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True, 'origin_dy': 8, 'indexed': BROLY_INDEXED}
     # and no ground shadow for either Broly (the owner, same day: "Remove the shadow beneath Broly's feet too cause it looks off"): BF's
     # 24x10 oval, the biggest the game has, sat out past his boots in every pose. The story's Broly is the same record (actor 29).
     cfg['_no_shadow'] = [29, 'broly_fp']
@@ -1322,7 +1327,11 @@ def add_actors(rom, clean):
             has = struct.unpack_from('<I', combo, 0x800000 + rec + 0x4C + 16 * 18 + 8)[0]
             a.setdefault('log2_overrides', {}).setdefault('18', 18 if 0x08800000 <= has < 0x09000000 else 5)
     cfg['android13_player'] = {'template': 93, 'slots': ANDROID13_SLOTS, 'stretch': True, 'grow': lengths, 'reserve': 4096}    # the boss's small record can't carry a playable form
-    cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths}
+    # His beam (the Electric Kamehameha's code: slot 18 frame 0 while charging, then 1 and 2 by turns): the prototype's slot 18 has the charge,
+    # the thrust, then four frames of him flexing with his arms up, so the thrust and a flex flickered by turns (Nov 10, the owner: "Why the fuck
+    # is super android 13s beam attack frames so glitched out"). The charge, then the thrust held ('reframe').
+    cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths,
+                             'reframe': {'18': [0, 1, 1, 1, 1, 1]}}
     for name, source in (('goku_ss2', 109), ('goku_ss2_b', 110), ('gohan_ss2', 104), ('gohan_green_ss2', 105), ('vegeta_ss2', 273), ('vegeta_ss2_b', 274), ('vegeta_armor_ss2', 'vegeta_armor_ss'), ('gohan_armor_ss2', 'gohan_armor_ss2_art'), ('trunks_ss2', 261), ('trunks_armor_ss2', 'trunks_armor_ss'), ('vegito_ss2', 276)):
         cfg[name] = {'same_as': source}
     cfg['android17']['reserve'] = 2048                  # the same as Super 17's: a change of size on transforming re-allocates OBJ memory and scrambled other sprites
@@ -1660,7 +1669,77 @@ KAME_CODE = (15, GALICK_SKILL, TENX_SKILL, SUPER_KAME_SKILL)
 KAME_GUESTS = ('krillin', 'tien', 'yamcha', 'krillin_kaioken', 'tien_kaioken', 'yamcha_kaioken', 'roshi', 'roshi_max', 'future_trunks', 'future_trunks_ss', 'goku_black', 'goku_rose')
 
 
-def beam_poses(rom, put):
+# Vegeta in Saiyan armour (LoG2's figures): slot 18 is LoG2's own firing animation, a slash with arcs, so his Galick Gun threw punches (Nov 10, the
+# owner: "Why is vegeta fucking punching while shooting the galick gun and not holding his hands out normally like the kamehameha frames do").
+# Each gets a Galick Gun pose as BF's Vegeta does (beam_poses), from his own frames: the charge, then both hands out.
+ARMOUR_GALICK = ('vegeta_armor', 'vegeta_armor_ss', 'vegeta_armor_ss2', 'vegeta_armor_ssb')
+# The side push: his ki blast's arm out (slot 19 frame 2, LoG2 animation 5 frame 2) with the far fist gone from his back, (y, x): (was, now):
+# the bodysuit's blues there instead
+ARMOUR_FIST = {(18, 18): (115, 159), (19, 18): (120, 159), (19, 19): (115, 159), (20, 18): (116, 159), (20, 19): (118, 161), (20, 20): (115, 159),
+               (21, 18): (120, 159), (21, 19): (118, 159), (21, 20): (115, 157), (22, 18): (115, 157), (22, 19): (115, 157)}
+ARMOUR_FAR = (1, 3)                 # and the far arm laid under the near one: its glove and sleeve one pixel back and three down,
+ARMOUR_DARK = {120: 118, 119: 117, 118: 117, 117: 116, 161: 159}    # a shade darker, seen only where nothing is in front of it
+
+
+ARMOUR_NECK = 17                    # front views: his head is the rows above this (LoG2's frames of him all stand the same there)
+
+
+def armour_pose(rom, rec, base, put):
+    """The Galick Gun pose (3 frames: the charge, then the push twice) of an armour Vegeta figure (record `rec`), from its own frames.
+    Side: the ki blast's wind-up (slot 19 frame 0), then its arm out with the other arm under it (two_hands). Front: LoG2's ki charge (base Vegeta's
+    slot 24, record `base`: LoG2's Super Saiyan has none): hands together, then at his chest with the ki in them, under the figure's own head (its
+    stance's). Back: the wind-up, then the power-up's back (slot 13 frame 0), arms out of sight in front of him. Frames keep their piece; only the
+    tiles are new."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    def fp(slot, i, v, rec=rec):
+        a = u(rec + 0x54 + 4 * slot) - ROM_BASE if slot < rom[rec] else -ROM_BASE
+        if a < 0 or i >= u(a): sys.exit('armour Galick pose: the figure has no slot %d frame %d' % (slot, i))
+        return u(a + 4 + 16 * i + 4 * v)
+    def retiled(f, img):
+        o = f - ROM_BASE
+        if u(o) != 1: sys.exit('armour Galick pose: a frame of %d pieces' % u(o))
+        h, w = img.shape
+        data = img.reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+        body = bytearray(rom[o:o + 20]); struct.pack_into('<I', body, 16, put(struct.pack('<II', 0, len(data)) + data))
+        return body
+    def two_hands(img):
+        out = img.copy()
+        for (y, x), (was, now) in ARMOUR_FIST.items():
+            if img[y, x] != was: sys.exit('armour Galick pose: the ki blast frame is not as drawn at (%d, %d): %d' % (y, x, img[y, x]))
+            out[y, x] = now
+        dx, dy = ARMOUR_FAR; far = np.zeros(img.shape, bool)
+        for y in range(13, 20):                    # the near arm: glove and sleeve, left of his shoulder
+            for x in range(1, 12):
+                if img[y, x] and not out[y + dy, x + dx]:
+                    out[y + dy, x + dx] = ARMOUR_DARK.get(int(img[y, x]), img[y, x]); far[y + dy, x + dx] = True
+        t = np.pad(out == 0, 1)
+        edge = far & (t[:-2, 1:-1] | t[2:, 1:-1] | t[1:-1, :-2] | t[1:-1, 2:])
+        out[edge] = np.where(np.isin(out[edge], (157, 159, 161)), 157, 115)     # its outline: the sleeve's or the glove's
+        return out
+    def view(slot, i, v, edit=None):               # a frame of his, as it is or edited
+        f = fp(slot, i, v)
+        return put(bytes(retiled(f, edit(sprites.frame_image(rom, f))))) if edit else f
+    def side(slot, i, edit=None):                  # views 2 and 3 (3 is 2 flipped: the same tiles)
+        a = view(slot, i, 2, edit)
+        if not edit: return a, fp(slot, i, 3)
+        b = bytearray(rom[fp(slot, i, 3) - ROM_BASE:fp(slot, i, 3) - ROM_BASE + 20]); struct.pack_into('<I', b, 16, u(a - ROM_BASE + 16))
+        return a, put(bytes(b))
+    def front(i):
+        body, head = fp(24, i, 0, base), fp(0, 0, 0)
+        if rom[body - ROM_BASE + 4:body - ROM_BASE + 12] != rom[head - ROM_BASE + 4:head - ROM_BASE + 12]: sys.exit('armour Galick pose: front frames of other sizes')
+        out = sprites.frame_image(rom, body).copy(); out[:ARMOUR_NECK] = sprites.frame_image(rom, head)[:ARMOUR_NECK]
+        return put(bytes(retiled(head, out)))
+    def lone(img):                                 # without the power-up's sparks off his body
+        from scipy import ndimage
+        lab, n = ndimage.label(img > 0)
+        if n < 2: return img
+        return np.where(lab == np.bincount(lab.ravel())[1:].argmax() + 1, img, 0).astype(img.dtype)
+    charge = [front(0), view(19, 0, 1), *side(19, 0)]
+    push = [front(1), view(13, 0, 1, lone), *side(19, 2, two_hands)]
+    return put(struct.pack('<I', 3) + struct.pack('<12I', *charge, *push, *push))
+
+
+def beam_poses(rom, put, put_art):
     """The Kamehameha's code (behaviour 0x0804D9F8) shows frames 0-2 of the fighter's slot 18: 0 while charging, then 1 and 2 by turns. Vegeta's figures
     hold his Big Bang there, two frames, so his Galick Gun drew a third frame from past the animation: junk over other sprites' tiles. Each such figure
     gets a pose of its own in slot BEAM_POSE (outfit.c beam_pose): his ki blast's wind-up (slot 3, frame 0), then Final Flash's push with both hands
@@ -1685,6 +1764,17 @@ def beam_poses(rom, put):
         new[0] = BEAM_POSE + 1; struct.pack_into('<I', new, 0x54 + 4 * BEAM_POSE, pose)
         struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put(bytes(new)))
         made[char] = f
+    armour = {}
+    base = record(fm[ARMOUR_GALICK[0]])[1]
+    for name in ARMOUR_GALICK:
+        char, rec = record(fm[name])
+        if char in made or char in armour: continue
+        pose = armour_pose(rom, rec, base, put_art)       # (with the sprites: the code area is full)
+        n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * (BEAM_POSE + 1 - n))
+        new[0] = BEAM_POSE + 1; struct.pack_into('<I', new, 0x54 + 4 * BEAM_POSE, pose)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
+        armour[char] = name
+    made.update(armour)
     print('Galick Gun pose for figures', sorted(made))
     books = {c: s for c, s in SKILL_BOOK.items() if set(s) & set(KAME_CODE)}
     for f in range(total):
@@ -1918,7 +2008,7 @@ def add_eraser(rom, clean, sym, at, art):
         if skill == TENX_SKILL: struct.pack_into('<I', row, 16, sym['ssj4_kame_can'] | 1)
         struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
         rows[skill] = row
-    beam_poses(rom, put)
+    beam_poses(rom, put, put_art)
     def tinted_frames(rows_at, count, lo, hi, remap, cache):
         """A copy of `count` {header, attributes, tiles} rows whose tiles in [lo, hi) are recoloured (each block once)."""
         out = bytearray(clean[rows_at - ROM_BASE:rows_at - ROM_BASE + 12 * count])

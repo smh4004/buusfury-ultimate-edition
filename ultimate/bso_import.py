@@ -40,6 +40,15 @@ PAGES = {
     'uub': (36, 114, 264), 'majuub': (37, 114, 264),
     'ledgic': (67, 64, 64),
 }
+# Actors the owner sent again later as BSO's "every frame" sheets (one folder in BFU_BSO, pages p1.png, p2.png ...): each slot's front, back
+# and side rows of frames at 4x on the same green field, the slots in turn (their frame counts here, to check the reading). They replace the
+# actor's page. SSJ4 Gogeta (Nov 10, the owner: "Also replace the SSJ4 Gogeta with this one"): BSO's finished Gogeta, four pages.
+SHEETS = {'gogeta_ssj4': ('gogeta_ssj4_v2', {0: 2, 1: 4, 2: 4, 3: 3, 4: 4, 5: 4, 6: 4, 7: 1, 8: 4, 9: 3, 10: 11, 12: 2, 13: 2, 14: 3, 15: 4, 16: 4,
+                                             17: 4, 18: 3, 19: 3})}
+# Slots of a sheet left out: Gogeta's 10 is BSO's change into him from base Gogeta (black hair); the look here never changes form, and his
+# own power-up stands in if a skill plays it (gt.FILL)
+SHEET_SKIP = {'gogeta_ssj4': (10,)}
+SHEET_ZOOM = 4
 # Pages lined up some other way: Majuub's page has Uub's frame window (his own frames match Uub 264 too loosely to
 # line up: the vest and the long hair differ), and Ledgic's source (BF's caped Bruiser, 64x64 pieces) doesn't fit the
 # 32-row canvas actor_frames reads, so his idle front's feet go on row FEET and its middle on column 32.
@@ -125,17 +134,43 @@ def line_up(cells, ref):
     return int(i) - 24, int(j) - 24, int(total.max())
 
 
+def sheet_pages(name):
+    d = os.path.join(folder(), SHEETS[name][0]); pages = []
+    while os.path.exists(os.path.join(d, 'p%d.png' % (len(pages) + 1))): pages.append(os.path.join(d, 'p%d.png' % (len(pages) + 1)))
+    if not pages: sys.exit('%s: no sheet pages (p1.png ...) in %s' % (name, d))
+    return pages
+
+
+def sheet_rows(name, colours):
+    """{slot: [front, back, side] frame lists (palette indices)} from an actor's SHEETS pages."""
+    _, counts = SHEETS[name]; rows = []
+    for path in sheet_pages(name):
+        a = np.asarray(Image.open(path).convert('RGB')).astype(int); g = green(a)
+        for y0, y1 in runs(np.nonzero(g[:, 150:].any(1))[0]):             # (the labels are left of x 150)
+            cells = [a[y0:y1 + 1, x0:x1 + 1] for x0, x1 in runs(np.nonzero(g[y0:y1 + 1].any(0))[0]) if x1 - x0 > 60]
+            rows.append([colours.index(c[SHEET_ZOOM // 2::SHEET_ZOOM, SHEET_ZOOM // 2::SHEET_ZOOM]) for c in cells])
+    slots = sorted(counts)
+    if len(rows) != 3 * len(slots): raise ValueError('%s: %d rows of frames on the sheets, expected %d' % (name, len(rows), 3 * len(slots)))
+    got = {}
+    for k, s in enumerate(slots):
+        views = rows[3 * k:3 * k + 3]
+        if any(len(v) != counts[s] for v in views): raise ValueError('%s slot %d: %s frames, expected %d' % (name, s, [len(v) for v in views], counts[s]))
+        if s not in SHEET_SKIP.get(name, ()): got[s] = views
+    return got
+
+
 def frames(rom, name, colours, cache=None):
     """{slot: [down, up, side]} canvases (CANVAS-shaped uint8) for a BSO actor."""
     sys.path[:0] = [HERE, os.path.join(HERE, 'lib'), os.path.join(HERE, '..', 'tools', 'scripts')]
     import goku_black
     page, template, source = PAGES[name]
-    rows = rows_of(page)
     got = {}
-    for label, cells in rows:
-        m = re.match(r'(\d+)\s.*,\s*(front|back|side)$', label)
-        if not m: raise ValueError('page %d: unreadable row label %r' % (page, label))
-        got.setdefault(int(m.group(1)), [None, None, None])[VIEW[m.group(2)]] = [colours.index(c[1::3, 1::3]) for c in cells]
+    if name in SHEETS: got = sheet_rows(name, colours)
+    else:
+        for label, cells in rows_of(page):
+            m = re.match(r'(\d+)\s.*,\s*(front|back|side)$', label)
+            if not m: raise ValueError('page %d: unreadable row label %r' % (page, label))
+            got.setdefault(int(m.group(1)), [None, None, None])[VIEW[m.group(2)]] = [colours.index(c[1::3, 1::3]) for c in cells]
     if name in SAME_OFFSET:
         (dy, dx), score = frames(rom, SAME_OFFSET[name], colours)[1]['offset'], 0
     elif name == 'ledgic':
@@ -167,7 +202,7 @@ def load_all(rom, pal, names=None):
     """Every actor in PAGES (or names), cached beside the pages by their modification times."""
     names = names or list(PAGES)
     d = folder(); cache = os.path.join(HERE, 'out', 'bso_frames.pkl')
-    stamp = {n: os.path.getmtime(os.path.join(d, 'p-%03d.png' % PAGES[n][0])) for n in names}
+    stamp = {n: [os.path.getmtime(p) for p in sheet_pages(n)] if n in SHEETS else os.path.getmtime(os.path.join(d, 'p-%03d.png' % PAGES[n][0])) for n in names}
     stamp['_code'] = os.path.getmtime(__file__)
     try:
         old = pickle.load(open(cache, 'rb'))
