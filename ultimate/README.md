@@ -232,6 +232,12 @@ FOR EXACT COLOR/SHADING", "Vegeta final shine is fine"):
     It fails on the builds the owner screenshotted.
   - Vegeta's glove and boot highlights are white too and still turn pale blue. That is unchanged and was not asked for; the owner was
     asked.
+- Switch Character draws no ground shadows (the owner: "Don't render the shadows under characters feet in the switch screen it's blocking
+  their name"). A fighter's sprite keeps the shadow its actor record gave it when it was made (+0x5C). On this screen it was drawn below
+  and to the right of him, over the name, e.g. Super Janemba's in the old trailer. Each frame, `outfit.c` `no_shadows` frees it with
+  sub_0800ECB0 and a size the game's table doesn't have. This affects only the screen's own sprites; back in the field the player
+  keeps his shadow. Checked in `test_build.py`. A few guests (Piccolo, Tien, Krillin, Android 17/18, Future Trunks, Roshi) also have a
+  small shadow drawn into their own frames under the feet. It stays, because those are their sprites (likely from the source sheets).
 - Super Saiyan 4 Vegeta's Final Shine wind-up (`gt.shine_charge`, approved): seen from the side, slot 19's frames 0-2 (charging, then the
   pull back) had his neck see-through and a glove turned to hair: the sheet's head swap took them with BF's head. Each gets BF Vegeta's
   (actor 270) gloves back over the hair, BF's neck and collar where the page left nothing, and BF's charge glow where it edges him, each

@@ -724,6 +724,19 @@ static void restore_borrowed(void *obj) {
     }
 }
 
+/* No ground shadows on this screen (Nov 10, the owner: "Don't render the shadows under characters feet in the switch screen it's blocking
+   their name"): a fighter's sprite keeps the shadow its actor record gave it when it was made (+0x5C), drawn below and right of him here,
+   over the name. sub_0800ECB0 with a size the game's table doesn't have frees it and leaves none. Only this screen's own sprites. */
+#define Sprite_SetShadow ((void (*)(void *, const u32 *))0x0800ECB1)
+static void no_shadows(void *obj) {
+    static const u32 none[2] = {0, 0};
+    int n = *field(obj, OBJ_COUNT), i;
+    for (i = 0; i < n; i++) {
+        u8 *sprite = (u8 *)*field(obj, OBJ_LIST + 4 + i * 8);
+        if (sprite && *(u32 *)(sprite + 0x5C)) Sprite_SetShadow(sprite, none);
+    }
+}
+
 int picker_update(void *obj) {
     int first = LABEL_OWNER != ((u32)obj ^ SNAP_MAGIC), r;
     if (first) restore_borrowed(obj);
@@ -733,6 +746,7 @@ int picker_update(void *obj) {
     update_label(obj);
     r = orig_update(obj);
     scroll_row(obj, first);
+    no_shadows(obj);
     return r;
 }
 

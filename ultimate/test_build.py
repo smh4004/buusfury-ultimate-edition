@@ -68,6 +68,27 @@ o = run(foreign, sel, d, sav2)
 check('foreign save: Select Game survives and New Game starts', 'bad pc' not in o and open(d + '/f.bin', 'rb').read()[1] & 1 == 0)
 check('foreign save: the save file itself is untouched', open(sav2, 'rb').read() == before)
 
+# No ground shadows on Switch Character (Nov 10, the owner: "Don't render the shadows under characters feet in the switch screen it's blocking
+# their name"): while it is open, none of its sprites has a shadow (+0x5C, outfit.c no_shadows); back in the field the player keeps his. The
+# screen's sprites are found in EWRAM as its object's row ({character, sprite} pairs at +0x118, their count at +0x114).
+def screen_sprites(ew):
+    w = lambda o: int.from_bytes(ew[o:o + 4], 'little')
+    for i in range(0, len(ew) - 0x170, 4):
+        n = w(i + 0x114)
+        if not 3 <= n <= 9: continue
+        pairs = [(w(i + 0x118 + 8 * k), w(i + 0x11C + 8 * k)) for k in range(n)]
+        if all(0 <= c <= 8 and 0x02000000 <= sp < 0x02040000 for c, sp in pairs) and len({c for c, _ in pairs}) == n:
+            return [(c, w(sp - 0x02000000 + 0x5C)) for c, sp in pairs]
+    return None
+sh = ['guardon 0x09000000'] + route + ['poke8 %08X %02X' % (0x03001560 + 8 * REC + FORM, forms['android17']), 'tap A 60', 'tap A 60', 'run 30', 'tap RIGHT 40', 'tap RIGHT 40',
+      'dump e 02000000 40000', 'tap B 60', 'run 200', 'dump f 02000000 40000', 'dump q 03001C34 4']
+o = run(rom, sh, d)
+on = screen_sprites(open(d + '/e.bin', 'rb').read())
+pl = int.from_bytes(open(d + '/q.bin', 'rb').read()[:4], 'little'); fe = open(d + '/f.bin', 'rb').read()
+kept = 0x02000000 <= pl < 0x02040000 and int.from_bytes(fe[pl - 0x02000000 + 0x5C:pl - 0x02000000 + 0x60], 'little') != 0
+print('   Switch Character sprites (character, shadow):', on, '; the player\'s sprite afterwards', hex(pl))
+check('Switch Character draws no ground shadows; the player keeps his in the field', 'bad pc' not in o and on and all(s == 0 for _, s in on) and kept)
+
 # Broly's second skin: Switch Character, last character, Down, A.
 bfp = forms['broly_fp']
 o = run(rom, ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * 5 + ['tap DOWN 40', 'tap A 180', 'run 60', 'keys RIGHT', 'run 30', 'keys', 'tap A 12', 'run 20', 'dump p 03001068 8a8'], d)
