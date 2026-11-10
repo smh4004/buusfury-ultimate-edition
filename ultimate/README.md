@@ -163,8 +163,8 @@ writable statics (they'd link into ROM); the build stops if one appears.
 - GT Vegeta's change ("his ssj4 transformation he did was the fusion dance not transformation frames"): the BSO sheet draws no change
   (slot 10) for him, and `gt.FILL`'s first choice is his slot 21, the sheet's "special", which starts with the arms flung out to one side
   and then the other. Every GT Vegeta look (base, tank top, moustache, Super Saiyan, Super Saiyan 4) now changes on his own power-up
-  (slot 13): the crouch twice, the shout eight times, his stance, a retail change's 11 frames (`gt.actors`). (Third pass: the shout and
-  stance are the next form's.)
+  (slot 13): the crouch twice, the shout eight times, his stance, a retail change's 11 frames (`gt.actors`). (Third pass: the next form's
+  crouch and stance, without the shout.)
 - Final Shine ("his final shine frames are broken"): Final Flash's code (Final Shine's too) shows slot 19's frames by number: 0 and 1 by
   turns while charging, 2, then 3 and 4 by turns while the beam is out (sub_0801B4EC). The sheet's five frames, grown to a retail
   player's ten by spreading, put the charge (sheet 1 and 2) at 3 and 4, so GT Vegeta never pushed his Final Flash or Final Shine out.
@@ -250,10 +250,12 @@ Third pass, from the owner's notes on cut 4 (15:16: "Why doesn't SSJ4 vegeta hav
 frames for shooting his eraser cannon. Why is vegeta fucking punching while shooting the galick gun and not holding his hands out normally
 like the kamehameha frames do. Why the fuck is super android 13s beam attack frames so glitched out", "PREVIEW BEFORE RESHOOT"), and 15:40
 ("Also replace the SSJ4 Gogeta with this one"):
-- GT Vegeta's changes show the new form: slot 10 is his crouch for two frames, then the form he changes into (`gt.GT_NEXT`: Super Saiyan,
-  then Super Saiyan 4; the tank top's the same) shouting for eight and its stance, as BF's own changes go (Goku 106: the old hair for two
-  frames, the new form from the third). Before, all eleven were his own figure, so the hair changed only when the change ended. The
-  moustache look and Super Saiyan 4 (no next form) keep their own.
+- GT Vegeta's changes show the new form: slot 10 is his power-up's crouch (slot 13 frame 0) for two frames, then the form he changes into
+  (`gt.GT_NEXT`: Super Saiyan, then Super Saiyan 4; the tank top's the same) in the same crouch for eight and its stance, as BF's own
+  changes go (Goku 106: the old hair for two frames, the new form from the third). Before, all eleven were his own figure, so the hair
+  changed only when the change ended. The moustache look and Super Saiyan 4 (no next form) keep their own. Not the shout (slot 13 frame
+  1, as cut 4 had): BF Vegeta's fists are up over his head there and the sheet's bigger hair covers his arms, so his arms vanished (the
+  owner, 16:04: "why are vegetas arms disappearing on transforming"). His power-up itself (slot 13) still has that frame.
 - Broly Full Power fires with his hand out: slots 3 (ki blast) and 18 (the pose Eraser Cannon's Big Bang code holds) were his idle. Both
   are now the sheet's strike, the wind-up then the open hand thrust, each frame kept at its number (`sprites` `indexed`, now also for
   `slots` sheets), so the hand is out from the second frame on.

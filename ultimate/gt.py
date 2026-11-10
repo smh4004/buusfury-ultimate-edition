@@ -297,11 +297,13 @@ def actors(clean, pal, lengths):
             # flung out to one side and then the other, which read as the fusion dance (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not
             # transformation frames"). His own power-up (slot 13: fists down, then the shout) in a retail change's 11 frames, as Goku's
             # Kaioken and Super Saiyan God are built: the crouch, the shout held, his stance. A form with a next one changes into it on the way,
-            # as BF's own (Goku 106's slot 10: his old hair for two frames, the new form from the third): his crouch, then the next form's shout and
-            # stance (Nov 10, the owner: "Why doesn't SSJ4 vegeta have transformation frames": the shout and stance were still his gold hair).
+            # as BF's own (Goku 106's slot 10: his old hair for two frames, the new form from the third): his crouch, then the next form's crouch
+            # and stance (Nov 10, the owner: "Why doesn't SSJ4 vegeta have transformation frames": they were all still his gold hair). Not the
+            # shout (slot 13 frame 1): BF Vegeta's fists are up over his head there, and the sheet's bigger hair covers his arms, so they
+            # vanished (the owner, 16:04: "why are vegetas arms disappearing on transforming").
             nxt = haves.get(GT_NEXT.get(name), have)
             p13, n13, n0 = have[13], nxt[13], nxt[0]
-            have[10] = [[p13[v][0]] * 2 + [n13[v][1]] * 8 + [n0[v][0]] for v in range(3)]
+            have[10] = [[p13[v][0]] * 2 + [n13[v][0]] * 8 + [n0[v][0]] for v in range(3)]
             gaps[name] = [m for m in gaps[name] if m[0] != 10]
     out = {}
     for name, tpl in ACTORS.items():
