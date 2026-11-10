@@ -14,6 +14,7 @@ BASE, ACTOR_LIST = 0x08000000, 0x6B6BD8
 LIGHTS = (28, 29, 2)            # the hair's highlights
 FACE = (200, 203, 215, 216, 117)  # the face's own colours (its light skin, the eyes)
 IRIS = (215, 216)               # the eyes' green
+HEAD = 4                        # fill: the hairline and the temples are this near an eye
 BASE_HAIR = (0, 1, 112)         # nothing, or the base figure's black hair (and its grey shine)
 O = 48                          # canvas margin
 SHIFT = 3                       # how far base_under looks for the base figure
@@ -95,14 +96,45 @@ def hair_mask(img, under, ramp):
     vegetas face pixels being blue"); with the body only below it, it is the hairline and stays hair."""
     from scipy import ndimage
     old = old_rule(img, ramp)
-    if under is None: return old
+    if under is None: return fill(img, old, None, ramp)
     cand = np.isin(img, ramp) & ~eye_whites(img) & (np.isin(under, BASE_HAIR) | old)
     lab, n = ndimage.label(cand, np.ones((3, 3)))
     keep = set(np.unique(lab[old | (cand & np.isin(img, LIGHTS))]).tolist()) - {0}
     add = np.isin(lab, list(keep)) & ~old
     p = np.pad((img != 0) & ~cand, 1)                                              # the body
     side = p[1:-1, :-2] | p[1:-1, 2:] | p[:-2, 1:-1]                              # left, right, above
-    return old | (add & ~side)
+    hair = old | (add & ~side)
+    lab, n = ndimage.label(hair, np.ones((3, 3)))                                 # what that cut off from the hair (a stub under Vegeta's ear)
+    hair = np.isin(lab, list(set(np.unique(lab[old | (hair & np.isin(img, LIGHTS))]).tolist()) - {0}))
+    return fill(img, hair, under, ramp)
+
+
+def fill(img, hair, under, ramp):
+    """The hair's shades the rules above left gold at its edge (Nov 10, the owner: "YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB"):
+    a ramp pixel with no skin or eye to its left, its right or above it is hair if hair is on three of its sides (a gap in the bangs), if
+    hair is above it and the face below it (the hair's last row over the face), if hair is above it and on one side and the base figure
+    has its hair there, or if hair is on one side and nothing on the rest and the base figure has its hair there (a side lock's end).
+    Repeated while it adds any; then, once (repeated it would run on down the side of the face), a ramp pixel with hair above it and to
+    one side: the hair's inner corner by the temple. The hairline and the temples are within HEAD pixels of an eye (so not the top of a
+    shoulder under the hair, running)."""
+    face = np.pad(np.isin(img, FACE) | eye_whites(img), 1)
+    beside = face[1:-1, :-2] | face[1:-1, 2:] | face[:-2, 1:-1]
+    from scipy import ndimage
+    head = ndimage.binary_dilation(np.isin(img, IRIS) | eye_whites(img), np.ones((2 * HEAD + 1, 2 * HEAD + 1), bool))
+    below = face[2:, 1:-1] & head                                                # (the face's skin, not an arm's or a shoulder's)
+    shade = np.isin(img, ramp) & ~eye_whites(img) & ~beside
+    based = np.isin(under, BASE_HAIR) if under is not None else np.zeros(img.shape, bool)
+    e = np.pad(img == 0, 1); ne = e[:-2, 1:-1].astype(int) + e[2:, 1:-1] + e[1:-1, :-2] + e[1:-1, 2:]
+    def grow(hair):
+        for _ in range(8):
+            h = np.pad(hair, 1); nh = h[:-2, 1:-1].astype(int) + h[2:, 1:-1] + h[1:-1, :-2] + h[1:-1, 2:]
+            add = shade & ~hair & ((nh >= 3) | (h[:-2, 1:-1] & (below | (nh >= 2) & based)) | ((nh >= 1) & (nh + ne >= 3) & based))
+            if not add.any(): break
+            hair = hair | add
+        return hair
+    hair = grow(hair)
+    h = np.pad(hair, 1)                                                           # then, once, the hair's inner corners: hair above it and
+    return grow(hair | (shade & head & h[:-2, 1:-1] & (h[1:-1, :-2] | h[1:-1, 2:])))   # beside it (where his hair wraps the temple), again
 
 
 def tint(rom, ss, base, to):

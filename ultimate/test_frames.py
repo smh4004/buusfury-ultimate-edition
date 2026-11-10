@@ -208,7 +208,7 @@ from scipy import ndimage
 # against the Super Saiyan figure it's made from, the eyes' whites (white beside an eye's green) unchanged, and no skin shade (16, 201, 202,
 # also the hair's) that changed has the face's skin (200, 203) or an eye to its left or right (the hairline, with the face only below it, is hair).
 SKIN_SHADES, FACE_SIDE = (16, 201, 202), (200, 203, 215, 216)
-face_blue = []
+face_blue, edge_gold = [], []
 for name, ss in (('goku_ssb', 3), ('goku_ssb_b', 4), ('vegeta_ssb', 28), ('vegeta_ssb_b', 29), ('vegeta_armor_ssb', forms['vegeta_armor_ss'])):
     for slot in range(22):
         A, B = anim(actor_of(forms[name]), slot), anim(actor_of(ss), slot)
@@ -220,7 +220,17 @@ for name, ss in (('goku_ssb', 3), ('goku_ssb_b', 4), ('vegeta_ssb', 28), ('veget
                 q = np.pad(np.isin(b, FACE_SIDE) | ew, 1)
                 n = int((ew & (a != b)).sum() + ((a != b) & np.isin(b, SKIN_SHADES) & (q[1:-1, :-2] | q[1:-1, 2:])).sum())
                 if n: face_blue.append((name, slot, i, d, n))
+                # gold left at the hair's edge (Nov 10, the owner: "YOU STILL HAVE LEFT YELLOW ON THE SIDES OF GOKU SSB"): an unchanged skin
+                # shade with blue on three sides (a gap in the bangs), or with blue above it and the face below it and no face beside it
+                # (the hair's last row over the face; within 4 pixels of an eye, so not a shoulder's skin under the hair)
+                h = np.pad(a != b, 1); nh = h[:-2, 1:-1].astype(int) + h[2:, 1:-1] + h[1:-1, :-2] + h[1:-1, 2:]
+                q2 = np.pad(np.isin(b, FACE_SIDE + (117,)) | ew, 1)
+                beside = q2[1:-1, :-2] | q2[1:-1, 2:] | q2[:-2, 1:-1]
+                head = ndimage.binary_dilation(np.isin(b, (215, 216)) | ew, np.ones((9, 9), bool))
+                gold = (a == b) & np.isin(b, SKIN_SHADES) & ~ew & ~beside & ((nh >= 3) | (h[:-2, 1:-1] & q2[2:, 1:-1] & head))
+                if gold.any(): edge_gold.append((name, slot, i, d, int(gold.sum())))
 check('Blue Goku\'s and Blue Vegeta\'s faces aren\'t blue (the eyes\' whites and the skin beside the face stay Super Saiyan\'s)%s' % ((': %s' % face_blue[:6]) if face_blue else ''), not face_blue)
+check('no gold left at the edge of their hair (no gap in the bangs, the hair\'s last row over the face blue)%s' % ((': %s' % edge_gold[:6]) if edge_gold else ''), not edge_gold)
 eyes = []                                  # his base and Super Saiyan looks: the sheet's eyes were dropped as background (gogeta.frame)
 for name in ('gogeta_dbs', 'gogeta_dbs_ss'):
     for slot in range(22):
