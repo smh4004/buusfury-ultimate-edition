@@ -144,7 +144,20 @@ def actors(clean, pal, lengths):
             if s in have or s >= n: continue
             alt = next((a for a in FILL.get(s, (0,)) + (0,) if _pick(frames[name], a) is not None), 0)
             have[s] = _pick(frames[name], alt); missing.append((s, alt))
+        if name.startswith('vegeta_gt'):
+            # GT Vegeta's change (slot 10): the sheet has none, and FILL's first choice, his slot 21 (the sheet's "special"), starts with the arms
+            # flung out to one side and then the other, which read as the fusion dance (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not
+            # transformation frames"). His own power-up (slot 13: fists down, then the shout) in a retail change's 11 frames, as Goku's
+            # Kaioken and Super Saiyan God are built: the crouch, the shout held, his stance.
+            p13, p0 = have[13], have[0]
+            have[10] = [[p13[v][0]] * 2 + [p13[v][1]] * 8 + [p0[v][0]] for v in range(3)]
+            missing = [m for m in missing if m[0] != 10]
         cfg = {'template': tpl, 'raw_frames': {str(k): v for k, v in sorted(have.items()) if k < n}, 'compress': True, 'high': True}   # above 16 MB in a 32 MB build
+        if name.startswith('vegeta_gt'):
+            # His Final Flash (and Final Shine, the same code) shows slot 19's frames by number: 0 and 1 by turns while charging, 2, then 3 and 4
+            # by turns while the beam is out. Grown to a retail player's 10 by spreading, frames 3 and 4 were the sheet's 1 and 2 (the charge),
+            # so he never pushed the beam out (Nov 10, the owner: "his final shine frames are broken"). Each keeps its number (sprites 'indexed').
+            cfg['indexed'] = [19]
         if name == 'ledgic': cfg['big'] = True
         else: cfg['grow'] = lengths
         out[name] = cfg

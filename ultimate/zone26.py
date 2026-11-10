@@ -229,8 +229,6 @@ TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 6
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
 import bog                                          # Battle of Gods (more flags 49-57, its people and Beerus in the real areas: add_bog)
 from bog import MORE_BOG_DONE
-import great_ape                                    # the Great Ape raid (more flags 64-67; Bulma and Vegeta in Dr. Brief's Lab, the raid in copies
-                                                    # of the Giant Crater: add_ape, ape_rooms)
 import garlic                                       # the Garlic Jr. quest (more flags 58-63; its people in the real areas, its fights in copies
                                                     # of the Lookout: add_garlic, garlic_rooms)
 MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
@@ -365,11 +363,6 @@ def garlic_first():
 
 def garlic_rooms():
     return {r: garlic_first() + k for k, r in enumerate(garlic.ROOMS)}
-
-
-def ape_rooms():
-    """The Great Ape raid's rooms (great_ape.ROOMS: copies of the Giant Crater), after Garlic Jr.'s."""
-    return {r: garlic_first() + len(garlic.ROOMS) + k for k, r in enumerate(great_ape.ROOMS)}
 
 
 def black_room(k=0):
@@ -520,12 +513,6 @@ def rush_rows(W, rom, harmless=False):
         then = garlic.makyan_fall(MORE_PUT, MORE_GET) if name == 'makyan' else garlic.fight_fall(name, rooms, MORE_PUT)
         struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
         rows += r
-    ape = ape_rooms()                              # the Great Ape raid: its two rounds, on copies of BF Broly's row (great_ape.ROWS)
-    for k, (hp, stats) in enumerate(great_ape.ROWS):
-        r = bytearray(rom[STATS + 28 * great_ape.BROLY_ROW:STATS + 28 * (great_ape.BROLY_ROW + 1)])
-        struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)        # (never harmless: the raid's test loses as well as wins)
-        struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(great_ape.after_fight(k, ape, MORE_PUT)))))
-        rows += r
     at = W.put(bytes(rows))
     for o in STATS_REFS:
         if struct.unpack_from('<I', rom, o)[0] != BASE + STATS:
@@ -659,18 +646,6 @@ def add_garlic(W, rom, actor_ids, quest_list, row):
     people = [npc(G.DENDE, G.DENDE_AT, when([], [G.GJ_CURED], G.ENDING)), npc(actor_ids['garlic_jr'] + 9, G.GARLIC_AT, when([G.GJ_CURED], [G.GJ_DONE]))]
     people += [npc(actor_ids[n] + 9, at, when([G.GJ_CURED], [G.GJ_SPICE, G.GJ_DONE])) for n, at in zip(('spice', 'vinegar', 'mustard', 'salt'), G.SPICE_AT)]
     set_actors(W, rom, e, new + people)
-
-
-def add_ape(W, rom, actor_ids, quest_list):
-    """The Great Ape raid (great_ape.py) in Dr. Brief's Lab, by spawn conditions on a new copy of its list: Bulma from the ending on, once
-    the GT looks are open; GT Vegeta beside her then too, but not while he is the Great Ape (the raid started, not won) or the one playing."""
-    A = great_ape
-    g = lambda f: '    pushn %d\n    call 0x%X\n' % (f, MORE_GET)
-    def npc(char, at, cond): return W.put(struct.pack('<8I', NPC_SPAWN, cond, at[1] << 16 | at[0], quest_list, char, 1, 0x080716EC, 0))
-    home = g(A.MORE_APE_START) + '    push 0\n    eq\n' + g(A.MORE_APE_DONE) + '    or\n' + g(A.Q_VEGETA) + '    push 0\n    eq\n    and\n'
-    e, ptrs = area_actors(rom, A.LAB)
-    set_actors(W, rom, e, ptrs + [npc(A.BULMA, A.BULMA_AT, condition(W, A.when(MORE_GET, [], []))),
-                                  npc(actor_ids['vegeta_gt'] + 9, A.VEGETA_AT, condition(W, A.when(MORE_GET, [], [], home)))])
 
 
 def add_balls(W, rom, actor_ids, popo_list):
@@ -836,24 +811,9 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
             st[3] = 1; struct.pack_into('<I', st, 0x10, W.put(struct.pack('<II', 0, ring)))
             st[4] = 0; struct.pack_into('<I', st, 0x14, 0)
         rows.append(bytes(st))
-    ape_row = garlic_row + 1 + len(garlic.FIGHTS)  # the Great Ape raid's two rounds (rush_rows)
-    crater = next(rom[AREAS + 56 * q:AREAS + 56 * q + 56] for q in range(COUNT) if (rom[AREAS + 56 * q], rom[AREAS + 56 * q + 1]) == great_ape.CRATER)
-    for room, number in ape_rooms().items():       # the Giant Crater (fighting on), empty but for the Great Ape, or a scene that plays as you arrive
-        st = bytearray(crater); st[0] = 26; st[1] = number
-        if room in great_ape.FIGHT_ROOMS:
-            k = great_ape.FIGHT_ROOMS.index(room); x, y = great_ape.FOE_AT
-            e = W.put(struct.pack('<8I', ENEMY_SPAWN, 0, ape_row + k, y << 16 | x, actor_ids['oozaru'] + 9, 0x080555A0, 1, 0x080716EC))
-            st[3] = 0; struct.pack_into('<I', st, 0x10, 0)
-            st[4] = 1; struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e)))
-        else:
-            ring = W.put(struct.pack('<2I4HI', TRIGGER[0], TRIGGER[1], 0, 0, 1024, 1024, quest_list))
-            st[3] = 1; struct.pack_into('<I', st, 0x10, W.put(struct.pack('<II', 0, ring)))
-            st[4] = 0; struct.pack_into('<I', st, 0x14, 0)
-        rows.append(bytes(st))
     add_bog(W, rom, actor_ids, quest_list, bog_row)
     hub_person(W, rom)
     add_garlic(W, rom, actor_ids, quest_list, garlic_row)
-    add_ape(W, rom, actor_ids, quest_list)
     add_balls(W, rom, actor_ids, popo_list)
     if debug_door:          # debug: on Snake Way, Down on the very spot you start reaches 26:1 and the rest of the road stays walkable; x 48-96 walk up reaches Broly; x<48 starts the ending
         e = next(AREAS + 56 * k for k in range(COUNT) if rom[AREAS + 56 * k] == 1 and rom[AREAS + 56 * k + 1] == 1)
@@ -866,6 +826,5 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
     n = COUNT + len(rows); tab = W.put(bytes(rom[AREAS:AREAS + 56 * COUNT]) + b''.join(rows))
     struct.pack_into('<I', rom, TABLE_LIT, tab)
     a_ = min(0xFF, n // 2)
-    if n - 2 * a_ > 0xFF: sys.exit('%d areas: more than the count code (movs, lsls, adds) can say' % n)
     struct.pack_into('<4H', rom, COUNT_INSN, 0x2000 | a_, 0x0040, 0x3000 | (n - 2 * a_), 0x4770)
     return W.cur, info

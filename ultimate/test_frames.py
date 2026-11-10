@@ -7,7 +7,7 @@
 2. Uub's and Majuub's flying (slot 15; "Those flying frames are super fucked for Uub/Majuub"): Majuub flies in his own outfit on Uub's flying
    (navy vest, white trousers; none of Uub's green), and seen from the front nothing but his hair and face is above his eyes (Goten's legs
    and boot soles left a green tuft and grey specks there). No dark purple specks (Goten's sleeve flicker) in either.
-3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr.'s frames. 6. The Great Ape's frames (boss and playable)."""
+3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr. 6. GT Vegeta's change and Final Flash frames. 7. Blue Gogeta's hair."""
 import json, struct, sys, os
 import numpy as np
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')]
@@ -71,13 +71,7 @@ check('no dark purple specks in any of Uub\'s or Majuub\'s frames%s' % (': %s' %
 # 3. Feet on the ground (Nov 9, the owner: "fix Broly looking like he's floating still"): the game draws the shadow from the actor record, so
 # every form whose record has the same collision boxes (+0x14..+0x53: the same template) stands with its feet on the same row under its origin.
 # Broly Full Power copies BF Broly's record (feet 15 rows down) with frames lined up like a fighter's (7): he hovered over his shadow.
-# The Great Ape's figures are drawn twice the size about each frame's piece centre (outfit.c big_check; lib/sprites.py 'scale2'), so their
-# feet are where the drawn picture ends: the piece's centre, plus twice the rows from there to its last row.
 names = {v: k for k, v in forms.items()}
-TWICE = {v for k, v in json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json'))).get('actors', {}).items() if k.startswith('oozaru')}
-def feet(a, fp, img):
-    y, last = struct.unpack_from('<b', rom, fp - BASE + 5)[0], int(np.nonzero(img.any(1))[0].max())
-    return y - img.shape[0] // 2 + 2 * last + 1 if a in TWICE else y + last
 groups = {}
 for f in range(max(forms.values()) + 1):
     a = actor_of(f)
@@ -88,7 +82,7 @@ for f in range(max(forms.values()) + 1):
     for fp in fr[0]:
         img = image(fp)
         if img is None or not img.any(): continue
-        rows.append(feet(a, fp, img))
+        rows.append(struct.unpack_from('<b', rom, fp - BASE + 5)[0] + int(np.nonzero(img.any(1))[0].max()))
     if rows: groups.setdefault(rom[u(LIST + 4 * a) - BASE + 0x14:u(LIST + 4 * a) - BASE + 0x54], []).append((names.get(f, f), max(rows)))
 spread = [v for v in groups.values() if max(r for _, r in v) - min(r for _, r in v) > 2]
 print('   %d groups of forms sharing a record\'s boxes; feet rows of broly / broly_fp: %s' % (len(groups), [v for v in groups.values() if any(n == 'broly' for n, _ in v)]))
@@ -137,40 +131,46 @@ if 'super_garlic' in actors:
 else:
     check('Super Garlic Jr. is in this build', False)
 
-# 6. The Great Ape (lib/oozaru.py, the owner's sheets): the raid's boss on Broly's record, every slot Broly has, frame for frame; GT Kid Goku's
-# and GT Vegeta's figures in every player slot, at least a retail player's length; the fur the game's red-brown ramp (not the grey-green tan
-# the nearest colour gave), the mouths dark red, the power-up's aura white, not the sheet's pink ("also make that aura white not pink"); no
-# ground shadow; the change starts on the small Saiyan and ends on the ape, the change back the other way round.
-if 'oozaru' in actors:
-    FUR, PINK, AURA, MOUTH = {62, 208, 207, 211, 212}, {144, 145}, {120, 171}, 31
-    boss, apes = actors['oozaru'], (actors['oozaru_kid_goku'], actors['oozaru_vegeta'])
-    same = all((anim(boss, s) is None) == (anim(29, s) is None) and (anim(boss, s) is None or len(anim(boss, s)) == len(anim(29, s))) for s in range(22))
-    check('the Great Ape boss has every slot BF Broly has, frame for frame', same)
-    player = [s for s in range(22) if anim(106, s)]
-    full = all(anim(a, s) and len(anim(a, s)) >= len(anim(106, s)) for a in apes for s in player)
-    check('both playable Great Apes have every slot BF Goku has, at least as long (%s)' % player, full)
-    seen, pink, frames = set(), [], 0
-    for a in (boss,) + apes:
-        for s in range(22):
-            for k, views in enumerate(anim(a, s) or []):
-                for d, fp in enumerate(views):
-                    img = image(fp)
-                    if img is None: continue
-                    frames += 1; c = set(np.unique(img).tolist()); seen |= c
-                    if c & PINK: pink.append((a, s, k, d))
-    check('the fur is the game\'s red-brown ramp, and no grey-green tan (%d frames)' % frames, FUR <= seen and 204 not in seen)
-    check('no pink anywhere: the power-up\'s aura is white%s' % (': %s' % pink[:6] if pink else ''), not pink and AURA <= seen)
-    roar = image(anim(boss, 21)[1][2])
-    check('the roar shows the mouth filled dark red', roar is not None and (roar == MOUTH).sum() >= 6)
-    no_shadow = [a for a in (boss,) + apes if tuple(rom[u(LIST + 4 * a) - BASE + 0xA:u(LIST + 4 * a) - BASE + 0xC]) in SHADOWS]
-    check('no ground shadow under any Great Ape', not no_shadow)
-    height = lambda fp: int(np.count_nonzero(image(fp).any(1)))
-    for a in apes:
-        ch, back = anim(a, 10), anim(a, 11)
-        check('actor %d: the change grows the Saiyan into the ape (%d to %d rows), the change back shrinks him' % (a, height(ch[0][0]), height(ch[-1][0])),
-              height(ch[0][0]) < 34 < 48 < height(ch[-1][0]) and height(back[0][0]) > 48 and height(back[-1][0]) < 34)
-else:
-    check('the Great Ape is in this build', False)
+
+# 6. GT Vegeta (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not transformation frames", "his final shine frames
+# are broken"). His change (slot 10) is his own power-up (slot 13): its two poses and then his stance, none of the sheet's "special" (slot 21,
+# the arms flung out). Final Flash's code (Final Shine's too) shows slot 19's frames by number, 0-1 charging, 3-4 firing: frames 3 and 4 are
+# the push, never frame 0, 1 or 2 again.
+for name in ('vegeta_gt', 'vegeta_gt_tank', 'vegeta_gt_mustache', 'vegeta_gt_ssj', 'vegeta_gt_tank_ssj', 'vegeta_gt_ssj4'):
+    a = actor_of(forms[name]); ch, pw, sp, st, fl = anim(a, 10), anim(a, 13), anim(a, 21), anim(a, 0), anim(a, 19)
+    imgs = lambda fr: [[image(fp).tobytes() if image(fp) is not None else None for fp in f] for f in fr]
+    C, P, SP, ST = imgs(ch), imgs(pw), imgs(sp) if sp else [], imgs(st)
+    ok = len(C) == 11 and all(C[k][d] in (P[0][d], P[1][d]) for k in range(10) for d in range(3)) and C[10] == ST[0] \
+         and not any(C[k][d] == x[d] for k in range(10) for x in SP for d in range(3))
+    check('%s changes on his own power-up (slot 13, then his stance), not the sheet\'s "special"' % name, ok)
+    F = imgs(fl)
+    check('%s\'s Final Flash / Final Shine pushes the beam out: slot 19 frames 3 and 4 are none of 0, 1, 2' % name,
+          len(F) >= 5 and all(F[k][d] not in (F[0][d], F[1][d], F[2][d]) for k in (3, 4) for d in range(3)))
+
+# 7. Blue Gogeta's hair (Nov 10, the owner: "Use SSB Goku as a basis and get the color and shape fully accurate"; lib/gogeta_hair.py): every
+# frame's hair is in Blue Goku's colours (the blues his own Blue figure's hair has), with no gold and none of the old flat cyan left, and no
+# frame is more than one 32x32 piece of 1 KB.
+gk, gg = actor_of(forms['goku_ssb']), actor_of(forms['gogeta_ssb'])
+goku_blue = set()
+for i, f in enumerate(anim(gk, 0)):
+    gimg, bimg = image(f[0]), image(anim(actor_of(3), 0)[i][0])       # Blue Goku's idle against Super Saiyan Goku's: the hair's blues
+    if gimg is not None and bimg is not None and gimg.shape == bimg.shape: goku_blue |= set(np.unique(gimg[gimg != bimg]).tolist())
+bad_hair, big = [], []
+for slot in range(22):
+    fr = anim(gg, slot)
+    if not fr: continue
+    for i, f in enumerate(fr):
+        for d in range(3):
+            img = image(f[d])
+            if img is None: continue
+            if img.shape[0] * img.shape[1] > 1024: big.append((slot, i, d))
+            cols = set(np.unique(img).tolist())
+            hair = np.isin(img, list(goku_blue)); pad = lambda m: np.pad(m, 1)
+            near = lambda m: pad(m)[:-2, 1:-1] | pad(m)[2:, 1:-1] | pad(m)[1:-1, :-2] | pad(m)[1:-1, 2:]
+            outline = (img == 1) & near(hair) & near(img == 0)               # black between the hair and nothing: the old flat blob's outline
+            if cols & {25, 28} or not hair.any() or outline.sum() > 8: bad_hair.append((slot, i, d, int(outline.sum())))
+check('Blue Gogeta\'s hair is Blue Goku\'s in every frame: his blues %s, no gold, no black outline round it (the old blob had 15-35 black pixels there, the new hair a few at most, at the face)%s' % (sorted(goku_blue), (': %s' % bad_hair[:6]) if bad_hair else ''), goku_blue and not bad_hair)
+check('every Blue Gogeta frame is one piece of at most 1 KB%s' % ((': %s' % big[:6]) if big else ''), not big)
 
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

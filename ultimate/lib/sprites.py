@@ -83,7 +83,7 @@ class Inserter:
     def frame(self, img, mirror=False):
         """Crop the cell to its art and cover it with as few/small OBJ pieces as possible (VRAM budget per frame).
         The cell's bottom-centre stays the actor origin. Identical frames are written once (frame cache)."""
-        key = (img.shape, img.tobytes(), mirror, getattr(self, 'oy', 0), getattr(self, 'big', False))
+        key = (img.shape, img.tobytes(), mirror, getattr(self, 'oy', 0))
         cache = self.__dict__.setdefault('_frames', {})
         if key not in cache: cache[key] = self._frame(img, mirror)
         return cache[key]
@@ -112,12 +112,6 @@ class Inserter:
             if mirror:                                   # mirror the whole layout, not just each piece
                 x = 16 - w - ((x0 + px) - (cw // 2 - 8))
                 pc = struct.pack('<bbBB', x, pc[1] if pc[1] < 128 else pc[1] - 256, w, h) * 2 + pc[8:]
-            if getattr(self, 'big', False):              # drawn at twice the size (outfit.c big_check): the game scales a piece about its own
-                x, y = struct.unpack_from('<bb', pc, 0)  # centre, so move that centre twice as far from the feet (x 8, y 8 + oy), and the
-                ax, ay = 8, 8 + getattr(self, 'oy', 0)   # sprite grows from the ground up
-                x, y = x + (x + w // 2 - ax), y + (y + h // 2 - ay)
-                assert -128 <= x < 128 and -128 <= y < 128, 'a twice-size piece is out of reach of its byte offsets: %d, %d' % (x, y)
-                pc = struct.pack('<bbBB', x, y, w, h) * 2 + pc[8:]
             out.append(pc)
         self.budget_max = max(getattr(self, 'budget_max', 0), sum(w * h for _, _, w, h in pieces))
         return self.put(struct.pack('<I', len(out)) + b''.join(out))
@@ -262,8 +256,8 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             continue
         if 'blue_hair' in a:                               # a Super Saiyan figure with blue hair (blue_hair_actor): its base and Super Saiyan built first
             h = a['blue_hair']; at_ = lambda x: (table[x] if isinstance(x, int) else table[ids[x]]) - BASE
-            rec, made = blue_hair_actor(ins, rom, at_(h['base']), at_(h['ss']), {'shared': set(h['shared'])}, {int(k): v for k, v in h['to'].items()})
-            print('%s: %d frames with blue hair' % (name, made))
+            rec, made = blue_hair_actor(ins, rom, at_(h['base']), at_(h['ss']), {'shared': set(h['shared'])}, {int(k): v for k, v in h['to'].items()}, h.get('transplant'))
+            print('%s: %d frames with blue hair%s' % (name, made, ' (Goku\'s Blue hair, worst overlap %.2f)' % min(ins._hair_iou) if h.get('transplant') else ''))
             ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
         if 'same_as' in a:                                 # another actor id for the same record (Super Saiyan 2 and Full Power: their lightning
@@ -353,11 +347,10 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
             ins.oy = a.get('origin_dy', 0)                 # map door regions already draw with the BF OBJ palette)
-            ins.big = a.get('scale2', False)
             for slot, dirs in a['raw_frames'].items():
                 if int(slot) >= n: continue
                 struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.anim(dirs))
-            ins.oy = 0; ins.big = False
+            ins.oy = 0
         for d, box in a.get('boxes', {}).items():          # per-direction (x, y, w, h) box override
             struct.pack_into('<4i', rec, 0x14 + 16 * int(d), *box)
         ins.oy = a.get('origin_dy', 0)                     # sheet frames drawn lower than the cell's bottom (Broly Full Power: see build.py)
@@ -382,7 +375,8 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             k = struct.unpack_from('<I', rom, ap - BASE)[0]
             if k >= want: continue
             old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
-            grown = [old[j * 4 + d] for j in longer(k, want, int(slot)) for d in range(4)]
+            idx = [min(i, k - 1) for i in range(want)] if int(slot) in a.get('indexed', ()) else longer(k, want, int(slot))   # 'indexed': as INDEXED, this figure only
+            grown = [old[j * 4 + d] for j in idx for d in range(4)]
             struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.put(struct.pack('<I', want) + struct.pack('<%dI' % len(grown), *grown)))
         if a.get('stance_back'):                           # slot 11 is the change back: an animation as long as a retail one takes four seconds, the stance one
             struct.pack_into('<I', rec, 0x54 + 44, struct.unpack_from('<I', rec, 0x54)[0])
@@ -716,12 +710,13 @@ def hairswap_actor(ins, rom, base_at, ref_at, ss_at, slot_map=None, idle_slots=(
     return rec, made, kept
 
 
-def blue_hair_actor(ins, rom, base_at, ss_at, gold, to):
+def blue_hair_actor(ins, rom, base_at, ss_at, gold, to, transplant=None):
     """A Super Saiyan figure with its hair turned blue, frame for frame (Nov 9, the owner: SSB Gogeta's sheet frames were a noisy blob with
     a glow round the hair, "recolor SSJ GOGETA ... just remove the halo"). `gold` are the Super Saiyan hair's colours; a pixel is hair when
     it is one of them where the base figure (same slot and frame, laid on the same grid by the pieces' offsets) is black hair or empty, or
     when it is one of the colours only the hair uses (`to`'s keys minus the shared ones are all hair). to: {gold index: blue index}.
-    Returns (record, frames recoloured)."""
+    transplant(a, b, view, slot) -> (canvas, its corner from the frame's, overlap) instead gives each frame new hair (Nov 10: Super Saiyan Blue
+    Goku's, lib/gogeta_hair.py); the canvas is cut back to its art in one piece (at most 32x32, 1 KB of OBJ memory, the feet kept). Returns (record, frames recoloured)."""
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
     def anim(rec_at, s):
         n = u(rec_at) & 0xFF
@@ -730,8 +725,24 @@ def blue_hair_actor(ins, rom, base_at, ss_at, gold, to):
         k = u(ap - BASE); return [u(ap - BASE + 4 + 4 * i) for i in range(4 * k)]
     def one_piece(fp): return fp and u(fp - BASE) == 1
     def origin(fp): return struct.unpack_from('<bb', rom, fp - BASE + 4)
-    def put_frame(fp, img):
+    def put_frame(fp, img, at=None):
         o = fp - BASE; body = bytearray(rom[o:o + 4 + 16])
+        if at is not None:                             # a canvas whose corner is `at` from the frame's: cut to its art, one piece of 1 KB at most
+            x, y, w0, h0 = struct.unpack_from('<bbBB', body, 4)
+            a0, a1 = struct.unpack_from('<HH', body, 12); flip = a1 & 0x1000
+            ys, xs = np.nonzero(img)
+            y1 = ys.max() + 1; y0 = max(ys.min(), y1 - 32)            # the feet kept: anything over 32 rows goes from the top
+            x0, x1 = xs.min(), xs.max() + 1
+            if x1 - x0 > 32: x0 = (x0 + x1) // 2 - 16; x1 = x0 + 32
+            w, h = min(((W, H) for (W, H) in SHAPE if W * H <= 1024 and W >= x1 - x0 and H >= y1 - y0), key=lambda s: s[0] * s[1])
+            cut = np.zeros((h, w), np.uint8); part = img[y0:y0 + h, x0:x0 + w]; cut[:part.shape[0], :part.shape[1]] = part
+            img = cut
+            ux = (16 - w0 - x if flip else x) + at[0] + x0          # the unmirrored layout's x, then mirrored back if the piece is flipped
+            nx, ny = (16 - w - ux if flip else ux), y + at[1] + y0
+            assert -128 <= nx < 128 and -128 <= ny < 128
+            struct.pack_into('<bbBBbbBB', body, 4, nx, ny, w, h, nx, ny, w, h)
+            sh, sz = SHAPE[(w, h)]
+            struct.pack_into('<HH', body, 12, (a0 & 0x3FFF) | sh << 14, (a1 & 0x3FFF) | sz << 14)
         h, w = img.shape
         data = np.ascontiguousarray(img, np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
         struct.pack_into('<I', body, 4 + 12, ins.put(struct.pack('<II', 0, len(data)) + data))
@@ -757,9 +768,14 @@ def blue_hair_actor(ins, rom, base_at, ss_at, gold, to):
                     dx, dy = bx - ax, by - ay
                     y0, x0 = max(0, dy), max(0, dx); y1, x1 = min(a.shape[0], dy + bi.shape[0]), min(a.shape[1], dx + bi.shape[1])
                     if y1 > y0 and x1 > x0: b[y0:y1, x0:x1] = bi[y0 - dy:y1 - dy, x0 - dx:x1 - dx]
-                hair = np.isin(a, only_hair) | (np.isin(a, list(gold['shared'])) & np.isin(b, [0, 1]))
-                img = a.copy(); img[hair] = lut[a[hair]]
-                done[key] = put_frame(fp, img); made += 1
+                at = None
+                if transplant:
+                    img, at, iou = transplant(a, b, i % 4, s)
+                    ins.__dict__.setdefault('_hair_iou', []).append(iou)
+                else:
+                    hair = np.isin(a, only_hair) | (np.isin(a, list(gold['shared'])) & np.isin(b, [0, 1]))
+                    img = a.copy(); img[hair] = lut[a[hair]]
+                done[key] = put_frame(fp, img, at); made += 1
             out.append(done[key])
         struct.pack_into('<I', rec, 0x54 + 4 * s, ins.put(struct.pack('<I', len(ss) // 4) + struct.pack('<%dI' % len(out), *out)))
     return rec, made
