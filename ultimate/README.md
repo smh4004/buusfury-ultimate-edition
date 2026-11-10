@@ -286,7 +286,9 @@ like the kamehameha frames do. Why the fuck is super android 13s beam attack fra
     `kame_update`) so the beam starts at his hands (the game places it for Goku's reach, 5 pixels past his: `ROSHI_BEAM`).
   - Super 13's beam: the wave's update (0x0801AE32) places the beam on its 24th frame at the fighter's place plus a step per facing
     (0x0871DEC4), set for a normal fighter; his thrust holds his hands higher and further out. `outfit.c` `wave_update` moves it there
-    for him (`S13_BEAM`: left 14 back and 9 up, right 18 and 9 up; measured in the emulator, both ways).
+    for him (`S13_BEAM`: left 14 back and 9 up, right 18 and 9 up; measured in the emulator, both ways). His charging ball, made at
+    the fighter's place plus a step per facing (0x0871DE94), sat behind him at his hip facing right (16:59: "Super 13 beam is facing out
+    of his ass when facing right"): `wave_start` moves it 14 pixels forward to his hands (`S13_BALL`), the mirror of facing left.
 - Approved figures are locked (16:08, "Reshoot it all and lock changes"): `ultimate/locked.json` lists the forms with a fingerprint of all
   their frames (`lib/lock.py`: every slot, frame and view, each piece's box, attributes and pixels, not where they sit in the ROM), and
   every build stops with LOCKED FRAMES CHANGED if one differs. Locked: GT Vegeta's looks, Broly Full Power, the four armour Vegetas,

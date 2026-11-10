@@ -1634,10 +1634,15 @@ int ssj4_kame_can(u8 *record) { return is_ssj4(record[0x14]) && KameCan(record);
 #define Wave_Start ((void (*)(u32 *, void *))0x0801ADA9)
 const u32 wave_params[12] = {1};
 const int wave_vt[9] = {1};
+static int s13_firing(void) { return *(u8 *)0x03001068 == 8 && FORM_OF(8) == FORM_S13; }
+/* His charging ball too (16:59, the owner: "Super 13 beam is facing out of his ass when facing right"): it is made at the fighter's place
+   plus a step per facing (0x0871DE94), which facing right put it behind him, at his hip; S13_BALL moves it to his hands (+0x20, x). */
+static const signed char S13_BALL[4] = {0, 0, 0, 14};
 void wave_start(u32 *self, void *player) {
     u32 *beam;
     Wave_Start(self, player);
     beam = (u32 *)self[2];
+    if (beam && s13_firing()) *(int *)((u8 *)beam + 0x20) += S13_BALL[((u8 *)player)[0x10] & 3];
     if (beam) {
         const u32 *mine = &wave_params[self[3] * 4];
         beam[0x40 / 4] = (u32)mine;
@@ -1653,7 +1658,7 @@ void wave_start(u32 *self, void *player) {
 static const signed char S13_BEAM[4][2] = {{0, 0}, {0, 0}, {-14, -9}, {18, -9}};
 void wave_update(u32 *self, u8 *player) {
     Wave_Update(self, player);
-    if (*(u16 *)(player + 0x12) == 0x18 && *(u8 *)0x03001068 == 8 && FORM_OF(8) == FORM_S13 && self[2]) {
+    if (*(u16 *)(player + 0x12) == 0x18 && s13_firing() && self[2]) {
         u8 *beam = (u8 *)self[2]; int f = player[0x10] & 3;
         *(int *)(beam + 0x20) += S13_BEAM[f][0];
         *(int *)(beam + 0x24) += S13_BEAM[f][1];
