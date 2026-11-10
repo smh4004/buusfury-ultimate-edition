@@ -82,8 +82,11 @@ check('beating Super 13 plays the finish and sets flag 621', flag(882) == 1 and 
 check('the finish returns you to West City', at(out) == 0x0104)
 talk = lambda b: talk_to(b)
 home = end[:end.index('tap A 40')]
-# Join state as in a real game: neither Gogeta nor the guest yet (debug joins the guest at the start).
-reward = talk(home + ['poke8 %08X 02' % (0x03001560 + 8 * 0x68), 'poke8 %08X 02' % (0x03001560 + 7 * 0x68)]) + ['shot said', 'tap A 60', 'shot said2'] + ['tap A 60'] * 7 + ['run 60', 'shot after', 'dump g 03001068 8a8']
+# Join state as in a real game: neither Gogeta nor the guest yet (debug joins the guest at the start), and so Broly's story fight not won
+# either (flag 111): with it set and the guest slot empty, skills_sync's story_sync joins Broly there (a save from the original game), every
+# 64 frames, and whether one of those came between the poke and the reward depended on the frame count (Nov 9: it did after the Great Ape).
+no_broly = 'poke8 %08X %02X' % (0x03001068 + 0x55 + 111 // 8, g[0x55 + 111 // 8] & ~(1 << 111 % 8))
+reward = talk(home + ['poke8 %08X 02' % (0x03001560 + 8 * 0x68), 'poke8 %08X 02' % (0x03001560 + 7 * 0x68), no_broly]) + ['shot said', 'tap A 60', 'shot said2'] + ['tap A 60'] * 7 + ['run 60', 'shot after', 'dump g 03001068 8a8']
 out = run(reward); g = open(d + '/g.bin', 'rb').read()
 check('the resident gives the rewards: Saiyan armor and Broly Full Power', all(flag(n) for n in (873, 874, 875, 876, 877, 878, 879, 883)))
 forms = json.load(open('ultimate/out/BFU_debug_zone.map.json'))['forms']; rec = lambda c: g[0x4F8 + c * 0x68:0x4F8 + (c + 1) * 0x68]
