@@ -7,7 +7,9 @@
 2. Uub's and Majuub's flying (slot 15; "Those flying frames are super fucked for Uub/Majuub"): Majuub flies in his own outfit on Uub's flying
    (navy vest, white trousers; none of Uub's green), and seen from the front nothing but his hair and face is above his eyes (Goten's legs
    and boot soles left a green tuft and grey specks there). No dark purple specks (Goten's sleeve flicker) in either.
-3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr. 6. GT Vegeta's change and Final Flash frames. 7. Blue Gogeta's hair."""
+3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr. 6. GT Vegeta's change and Final Flash frames. 7. Super Saiyan Blue's hair.
+8. Super Saiyan 4 Kid Goku's hands on the 10x Kamehameha. 9. Super Saiyan 4 Vegeta's Final Shine wind-up. (7 also: Blue Goku's and Blue
+Vegeta's faces stay Super Saiyan's.)"""
 import json, struct, sys, os
 import numpy as np
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')]
@@ -147,30 +149,125 @@ for name in ('vegeta_gt', 'vegeta_gt_tank', 'vegeta_gt_mustache', 'vegeta_gt_ssj
     check('%s\'s Final Flash / Final Shine pushes the beam out: slot 19 frames 3 and 4 are none of 0, 1, 2' % name,
           len(F) >= 5 and all(F[k][d] not in (F[0][d], F[1][d], F[2][d]) for k in (3, 4) for d in range(3)))
 
-# 7. Blue Gogeta's hair (Nov 10, the owner: "Use SSB Goku as a basis and get the color and shape fully accurate"; lib/gogeta_hair.py): every
-# frame's hair is in Blue Goku's colours (the blues his own Blue figure's hair has), with no gold and none of the old flat cyan left, and no
-# frame is more than one 32x32 piece of 1 KB.
+# 7. Super Saiyan Blue (Nov 10, the owner: "Get the fucking hair RIGHT according to BUUS FURY GOGETA AND FIX SSB GOKUS HAIR NOT BEING FULLY
+# BLUE WHY IS THERE STILL YELLOW"; lib/ssb.py). Blue Gogeta: every frame is one of Buu's Fury's own Super Saiyan Gogeta's (actor 93) in the
+# same slot and view, the same figure pixel for pixel, and the only pixels that differ are his hair's (its gold, and the skin shades in it),
+# in Blue Goku's hair colours (those his Blue idle has that Super Saiyan Goku's hasn't); no gold left anywhere; one 1 KB piece each.
+# Blue Goku and Blue Vegeta: no gold left in their hair (the pure golds 28, 29 and 246 anywhere, or a gold shade on the hair's outer edge).
 gk, gg = actor_of(forms['goku_ssb']), actor_of(forms['gogeta_ssb'])
 goku_blue = set()
 for i, f in enumerate(anim(gk, 0)):
     gimg, bimg = image(f[0]), image(anim(actor_of(3), 0)[i][0])       # Blue Goku's idle against Super Saiyan Goku's: the hair's blues
     if gimg is not None and bimg is not None and gimg.shape == bimg.shape: goku_blue |= set(np.unique(gimg[gimg != bimg]).tolist())
-bad_hair, big = [], []
-for slot in range(22):
-    fr = anim(gg, slot)
-    if not fr: continue
+def placed(fp):
+    """A frame on a 64 x 64 canvas, where the game draws it (the piece's x, y from the origin)."""
+    c = np.zeros((64, 64), np.uint8); img = image(fp)
+    if img is None: return None
+    x, y = struct.unpack_from('<bb', rom, fp - BASE + 4); h, w = img.shape
+    if struct.unpack_from('<H', rom, fp - BASE + 4 + 10)[0] & 0x1000: img = img[:, ::-1]      # a mirrored piece
+    c[40 + y:40 + y + h, 24 + x:24 + x + w] = img
+    return c
+GOLD = [25, 26, 27, 28, 29, 30]
+n4 = lambda m: (lambda q: q[:-2, 1:-1] | q[2:, 1:-1] | q[1:-1, :-2] | q[1:-1, 2:])(np.pad(m, 1))
+bad_shape, bad_hair, big, gold_left = [], [], [], []
+for slot in range(20):
+    fr, sf = anim(gg, slot), anim(93, slot)
+    if not fr: bad_shape.append((slot, 'missing')); continue
     for i, f in enumerate(fr):
         for d in range(3):
             img = image(f[d])
             if img is None: continue
             if img.shape[0] * img.shape[1] > 1024: big.append((slot, i, d))
-            cols = set(np.unique(img).tolist())
-            hair = np.isin(img, list(goku_blue)); pad = lambda m: np.pad(m, 1)
-            near = lambda m: pad(m)[:-2, 1:-1] | pad(m)[2:, 1:-1] | pad(m)[1:-1, :-2] | pad(m)[1:-1, 2:]
-            outline = (img == 1) & near(hair) & near(img == 0)               # black between the hair and nothing: the old flat blob's outline
-            if cols & {25, 28} or not hair.any() or outline.sum() > 8: bad_hair.append((slot, i, d, int(outline.sum())))
-check('Blue Gogeta\'s hair is Blue Goku\'s in every frame: his blues %s, no gold, no black outline round it (the old blob had 15-35 black pixels there, the new hair a few at most, at the face)%s' % (sorted(goku_blue), (': %s' % bad_hair[:6]) if bad_hair else ''), goku_blue and not bad_hair)
+            if np.isin(img, GOLD).any(): gold_left.append((slot, i, d, int(np.isin(img, GOLD).sum())))
+            if slot in (8, 10, 11) or not sf: continue                       # (his figure lacks these: filled from his own poses)
+            blue = placed(f[d]); same = [c for c in (placed(g[d]) for g in sf) if c is not None and (c != 0).tolist() == (blue != 0).tolist()]
+            if not same: bad_shape.append((slot, i, d)); continue
+            ok = False
+            for ss in same:
+                diff = blue != ss
+                if np.isin(ss[diff], GOLD + [202, 201, 16]).all() and np.isin(blue[diff], list(goku_blue)).all(): ok = True; break   # (none, if no hair shows)
+            if not ok: bad_hair.append((slot, i, d))
+check('Blue Gogeta is Buu\'s Fury\'s Super Saiyan Gogeta pixel for pixel, the same hair shape%s' % ((': %s' % bad_shape[:6]) if bad_shape else ''), not bad_shape)
+check('only his hair changed, into Blue Goku\'s hair colours %s%s' % (sorted(goku_blue), (': %s' % bad_hair[:6]) if bad_hair else ''), goku_blue and not bad_hair)
+check('no gold left anywhere on Blue Gogeta%s' % ((': %s' % gold_left[:6]) if gold_left else ''), not gold_left)
 check('every Blue Gogeta frame is one piece of at most 1 KB%s' % ((': %s' % big[:6]) if big else ''), not big)
+yellow = []
+for name in ('goku_ssb', 'goku_ssb_b', 'vegeta_ssb', 'vegeta_ssb_b'):
+    for slot in range(22):
+        for i, f in enumerate(anim(actor_of(forms[name]), slot) or []):
+            for d in range(3):
+                img = image(f[d])
+                if img is None: continue
+                pure = np.isin(img, [28, 29, 246]).sum()                      # his hair's own golds, anywhere
+                ys = np.nonzero(img.any(1))[0]
+                tips = np.isin(img[ys.min():ys.min() + 4], [202, 201, 16, 2]).sum() if slot <= 2 and len(ys) else 0   # standing, walking, running: the spikes' tips (other poses raise a fist above them)
+                if pure or tips: yellow.append((name, slot, i, d, int(pure), int(tips)))
+check('Blue Goku\'s and Blue Vegeta\'s hair has no gold left (none of 28, 29, 246; standing, walking or running, no gold shade in the spikes\' top 4 rows)%s' % ((': %s' % yellow[:6]) if yellow else ''), not yellow)
+from scipy import ndimage
+# ... and their faces stay as Super Saiyan's (Nov 10, the owner: "Fix some of SSB Goku and vegetas face pixels being blue"): every frame
+# against the Super Saiyan figure it's made from, the eyes' whites (white beside an eye's green) unchanged, and no skin shade (16, 201, 202,
+# also the hair's) that changed has the face's skin (200, 203) or an eye to its left or right (the hairline, with the face only below it, is hair).
+SKIN_SHADES, FACE_SIDE = (16, 201, 202), (200, 203, 215, 216)
+face_blue = []
+for name, ss in (('goku_ssb', 3), ('goku_ssb_b', 4), ('vegeta_ssb', 28), ('vegeta_ssb_b', 29), ('vegeta_armor_ssb', forms['vegeta_armor_ss'])):
+    for slot in range(22):
+        A, B = anim(actor_of(forms[name]), slot), anim(actor_of(ss), slot)
+        for i, (f, g) in enumerate(zip(A or [], B or [])):
+            for d in range(3):
+                a, b = image(f[d]), image(g[d])
+                if a is None or b is None or a.shape != b.shape: continue
+                ew = (b == 2) & ndimage.binary_dilation(np.isin(b, (215, 216)), np.ones((3, 3), bool))
+                q = np.pad(np.isin(b, FACE_SIDE) | ew, 1)
+                n = int((ew & (a != b)).sum() + ((a != b) & np.isin(b, SKIN_SHADES) & (q[1:-1, :-2] | q[1:-1, 2:])).sum())
+                if n: face_blue.append((name, slot, i, d, n))
+check('Blue Goku\'s and Blue Vegeta\'s faces aren\'t blue (the eyes\' whites and the skin beside the face stay Super Saiyan\'s)%s' % ((': %s' % face_blue[:6]) if face_blue else ''), not face_blue)
+eyes = []                                  # his base and Super Saiyan looks: the sheet's eyes were dropped as background (gogeta.frame)
+for name in ('gogeta_dbs', 'gogeta_dbs_ss'):
+    for slot in range(22):
+        for i, f in enumerate(anim(actor_of(forms[name]), slot) or []):
+            for d in range(3):
+                img = image(f[d])
+                if img is None: continue
+                lab, n = ndimage.label(ndimage.binary_fill_holes(img != 0) & (img == 0))
+                if any((lab == t).sum() <= 4 for t in range(1, n + 1)): eyes.append((name, slot, i, d))
+check('Gogeta\'s base and Super Saiyan eyes aren\'t see-through (no pinhole of 4 pixels or fewer inside him)%s' % ((': %s' % eyes[:4]) if eyes else ''), not eyes)
+
+# 8. Super Saiyan 4 Kid Goku's hands (Nov 10, the owner: "Goku hand still red on 10x kame"; gt.ssj4_hands): the sheet drew his arms' fur
+# over his hands too. Pushing the beam out from the side (slot 18, frames 1 and 2), the hand at the front of his outstretched arms (the
+# figure's three leftmost columns) is skin, not fur, and his forearm behind it is still fur ("You got rid of the fur on his ARMS I said his
+# HANDS only": only the firing pose's hands change).
+FUR, SKIN = [31, 32, 33, 105], [16, 200, 201, 202, 203]
+fr = anim(actor_of(forms['kid_goku_ssj4']), 18); bad = []
+for k in (1, 2):
+    img = image(fr[k][2]) if fr and k < len(fr) else None
+    if img is None: bad.append((k, 'no frame')); continue
+    xs = np.nonzero(img.any(0))[0]; front = img[:, xs.min():xs.min() + 3]
+    arm = img[:, xs.min() + 6:xs.min() + 12]                             # the forearm behind the hand and its band
+    if np.isin(front, FUR).any() or np.isin(front, SKIN).sum() < 6 or np.isin(arm, FUR).sum() < 10:
+        bad.append((k, int(np.isin(front, FUR).sum()), int(np.isin(front, SKIN).sum()), int(np.isin(arm, FUR).sum())))
+check('Super Saiyan 4 Kid Goku pushes the 10x Kamehameha out with skin hands, his arms still furred ("HANDS only")%s' % (': %s' % bad if bad else ''), not bad)
+
+# 9. Super Saiyan 4 Vegeta's Final Shine wind-up (Nov 10, the owner: "final shine still off"; gt.shine_charge): seen from the side, slot 19
+# frames 0-2 left his neck see-through and turned a glove to hair. Laid on BF Vegeta's own frames (actor 270, which his page was drawn on)
+# at their best overlap, none of BF's body (not his hair, not the charge glow) is see-through, and frame 2's glove is lavender again.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import goku_black
+bfv = goku_black.actor_frames(open('baserom.gba', 'rb').read(), 270)[19][2]
+fr = anim(actor_of(forms['vegeta_gt_ssj4']), 19); bad = []
+for k in range(3):
+    img = image(fr[k][2]); b = bfv[k]; H, W = img.shape
+    body = (b != 0) & ~np.isin(b, (1, 112, 5)); best = None
+    for dy in range(-4, 5):
+        for dx in range(-W, b.shape[1]):
+            cv = np.zeros_like(b); y0, x0 = b.shape[0] - H + dy, dx
+            ys, xs = slice(max(0, y0), min(b.shape[0], y0 + H)), slice(max(0, x0), min(b.shape[1], x0 + W))
+            if ys.stop <= ys.start or xs.stop <= xs.start: continue
+            cv[ys, xs] = img[ys.start - y0:ys.stop - y0, xs.start - x0:xs.stop - x0]
+            score = ((cv != 0) & body).sum()
+            if best is None or score > best[0]: best = (score, int((body & (cv == 0)).sum()), cv)
+    upper = best[2][:20]
+    if best[1] > 2 or (k == 2 and np.isin(upper, [151, 169]).sum() < 12): bad.append((k, best[1], int(np.isin(upper, [151, 169]).sum())))
+check('Super Saiyan 4 Vegeta\'s Final Shine wind-up seen from the side: nothing see-through where BF Vegeta has his body, his glove lavender%s' % (': %s' % bad if bad else ''), not bad)
 
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

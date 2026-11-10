@@ -69,8 +69,8 @@ def tidy(c, m):
     return c, m
 
 
-def cut(a, bands, cells, band, n):
-    """One cell as (rgb, mask): the dark cell background goes by colour, stray compression specks by size."""
+def raw_mask(a, bands, cells, band, n):
+    """One cell's figure on its whole box, before cut() crops it: (rgb, mask)."""
     y0, y1 = bands[band]; x0, x1 = cells[band][n]
     c = a[y0:y1, x0:x1]
     d = np.abs(c - np.array((0, 76, 78))).sum(2)
@@ -79,7 +79,12 @@ def cut(a, bands, cells, band, n):
     for p in parts(m):
         if len(p) >= 10:
             for q in p: keep[q] = True
-    c, keep = tidy(c, keep)
+    return tidy(c, keep)
+
+
+def cut(a, bands, cells, band, n):
+    """One cell as (rgb, mask): the dark cell background goes by colour, stray compression specks by size."""
+    c, keep = raw_mask(a, bands, cells, band, n)
     ys, xs = np.nonzero(keep)
     return c[ys.min():ys.max() + 1, xs.min():xs.max() + 1], keep[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 
@@ -137,24 +142,61 @@ def flat_cell(c, m, flat, form):
     return despeckle(calm_hair(rgb, m, form), m)
 
 
+def cells_of(name):
+    """The cells of one animation as [(sheet row 0-3, cell number, mirrored)], in sprites.py's order: down, up, side (the sheet's is down,
+    side, up; its side views face right, the game's face left and it mirrors them)."""
+    out = []
+    for row in (0, 2, 1):
+        for f in VIEWS.get((name, row), ANIMS[name]):
+            out.append((3, f[1], row == 1) if isinstance(f, tuple) else (row, f, row == 1))
+    return out
+
+
+def place(a, bands, cells, form, row, n, flip):
+    """One cell cut from the sheet and where it goes on its 32x32 frame: (rgb, mask, top, left) (the feet on the bottom row, centred), and
+    the box it was cut from: (sheet y, sheet x) of the cut's corner. (A cell over 32 keeps its bottom rows and left columns.)"""
+    b = FORMS[form]; y0, _ = bands[b + row]; x0, _ = cells[b + row][n]
+    c, m = cut(a, bands, cells, b + row, n)
+    ys, xs = np.nonzero(raw_mask(a, bands, cells, b + row, n)[1])
+    corner = (y0 + ys.min(), x0 + xs.min())
+    if flip: c, m = c[:, ::-1], m[:, ::-1]
+    h, w = m.shape
+    if h > 32 or w > 32: h2, w2 = min(h, 32), min(w, 32); c, m = c[h - h2:, :w2], m[h - h2:, :w2]; h, w = h2, w2
+    return c, m, 32 - h, (32 - w) // 2, corner
+
+
+EYE_HOLE = 4          # a see-through patch this small inside the figure is an eye (or a pinhole), not a gap between limbs
+HAIR = (1, 25, 28, 242)   # his hair's black and gold (a pinhole with only these round it is in his hair, and takes their colour)
+
+
+def frame(a, bands, cells, flat, form, row, n, flip, one):
+    """One cell as its indexed 32x32 frame, and (top, left, corner, width) of place(). The sheet's eyes are near its background's teal, so
+    cut() drops them and they were see-through (Nov 10): a patch of up to EYE_HOLE pixels the figure closes round takes the sheet's own
+    colour there."""
+    from scipy import ndimage
+    c, m, top, left, corner = place(a, bands, cells, form, row, n, flip)
+    img = np.zeros((32, 32), np.uint8); rgb = flat_cell(c, m, flat, form)
+    for y, x in zip(*np.nonzero(m)):
+        img[top + y, left + x] = one(rgb[y, x])
+    holes, k = ndimage.label(ndimage.binary_fill_holes(img != 0) & (img == 0))
+    for t in range(1, k + 1):
+        hole = holes == t
+        if hole.sum() > EYE_HOLE: continue
+        for Y, X in zip(*np.nonzero(hole)):
+            y, x = Y - top, X - left
+            around = [int(img[j, i]) for j, i in ((Y - 1, X), (Y + 1, X), (Y, X - 1), (Y, X + 1)) if 0 <= j < 32 and 0 <= i < 32]
+            if around and all(v in HAIR for v in around): img[Y, X] = max(set(around), key=around.count)   # a pinhole in his hair
+            elif 0 <= y < c.shape[0] and 0 <= x < c.shape[1]: img[Y, X] = one(c[y, x])
+    return img, (top, left, corner, m.shape[1])
+
+
 def write_frames(out, form, one):
     """Save indexed 32x32 cells named for sprites.slot_frames. one(rgb) -> palette index."""
-    a = np.array(Image.open(SHEET).convert('RGB')).astype(int); bands, cells = grid(a); b = FORMS[form]
+    a = np.array(Image.open(SHEET).convert('RGB')).astype(int); bands, cells = grid(a)
     flat = flatten(a, bands, cells, form)
-    for name, seq in ANIMS.items():
-        frames = []
-        for row in (0, 2, 1):                        # sprites.py order: down, up, side; the sheet's is down, side, up
-            for f in VIEWS.get((name, row), seq):
-                if isinstance(f, tuple): c, m = cut(a, bands, cells, b + 3, f[1])
-                else: c, m = cut(a, bands, cells, b + row, f)
-                if row == 1: c, m = c[:, ::-1], m[:, ::-1]       # the sheet's side views face right; the game's face left and it mirrors them
-                frames.append((c, m))
-        for i, (c, m) in enumerate(frames):
-            h, w = m.shape
-            if h > 32 or w > 32: h2, w2 = min(h, 32), min(w, 32); c, m = c[h - h2:, :w2], m[h - h2:, :w2]; h, w = h2, w2
-            img = np.zeros((32, 32), np.uint8); rgb = flat_cell(c, m, flat, form)
-            for y, x in zip(*np.nonzero(m)):
-                img[32 - h + y, (32 - w) // 2 + x] = one(rgb[y, x])
+    for name in ANIMS:
+        for i, (row, n, flip) in enumerate(cells_of(name)):
+            img, _ = frame(a, bands, cells, flat, form, row, n, flip, one)
             Image.fromarray(img).save('%s/gg%s_%s_%02d.png' % (out, form, name, i))
 
 

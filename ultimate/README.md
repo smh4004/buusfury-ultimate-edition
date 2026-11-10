@@ -169,11 +169,57 @@ writable statics (they'd link into ROM); the build stops if one appears.
   player's ten by spreading, put the charge (sheet 1 and 2) at 3 and 4, so GT Vegeta never pushed his Final Flash or Final Shine out.
   His figures keep each frame at its number (`sprites` `indexed`, the per-figure `INDEXED`).
 - Super Saiyan Blue Gogeta's hair ("still fucked too looks totally wrong. Use SSB Goku as a basis and get the color and shape fully
-  accurate"): his Super Saiyan's gold hair turned blue was a flat cyan mass in a black outline. Each of his frames now has Super Saiyan
-  Blue Goku's hair (`lib/gogeta_hair.py`): his own hair (the gold, the black strokes in it and its outer outline) goes, and the hair of
-  the BF Super Saiyan Goku frame closest in shape in the same view (actor 109, every frame; a fall's tilted head finds Goku's own fall)
-  takes its place, in Goku's Blue colours (`ssb_hair`: the dark blue edge, two blues, the pale highlights), laid only over empty pixels
-  and his old hair, never the face or body. 16-wide frames become 32 wide, centred (the same 1 KB of OBJ memory), so the spikes fit.
+  accurate"): cut 3 gave each frame BF Super Saiyan Blue Goku's hair (the closest shape in the same view). Replaced in the second pass
+  below.
+
+Second pass, from the owner's notes on cut 3 ("Goku hand still red on 10x kame, Gogeta hair still wrong, and final shine still off"), and
+the owner's notes on its review images ("You got rid of the fur on his ARMS I said his HANDS only", "Literally look at SSJ Gogeta, turn
+that hair blue colored and use SSB Gokus hair as a reference but DONT CHANGE THE SSJ GOGETA HAIR SHAPE JUST USE THE SSB GOKU FOR REFERENCE
+FOR EXACT COLOR/SHADING", "Vegeta final shine is fine"):
+- Super Saiyan 4 Kid Goku's hands on the 10x Kamehameha (`gt.ssj4_hands`): the BSO sheet draws his Super Saiyan 4 on BF Goku (actor
+  106) frame for frame and turned the arms' skin to red fur, hands and all. In his firing pose seen from the side (slot 18,
+  `gt.HAND_SLOTS`, `HAND_VIEWS`) each frame is
+  laid on BF Goku's at their best overlap, and a hand-sized patch of BF skin the sheet made fur on the far side of a wristband (fur on
+  both sides of the band: the other side is his forearm) gets BF's skin back, its band the sheet's blue. Only the hands: his forearms keep
+  their fur, and every other pose is the sheet's own. (A first try also changed patches past sleeve ends and the push seen from the
+  front, which took the fur off his arms: gone.) From the front and back his hands stay as the sheet drew them.
+- Super Saiyan Blue Gogeta (`lib/ssb.py` `gogeta_frames`; the owner: "Get the fucking hair RIGHT according to BUUS FURY GOGETA"): Buu's
+  Fury's own Super Saiyan Gogeta (actor 93, forms 41 and 44), every frame, the same figure and hair shape, his hair in Blue Goku's colours
+  shade for shade. His gold runs 25 (outline, darkest), 26, 27, 28, 29, 30; each takes the Blue of the Goku gold of the same shade, as
+  Goku's own does (202 the blue, 201 the shade, 28 the cyan, 29 and white the near-white, 16 the dark blue): 25 the blue, 26 and 27 the
+  shade, 28 the cyan, 29 and 30 the near-white, and the skin shades (202, 201, 16) among his hair as Goku's. His figure has no slots 8,
+  10 or 11: the ki blast's (9), his power-up's two poses as a retail change's 11 frames, his stance (0). His knockdown seen from the side
+  (slot 16) is stored mirrored with the mirror bit set, which `goku_black.actor_frames` doesn't read (`ssb.actor_frames` does; likely
+  the same for Goku Black's and Rose's slot 16 side view, from BF Goku's mirrored frames: unchecked). He still changes to it from DBS
+  Gogeta's Super Saiyan. (Three earlier tries on DBS Gogeta's sheet figure, Blue Goku's hair on it, its own Blue cells, its Super Saiyan
+  hair recoloured, are gone.) DBS Gogeta's eyes were see-through in his base and Super Saiyan looks: the sheet's eyes are near its
+  background's teal, so `gogeta.cut` dropped them (and a few pinholes); `gogeta.frame` now gives a see-through patch of up to 4 pixels
+  that his figure closes round the sheet's colour there (or his hair's, for a pinhole in his hair).
+- Blue Goku's and Blue Vegeta's hair, every pixel (`lib/ssb.py` `tint`; the owner: "FIX SSB GOKUS HAIR NOT BEING FULLY BLUE WHY IS THERE
+  STILL YELLOW"): BF's Super Saiyan hair and skin share colours, so `ssb_hair` took a ramp pixel for hair only within 3 pixels of the
+  hair's highlights and nearer them than the face: the spike tips, the outline far from a highlight and the hairline stayed gold, and
+  Vegeta's palest gold (246) wasn't in the ramp at all. Each Super Saiyan frame is now laid on the base figure's same frame (where the game
+  draws them): a ramp pixel is hair where the base has its black hair or nothing, kept with the patch holding the hair's highlights (so an
+  arm a pose moved stays skin); the old rule's pixels count too, and alone where the base lacks the frame (the armour's Blue). 246 is in
+  `SSB_HAIR` as the near-white.
+- Blue Goku's and Blue Vegeta's faces (the owner: "Fix some of SSB Goku and vegetas face pixels being blue"). Three causes, all fixed in
+  `lib/ssb.py`:
+  - The eyes' whites are white (2), which is also the hair's brightest colour, so the old rule took them, and the skin within 3 pixels of
+    them, for hair. White beside an eye's green (215, 216) is now the eye (`eye_whites`).
+  - Goku's Super Saiyan side figure stands 2 pixels left of his base one, so the base hair landed on his profile. `base_under` now moves
+    the base figure (up to 3 pixels) to where its body matches.
+  - Where the base figure's hair hung over the face or neck (Vegeta's brow and jaw), the outline turned blue. A pixel only the base
+    figure makes hair stays skin if the body is to its left, its right or above it. The hairline, with the face only below it, stays
+    hair.
+  - Check: test_frames 7 (no eye white changed, no changed skin shade beside the face).
+  - Vegeta's glove and boot highlights are white too and still turn pale blue. That is unchanged and was not asked for; the owner was
+    asked.
+- Super Saiyan 4 Vegeta's Final Shine wind-up (`gt.shine_charge`, approved): seen from the side, slot 19's frames 0-2 (charging, then the
+  pull back) had his neck see-through and a glove turned to hair: the sheet's head swap took them with BF's head. Each gets BF Vegeta's
+  (actor 270) gloves back over the hair, BF's neck and collar where the page left nothing, and BF's charge glow where it edges him, each
+  in the page's own colour for that BF colour. The glow is still Final Flash's yellow (the frames are shared with his Final Flash). The
+  other GT Vegeta pages lose a few neck pixels the same way, too few to show: left as they are.
+  `test_frames.py` 7-9 check all of these on the built ROM.
 
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The

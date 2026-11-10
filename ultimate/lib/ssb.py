@@ -1,0 +1,185 @@
+"""Super Saiyan Blue hair, every pixel of it (Nov 10, the owner: "FIX SSB GOKUS HAIR NOT BEING FULLY BLUE WHY IS THERE STILL YELLOW").
+
+BF's Super Saiyan hair and skin share colours (202, 201 and 16 are both a hair's shading and a face's), so build.ssb_hair took a ramp pixel
+for hair only within 3 pixels of the hair's own highlights (28, 29, 2) and nearer them than the face: the spike tips, the outline far from
+a highlight and the hairline stayed gold. Here each Super Saiyan frame is laid on the same frame of the base figure (same slot, frame and
+view, where the game draws them): a ramp pixel is hair where the base figure has its black hair or nothing, and it is kept with the patch
+of such pixels it touches that holds the hair's highlights (so his arms, where a pose moved them, stay skin). The old rule's pixels count
+too; a frame the base figure lacks keeps the old rule alone.
+"""
+import struct
+import numpy as np
+
+BASE, ACTOR_LIST = 0x08000000, 0x6B6BD8
+LIGHTS = (28, 29, 2)            # the hair's highlights
+FACE = (200, 203, 215, 216, 117)  # the face's own colours (its light skin, the eyes)
+IRIS = (215, 216)               # the eyes' green
+BASE_HAIR = (0, 1, 112)         # nothing, or the base figure's black hair (and its grey shine)
+O = 48                          # canvas margin
+SHIFT = 3                       # how far base_under looks for the base figure
+NOT_BODY = (0, 1, 112, 16, 202, 201, 28, 29, 2, 246)   # not the body's own colours: nothing, black hair, the Super Saiyan ramp
+
+
+def _frames(rom, actor):
+    """{(slot, frame, view): frame pointer} for views 0-2."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    rec = u(ACTOR_LIST + 4 * actor) - BASE; out = {}
+    for s in range(u(rec) & 0xFF):
+        ap = u(rec + 0x54 + 4 * s)
+        if not ap: continue
+        ap -= BASE
+        for k in range(u(ap)):
+            for d in range(3):
+                fp = u(ap + 4 + 4 * (4 * k + d))
+                if BASE < fp < BASE + len(rom): out[(s, k, d)] = fp - BASE
+    return out
+
+
+def _pieces(rom, fp):
+    """[(x, y, image, mirrored)] of a frame's pieces."""
+    import goku_black
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]; out = []
+    for i in range(u(fp)):
+        o = fp + 4 + 16 * i; x, y, w, h = struct.unpack_from('<bbBB', rom, o)
+        if not 0 < u(o + 12) - BASE < len(rom) or not w or not h: continue
+        out.append((x, y, goku_black.tiles(rom, u(o + 12) - BASE, w, h), bool(struct.unpack_from('<H', rom, o + 10)[0] & 0x1000)))
+    return out
+
+
+def base_under(rom, ss, base):
+    """{(shape, bytes) of a Super Saiyan piece: the base figure's pixels under it} over every frame both figures have. The two figures are
+    not always drawn in the same place (Goku's side view: the Super Saiyan figure stands 2 pixels left of the base one), so the base
+    figure is shifted up to SHIFT pixels to where its body (the colours that are neither hair nor shared with it) matches the piece best;
+    a piece used in several frames takes the frame where it matches best."""
+    B = _frames(rom, base); out = {}
+    for key, fp in _frames(rom, ss).items():
+        if key not in B: continue
+        canvas = np.zeros((64 + 2 * O, 64 + 2 * O), np.uint8)
+        for x, y, t, flip in _pieces(rom, B[key]):
+            if flip: t = t[:, ::-1]
+            h, w = t.shape; c = canvas[O + y:O + y + h, O + x:O + x + w]; m = t[:c.shape[0], :c.shape[1]] != 0
+            c[m] = t[:c.shape[0], :c.shape[1]][m]
+        for x, y, t, flip in _pieces(rom, fp):
+            h, w = t.shape; body = (t != 0) & ~np.isin(t, NOT_BODY); best = None
+            for dy, dx in sorted(((dy, dx) for dy in range(-SHIFT, SHIFT + 1) for dx in range(-SHIFT, SHIFT + 1)), key=lambda d: abs(d[0]) + abs(d[1])):
+                under = canvas[O + y + dy:O + y + dy + h, O + x + dx:O + x + dx + w]
+                under = under[:, ::-1] if flip else under                                     # (in the piece's own orientation)
+                score = ((under == t) & body).sum() / max(1, body.sum())
+                if best is None or score > best[0]: best = (score, under.copy())
+            k = (t.shape, t.tobytes())
+            if k not in out or best[0] > out[k][0]: out[k] = best
+    return {k: v[1] for k, v in out.items()}
+
+
+def eye_whites(img):
+    """The whites of the eyes: white (2, also the hair's brightest) beside the green of an eye (Nov 10, the owner: "Fix some of SSB Goku
+    and vegetas face pixels being blue": the hair rules took them, and the face pixels near them, for hair)."""
+    from scipy import ndimage
+    return (img == 2) & ndimage.binary_dilation(np.isin(img, IRIS), np.ones((3, 3), bool))
+
+
+def old_rule(img, ramp):
+    """build.ssb_hair's rule (cut 3): a ramp pixel within 3 pixels of the hair's highlights and nearer them than the face; the eyes'
+    whites are face, not highlights."""
+    from scipy import ndimage
+    ew = eye_whites(img)
+    dh = ndimage.distance_transform_edt(~(np.isin(img, LIGHTS) & ~ew))
+    df = ndimage.distance_transform_edt(~(np.isin(img, FACE) | ew))
+    return np.isin(img, ramp) & ~ew & (dh < df) & (dh <= 3)
+
+
+def hair_mask(img, under, ramp):
+    """The Super Saiyan hair in one piece `img` (see the note above); `under` the base figure's pixels under it, or None. A pixel only the
+    base figure makes hair that has the figure's body (not hair, not empty) to its left, its right or above it is the face's or the neck's
+    outline where the base figure's hair hung over it (Vegeta's brow and jaw, Goku's cheeks; Nov 10, the owner: "Fix some of SSB Goku and
+    vegetas face pixels being blue"); with the body only below it, it is the hairline and stays hair."""
+    from scipy import ndimage
+    old = old_rule(img, ramp)
+    if under is None: return old
+    cand = np.isin(img, ramp) & ~eye_whites(img) & (np.isin(under, BASE_HAIR) | old)
+    lab, n = ndimage.label(cand, np.ones((3, 3)))
+    keep = set(np.unique(lab[old | (cand & np.isin(img, LIGHTS))]).tolist()) - {0}
+    add = np.isin(lab, list(keep)) & ~old
+    p = np.pad((img != 0) & ~cand, 1)                                              # the body
+    side = p[1:-1, :-2] | p[1:-1, 2:] | p[:-2, 1:-1]                              # left, right, above
+    return old | (add & ~side)
+
+
+def tint(rom, ss, base, to):
+    """A tint function (sprites.tinted_actor) turning Super Saiyan figure `ss`'s hair blue: {ramp index: blue index} `to`, the hair found
+    against base figure `base` (or the old rule alone when base is None)."""
+    under = base_under(rom, ss, base) if base is not None else {}
+    ramp = list(to)
+    def fn(img):
+        hair = hair_mask(img, under.get((img.shape, img.tobytes())), ramp)
+        out = img.copy()
+        for k, v in to.items(): out[hair & (img == k)] = v
+        return out
+    return fn
+
+
+# Super Saiyan Blue Gogeta (Nov 10, the owner: "Literally look at SSJ Gogeta, turn that hair blue colored and use SSB Gokus hair as a
+# reference but DONT CHANGE THE SSJ GOGETA HAIR SHAPE", then "Get the fucking hair RIGHT according to BUUS FURY GOGETA"): Buu's Fury's own
+# Super Saiyan Gogeta (actor 93, forms 41 and 44), every frame, the hair blue as Blue Goku's. His gold runs 25 (the outline and darkest),
+# 26, 27, 28, 29 and 30 (the lightest); by shade they take Goku's Blue colours as Goku's own gold does: his 202 (the outline and dark strands) the
+# blue, 201 the shade, 28 the cyan, 29 and white the near-white (and 16, the dark by his face, the dark blue). So 25 the blue (49% of his
+# hair, Goku's blue 47%), 26 and 27 the shade (31%, Goku's 23%), 28 the cyan (13%, 17%), 29 and 30 the near-white (8%, 13%). Where his hair's
+# shading uses the skin's 202, 201 and 16 (beside his face), those pixels go as Goku's do.
+GOGETA = 93
+GOGETA_GOLD = {25: 202, 26: 201, 27: 201, 28: 28, 29: 29, 30: 29}    # his gold -> the Goku gold of the same shade
+GOGETA_FILL = {8: 9, 11: 0}                                     # slots his figure lacks: the ki blast's, the stance
+NEAR = 4                                                        # gold this far from his hair's mass is still hair (his side locks'
+                                                                # ends by the jaw: every bit of his gold is within 4 pixels, Nov 10)
+
+
+def gogeta_hair_mask(img):
+    """Gogeta's hair in one frame: his gold (25-30) in the patch of it that is his hair (and bits within NEAR), and the skin shades among
+    it (202, 201, 16 with at least two gold neighbours)."""
+    from scipy import ndimage
+    gold = np.isin(img, list(GOGETA_GOLD))
+    if not gold.any(): return gold
+    lab, n = ndimage.label(gold, np.ones((3, 3)))
+    main = lab == np.bincount(lab.ravel())[1:].argmax() + 1
+    near = ndimage.distance_transform_edt(~main) <= NEAR
+    hair = np.isin(lab, [t for t in range(1, n + 1) if (near & (lab == t)).any()])
+    for _ in range(2):
+        p = np.pad(hair, 1)
+        k = p[:-2, 1:-1].astype(int) + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]
+        hair |= np.isin(img, (202, 201, 16)) & (k >= 2)
+    return hair
+
+
+def actor_frames(rom, actor):
+    """goku_black.actor_frames (32 x 64 canvases, the origin at row 24, column 24), but a mirrored piece drawn mirrored: his knockdown's side
+    view (slot 16) is stored the other way round with the mirror bit set."""
+    out = {}
+    for (s, k, d), fp in sorted(_frames(rom, actor).items()):
+        views = out.setdefault(s, [[], [], []]); canvas = np.zeros((32, 64), np.uint8)
+        for x, y, t, flip in _pieces(rom, fp):
+            if flip: t = t[:, ::-1]
+            for r in range(t.shape[0]):
+                for c in range(t.shape[1]):
+                    R, C = y + 24 + r, x + 24 + c
+                    if t[r, c] and 0 <= R < 32 and 0 <= C < 64: canvas[R, C] = t[r, c]
+        while len(views[d]) < k: views[d].append(np.zeros((32, 64), np.uint8))
+        views[d].append(canvas)
+    return out
+
+
+def gogeta_frames(rom, to, lengths=None):
+    """{slot: [[canvas, ...] for views]} of Blue Gogeta: actor 93's frames (goku_black.actor_frames canvases) with his hair blue. `to` is
+    {Goku gold index: blue index} (build.SSB_HAIR through the indexer). His change (slot 10) is his power-up's (slot 13) two poses,
+    the crouch twice and the shout eight times, then his stance: a retail change's 11 frames."""
+    frames = actor_frames(rom, GOGETA)
+    lut = {g: to[k] for g, k in GOGETA_GOLD.items()}
+    lut.update({k: to[k] for k in (202, 201, 16)})
+    def blue(c):
+        hair = gogeta_hair_mask(c); out = c.copy()
+        for k, v in lut.items(): out[hair & (c == k)] = v
+        return out
+    out = {s: [[blue(c) for c in views[v]] for v in range(3)] for s, views in frames.items()}
+    for s, src in GOGETA_FILL.items():
+        if s not in out: out[s] = out[src]
+    p13, p0 = out[13], out[0]
+    out[10] = [[p13[v][0]] * 2 + [p13[v][1]] * 8 + [p0[v][0]] for v in range(3)]
+    return out

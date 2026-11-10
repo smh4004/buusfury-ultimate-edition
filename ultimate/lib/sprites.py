@@ -257,7 +257,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         if 'blue_hair' in a:                               # a Super Saiyan figure with blue hair (blue_hair_actor): its base and Super Saiyan built first
             h = a['blue_hair']; at_ = lambda x: (table[x] if isinstance(x, int) else table[ids[x]]) - BASE
             rec, made = blue_hair_actor(ins, rom, at_(h['base']), at_(h['ss']), {'shared': set(h['shared'])}, {int(k): v for k, v in h['to'].items()}, h.get('transplant'))
-            print('%s: %d frames with blue hair%s' % (name, made, ' (Goku\'s Blue hair, worst overlap %.2f)' % min(ins._hair_iou) if h.get('transplant') else ''))
+            print('%s: %d frames with blue hair%s' % (name, made, ' (recoloured by the transplant)' if h.get('transplant') else ''))
             ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
         if 'same_as' in a:                                 # another actor id for the same record (Super Saiyan 2 and Full Power: their lightning
@@ -715,8 +715,8 @@ def blue_hair_actor(ins, rom, base_at, ss_at, gold, to, transplant=None):
     a glow round the hair, "recolor SSJ GOGETA ... just remove the halo"). `gold` are the Super Saiyan hair's colours; a pixel is hair when
     it is one of them where the base figure (same slot and frame, laid on the same grid by the pieces' offsets) is black hair or empty, or
     when it is one of the colours only the hair uses (`to`'s keys minus the shared ones are all hair). to: {gold index: blue index}.
-    transplant(a, b, view, slot) -> (canvas, its corner from the frame's, overlap) instead gives each frame new hair (Nov 10: Super Saiyan Blue
-    Goku's, lib/gogeta_hair.py); the canvas is cut back to its art in one piece (at most 32x32, 1 KB of OBJ memory, the feet kept). Returns (record, frames recoloured)."""
+    transplant(a, b, view, slot) -> (canvas, its corner from the frame's, a score) instead gives each frame its own new hair or colours
+    (Nov 10, for Blue Gogeta, since replaced by lib/ssb.py); the canvas is cut back to its art in one piece (at most 32x32, 1 KB of OBJ memory, the feet kept). Returns (record, frames recoloured)."""
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
     def anim(rec_at, s):
         n = u(rec_at) & 0xFF

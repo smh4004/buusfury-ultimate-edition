@@ -18,6 +18,7 @@ import icons as iconlib
 sys.path.insert(0, 'ultimate')
 import gogeta
 import goku_black
+import ssb
 import gt
 import garlic_art
 import super_garlic
@@ -102,8 +103,8 @@ SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 've
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
 SSB_FORMS = tuple((v[0], k) for k, v in SSB_LOOKS.items())
 # The blue: Super Saiyan's hair ramp (BF indices) -> DBS Gogeta's Blue tones (gogeta.py's sheet, flattened), lightest as his lightest
-SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86, 246, 246), 29: (200, 248, 248), 2: (200, 248, 248)}
-GOGETA_BLUE = {25: (24, 128, 240), 242: (69, 199, 246), 28: (86, 246, 246)}     # his Super Saiyan hair's dark, mid and light gold -> Blue's (SSB_HAIR's tones)
+SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86, 246, 246), 29: (200, 248, 248), 2: (200, 248, 248),
+            246: (200, 248, 248)}     # (246: Vegeta's palest gold, Nov 10: it stayed yellow)
 KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outlines stay)
 
 
@@ -203,22 +204,6 @@ def ssg_hair(one):
         hair = np.isin(lab, [k + 1 for k, v in enumerate(sizes) if v >= 12])
         inner = ndimage.binary_erosion(hair, np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]))
         out = img.copy(); out[hair] = edge; out[inner] = fill
-        return out
-    return fn
-
-
-def ssb_hair(one):
-    """Super Saiyan hair -> blue. Hair and skin share BF's colours: a ramp pixel is hair when nearer the hair's highlights than the face's
-    own colours, within 3 px (BSO's kidcombat.ssj_gold)."""
-    from scipy import ndimage
-    to = {k: one(np.array(v)) for k, v in SSB_HAIR.items()}
-    def fn(img):
-        ramp = np.isin(img, list(SSB_HAIR))
-        dh = ndimage.distance_transform_edt(~np.isin(img, [28, 29, 2]))
-        df = ndimage.distance_transform_edt(~np.isin(img, [200, 203, 215, 216, 117]))
-        hair = ramp & (dh < df) & (dh <= 3)
-        out = img.copy()
-        for k, v in to.items(): out[hair & (img == k)] = v
         return out
     return fn
 
@@ -1323,17 +1308,12 @@ def add_actors(rom, clean):
     for actor, form in (('gogeta_dbs', 'base'), ('gogeta_dbs_ss', 'ssj')):
         gogeta.write_frames(clean_dir, form, one)
         cfg[actor] = {'template': 93, 'slots': gogeta.slots(form), 'stretch': True, 'grow': lengths}
-    # Super Saiyan Blue Gogeta (Nov 9, the owner: the sheet's Blue frames were a noisy blob with a glow round the hair: "recolor SSJ GOGETA
-    # if you have to just remove the halo"): his Super Saiyan's frames, the gold hair in Blue's tones. 242 is also his vest's gold, so it
-    # is hair only where his base figure has black hair or nothing (sprites.blue_hair_actor).
-    # Then (Nov 10, the owner: "Gogeta blues hair is still fucked too looks totally wrong. Use SSB Golu [Goku] and a basis and get the color
-    # and shape fully accurate"): each frame's hair is Super Saiyan Blue Goku's, the closest in shape in the same view, in Goku's Blue colours
-    # (lib/gogeta_hair.py; ssb_hair turns BF Super Saiyan Goku's hair blue exactly as Goku's own Blue figure).
-    import gogeta_hair
-    hair_of = gogeta_hair.goku_templates(clean, ssb_hair(one))
-    cfg['gogeta_ssb'] = {'blue_hair': {'base': 'gogeta_dbs', 'ss': 'gogeta_dbs_ss', 'shared': [242],
-                                       'to': {k: one(np.array(v)) for k, v in GOGETA_BLUE.items()},
-                                       'transplant': lambda a, b, d, slot: gogeta_hair.blue(a, b, d, hair_of, [25, 28], [242], slot)}, 'high': True}
+    # Super Saiyan Blue Gogeta: Buu's Fury's own Super Saiyan Gogeta (actor 93), every frame, his hair in Blue Goku's colours shade for shade
+    # (lib/ssb.py gogeta_frames). Nov 9-10 tries on DBS Gogeta's sheet figure are gone (the owner: "Literally look at SSJ Gogeta, turn that
+    # hair blue colored and use SSB Gokus hair as a reference but DONT CHANGE THE SSJ GOGETA HAIR SHAPE", "Get the fucking hair RIGHT
+    # according to BUUS FURY GOGETA"). He changes to it from DBS Gogeta's Super Saiyan as before (outfit.c ssb_use).
+    cfg['gogeta_ssb'] = {'template': ssb.GOGETA, 'raw_frames': {str(k): v for k, v in ssb.gogeta_frames(clean, {k: one(np.array(v)) for k, v in SSB_HAIR.items()}).items()},
+                         'compress': True, 'high': True, 'grow': lengths}
     for name in ('piccolo', 'android17', 'android18', 'krillin', 'future_trunks', 'future_trunks_ss', 'videl_player', 'kid_buu_player', 'majin_buu_player', 'super_janemba_player', 'tien_player', 'yamcha_player', 'pikkon_player', 'hercule_player'):
         cfg[name]['grow'] = lengths
     for a in cfg.values():      # slot 18 is the pose held while firing a skill: LoG2's own firing pose when it has one, else its ki pose
@@ -1373,9 +1353,12 @@ def add_actors(rom, clean):
     cfg['super_garlic'].update(tint=sg, by_view=True)           # (lib/super_garlic.py; the owner's choice of base, Nov 9)
     cfg['spice']['fill'] = {'11': 0}          # Majin Vegeta's row (Spice's behaviour) is for his Super Saiyan figure, which has slot 11; BF Vegeta's has not
     cfg['gohan_gt_ss2'] = {'same_as': 'gohan_gt_ssj'}     # GT Gohan's Super Saiyan 2: his Super Saiyan's figure, with the crackle (outfit.c)
-    hair = ssb_hair(one)
-    for n, (_, _, _, src, _) in SSB_LOOKS.items():
-        cfg[n] = {'tint_of': src, 'tint': hair, 'high': True}
+    # Super Saiyan Blue's hair (lib/ssb.py; Nov 10, the owner: "FIX SSB GOKUS HAIR NOT BEING FULLY BLUE WHY IS THERE STILL YELLOW"): each
+    # Super Saiyan frame against its base figure's, so the spike tips and the hairline turn too
+    to = {k: one(np.array(v)) for k, v in SSB_HAIR.items()}
+    for n, (_, _, _, src, base) in SSB_LOOKS.items():
+        under = struct.unpack_from('<H', clean, FORMS + FORM_SIZE * base + 0x0E)[0] - 9 if isinstance(src, int) and isinstance(base, int) else None
+        cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to), 'high': True}
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
