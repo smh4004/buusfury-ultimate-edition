@@ -225,12 +225,12 @@ static void more_flag_set(int f, int on) {
 #define MORE_POINTS 255
 int mastery_level(int c, int skill);
 /* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (area << 8 | world), 252 Goku playing, 253 the quest can start
-   (after the ending, Goku's Super Saiyan mastered, Goku playing) */
+   (after the ending and the Garlic Jr. quest (garlic.py: it comes first, the owner's choice), Goku's Super Saiyan mastered, Goku playing) */
 void more_get(int *sp) {
     int n = *sp, f = sp[n], me = *(u8 *)0x03001068;
     if (f == 251) sp[n] = *(volatile u16 *)0x0300197C;
     else if (f == 252) sp[n] = me == 0;
-    else if (f == 253) sp[n] = GetFlag((void *)0x03001068, 149) && mastery_level(0, 20) == 2 && me == 0;
+    else if (f == 253) sp[n] = GetFlag((void *)0x03001068, 149) && more_flag(MORE_GJ_DONE) && mastery_level(0, 20) == 2 && me == 0;
     else sp[n] = more_flag(f);
 }
 void more_put(int *sp) {

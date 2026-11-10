@@ -2,13 +2,14 @@
 """Battle of Gods (ultimate/bog.py), in the game's own areas. Needs a zone debug build whose official warps to Capsule Corporation:
   BFU_HUB_WARP="4, 20, 1, 192, 196" BFU_OUT=<dir> python3 ultimate/build.py --debug --zone
   python3 ultimate/test_bog.py <dir> [work dir]
-After the ending, with Goku's Super Saiyan mastered: Whis at Capsule Corporation, King Kai's planet (Grand Kai's) and the fight Goku loses,
+After the ending and the Garlic Jr. quest, with Goku's Super Saiyan mastered: Whis at Capsule Corporation, King Kai's planet (Grand Kai's) and the fight Goku loses,
 Bulma's party at Capsule Corporation and Vegeta's fight there (with fighting on), the ritual (Super Saiyan God learned), the god fight
 across West City (lost: back to the party; West City's own people stand aside meanwhile), the forest and the desert, then home, where
-Beerus spares the Earth."""
+Beerus spares the Earth. Goku is a level 150 fighter made the game's way (fightrig.py); each Beerus fight starts with a real exchange,
+measured (the Garlic Jr. quest is balanced below these)."""
 import os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, bog, floorcheck
+import zone26, bog, floorcheck, fightrig
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='bog'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
@@ -72,6 +73,7 @@ def beat(hp, name, fighting):
     """As test_cell.py: Beerus (the first enemy) left at 2 HP, Goku just below him facing up, three punches; again while `fighting()`."""
     foe = mem(ENEMIES)[0]
     check('%s: Beerus is there with %d HP' % (name, hp), foe and mem(foe + 0x28C)[0] == hp << 10)
+    if fighting(): RIG.spar('Beerus, ' + name)
     for _ in range(60):
         if not fighting(): break
         foe = mem(ENEMIES)[0]
@@ -93,10 +95,10 @@ def lose(fighting):
 def standing(x, y):
     """Is someone standing still at (x, y)? (an object's position words, +0x1A0, in work RAM)"""
     return dump(0x02000000, 0x40000).find(struct.pack('<ii', x << 8, y << 8)) >= 0
+RIG = None                           # fightrig.Rig: a level 150 Goku (the owner, Nov 9: "Test these with a level 150 Goku"), heal(), spar()
 def full():
-    """Health 32767, and the most health too: the rig's Goku is a new game's (about 135 at most), and with only his health raised Beerus
-    floored him within about 70 frames (Nov 9, the desert, where the first punches missed and Beerus struck back)."""
-    send('poke8 %08X FF' % (REC0 + 0x16), 'poke8 %08X 7F' % (REC0 + 0x17), 'poke8 %08X FF' % (REC0 + 0x18), 'poke8 %08X 7F' % (REC0 + 0x19))
+    """Goku's health and ki back to his maximum: a level 150 fighter's (fightrig.level150), not poked numbers (0x7FFF went negative)."""
+    RIG.heal()
 
 # 0. Every place the quest puts someone (people, Beerus, Goku's arrivals, the spot below each person where you talk) is floor
 spots = [(*wa, n, x, y) for wa, people, _ in bog.PEOPLE for n, x, y in people] + [(*wa, 'talk to ' + n, x, y + 22) for wa, people, _ in bog.PEOPLE for n, x, y in people]
@@ -110,6 +112,8 @@ doors = [d for d in doors if d[1]]
 check('every fight stands clear of its area\'s doors, capsule and gates%s' % ((': not ' + str(doors)) if doors else ''), not doors)
 send('guardon 0x09000000', *start); mem(G)
 send(flag_on(149)); send(flag_on(862)); send(flag_on(883)); mem(G)
+RIG = fightrig.Rig(send, mem, open(ROM, 'rb').read())
+L150 = RIG.level150(); print('   Goku: level %d -> 150: %d HP, %d ki, Strength/Power/Endurance %s' % L150, flush=True)
 door = [x for x in zone26.links(__import__('json').load(open('ultimate/zone26.json')), {a: zone26.floor_mask(open(os.environ['BFU_PROTO'], 'rb').read(), os.environ['BFU_PROTO'], a) for a in range(1, 16)})[1] if 'world' in x][0]
 pl = mem(PLAYER)[0]; x0, y0, x1, y1 = door['rect']
 send('poke %08X %08X' % (pl + 0x1A0, (x0 + x1) // 2 << 8), 'poke %08X %08X' % (pl + 0x1A4, (y0 + y1) // 2 << 8), 'keys ' + 'DOWN UP LEFT RIGHT'.split()[door['key']], 'run 12', 'keys', 'run %d' % WALK_IN); mem(G)
@@ -123,6 +127,8 @@ send('run 100')
 check('the West City resident stands at his spot (as the check in West City below expects)', standing(320, 360))
 talk_until(96, 328, 0x103)
 send(*BENCH_ON, 'poke8 %08X FA' % MASTERY)        # Goku's Super Saiyan mastered
+import garlic                                     # and the Garlic Jr. quest done: Battle of Gods waits for it (outfit.c more_get 253)
+b = FLAGS2 + (garlic.GJ_DONE - 32 >> 3); send('poke8 %08X %02X' % (b, (mem(b)[0] & 255) | 1 << ((garlic.GJ_DONE - 32) & 7)))
 # 1. Whis, then King Kai's planet (Grand Kai's)
 send(flag_on(883)); talk_until(*zone26.HUB_AT, CAPSULE); send('run 100', 'shot cc_whis'); mem(G)
 check('the rig lands at Capsule Corporation', at() == CAPSULE)

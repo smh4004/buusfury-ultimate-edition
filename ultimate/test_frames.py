@@ -95,5 +95,41 @@ print('   shadow sizes: broly %s, broly_fp %s, goku %s, majin_buu %s; the game\'
 check('neither Broly has a ground shadow; Goku and the other big fighters keep theirs',
       shadow(forms['broly']) not in SHADOWS and shadow(forms['broly_fp']) not in SHADOWS and shadow(0) in SHADOWS and shadow(forms['majin_buu']) in SHADOWS)
 
+# 5. Super Garlic Jr. (lib/super_garlic.py, Nov 9: "remove the singlet ... fill his abs ... remove the majin head symbol and give him the brain
+# grooves", "Fix the pants and waistband too and don't let it ever overlap the arms"): Spopovich's every frame, none of Spopovich left in it.
+actors = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json'))).get('actors', {})
+if 'super_garlic' in actors:
+    sg, spop = actors['super_garlic'], 243
+    SPOP_SKIN = {16, 17, 18, 19, 20, 21, 22, 23, 30, 203, 245, 205, 206, 208, 202, 84, 68, 82, 229, 141, 142, 213}
+    YELLOW = {109, 249, 81}
+    same, left, mark, teal, n = True, set(), [], 0, 0
+    for slot in range(24):
+        a, b = anim(sg, slot), anim(spop, slot)
+        if (a is None) != (b is None) or (a and len(a) != len(b)): same = False
+        for i, views in enumerate(a or []):
+            for d, fp in enumerate(views):
+                img = image(fp)
+                if img is None: continue
+                n += 1; cols = set(np.unique(img).tolist())
+                left |= cols & (SPOP_SKIN | YELLOW)
+                teal += bool(cols & {70, 187, 252, 253, 254})
+                for y in range(img.shape[0]):
+                    r = img[y]
+                    if any(r[x] == 1 and r[x + 2] == 1 and r[x + 4] == 1 and r[x + 1] == 16 and r[x + 3] == 16 for x in range(img.shape[1] - 4)):
+                        mark.append((slot, i, d)); break
+    check('Super Garlic Jr. has every slot Spopovich\'s behaviour plays, frame for frame (%d frames)' % n, same and n > 100)
+    check('no Spopovich left in Super Garlic Jr.: no tan skin, no yellow boots%s' % (': %s' % sorted(left) if left else ''), not left)
+    check('no Majin mark on Super Garlic Jr.\'s forehead%s' % (': %s' % mark if mark else ''), not mark)
+    check('every Super Garlic Jr. frame is teal', teal == n)
+    st = image(anim(sg, 0)[0][0])                                      # standing, from the front: the sash, the trousers, the ears
+    ys = [y for y in range(st.shape[0]) if (st[y] == 2).sum() >= 8]
+    check('standing, a white sash across his waist with black trousers under it', bool(ys) and ((st[ys[0] + 3] == 112) | (st[ys[0] + 3] == 111) | (st[ys[0] + 3] == 1)).sum() >= 10)
+    top = min(y for y in range(st.shape[0]) if st[y].any())
+    ears = [x for x in range(st.shape[1]) if st[top + 2:top + 6, x].any()]
+    check('standing, his ears stand out on both sides of his head', bool(ears) and max(ears) - min(ears) >= 24)
+else:
+    check('Super Garlic Jr. is in this build', False)
+
+
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

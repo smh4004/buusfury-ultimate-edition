@@ -139,8 +139,10 @@ def steps(more_get, more_put):
          + 'Q6:\n    push {ritual}\n    end\nQ5:\n    push {party}\n    end\n'
          + 'Q4:\n' + g(MORE_BOG_START) + '    jz Q7\n    push {resume}\n    end\n'
          + 'Q7:\n' + g(Q_READY) + '    jz Q8\n    push {call}\n    end\nQ8:\n    push {idle}\n    end\n')
-    # Capsule Corporation: King Kai's call, and Whis
-    say('call', KING_KAI, "Goku! Goku, can you hear me? It's King Kai! The God of Destruction is awake!")
+    # Capsule Corporation: the movie's opening, King Kai's call, and Whis
+    say('call', NARR, "Far across the universe, Beerus, the God of Destruction, woke from a 39-year sleep.")
+    say('call1', NARR, "The Oracle Fish foretold a rival for him: a Super Saiyan God. He went looking.")
+    say('call1b', KING_KAI, "Goku! Goku, can you hear me? It's King Kai! The God of Destruction is awake!")
     say('call2', KING_KAI, "Lord Beerus is on my planet, asking about a Super Saiyan God! Stay away, Goku!")
     say('call3', GOKU, "A god? He must be crazy strong! I've gotta meet him!")
     say('call4', WHIS, "Oh my, how eager. I'm Whis, Lord Beerus's attendant. Shall I take you to him?")
@@ -159,11 +161,14 @@ def steps(more_get, more_put):
     say('kai5', WHIS, "Do try not to break the planet, Lord Beerus. Grand Kai is rather fond of it.")
     code('kai_go', fight() + warp(KAI_AT) + '    push {END}\n    end\n')
     # 2. Bulma's party, at Capsule Corporation
-    say('party', NARR, "Two taps were all it took. Goku was out cold, and Beerus went on to Earth...")
+    say('party', NARR, "Goku went Super Saiyan 3. Two taps were all it took. Beerus went on to Earth...")
     say('party2', BULMA, "Welcome to my birthday party, everybody! Wait... who are you two, now?")
+    say('party2b', VEGETA, "(Lord Beerus... I saw him put his foot on my father's head. Keep him happy!)")
+    say('party2c', VEGETA, "Ahem. Bingo! Bingo! Lord Beerus, more food? Anything you like!")
     say('party3', WHIS, "Oh my! This pudding is divine! Lord Beerus, you simply must try it!")
-    say('party4', NARR, "But Majin Buu ate the very last pudding. Beerus did not take it well.")
+    say('party4', 'MAJIN BUU', "Pudding? Mine! Buu won't share. Go away, kitty!")
     say('party5', BEERUS, "No pudding? Then I'll destroy this planet!")
+    say('party5b', NARR, "Beerus took on Gotenks, Piccolo, Gohan, Android 18 and Tien, and floored each in a blink.")
     say('party6', BULMA, "Nobody threatens the Earth at my party! Take that!")
     say('party6b', NARR, "Bulma slapped Beerus... and Beerus slapped her right back.")
     say('party7', VEGETA, "You... hit... MY BULMA!!! Kakarot, stay out of this! He's mine!")
@@ -189,6 +194,8 @@ def steps(more_get, more_put):
     # 4. The god fight won: Beerus spares the Earth (told at Capsule Corporation)
     say('told', BEERUS, "Heh... You're the second strongest I've ever fought, Son Goku.")
     say('told2', GOKU, "Second? Who's first?")
+    say('told2b', WHIS, "Me, of course. I'm Lord Beerus's teacher. Oh, did he not mention it?")
+    say('told2c', GOKU, "The god ki's gone... but I can still feel its power. Whoa, this is great!")
     say('told3', WHIS, "Lord Beerus, you can't destroy a planet with pudding this good. Time to go home.")
     say('told4', BEERUS, "...I'm sleepy. The Earth stays, for now. Save me some pudding.")
     say('told5', NARR, "Goku keeps the power of a Super Saiyan God!")

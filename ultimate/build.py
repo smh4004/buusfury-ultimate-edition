@@ -19,6 +19,8 @@ sys.path.insert(0, 'ultimate')
 import gogeta
 import goku_black
 import gt
+import garlic_art
+import super_garlic
 
 CLEAN_SHA1 = 'f1c4b07554d2a3b1ad2f325307051e775ce68087'
 ROM_BASE = 0x08000000
@@ -62,12 +64,14 @@ FP_SKILL = 47                    # Full Power (Nov 9): Mystic Gohan only, from h
 MYSTIC_FLAG = 860                # outfits.json: the Elder Kai's scene gives Gohan the orange gi (outfit 110)
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
 # picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
-GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH = 162, 163, 164, 165, 166
+GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH, GEAR_NECKLACE = 162, 163, 164, 165, 166, 167
 GEAR = ((GEAR_POTARA, 'Potara Earrings', "The Supreme Kai's earrings. Every transformation drains its ki a third slower.", 153, 3, (0, 10, 10, 10, 0), 0, 95),
         (GEAR_GRAVITY, 'Gravity Band', "Bulma built it for Vegeta's training. Transformations are mastered twice as fast.", 67, 1, (10, 0, 5, 5, -5), 0, 215),
         (GEAR_SHADES, "King Kai's Shades", "King Kai's own sunglasses. The Kaioken wears on your health half as much.", 117, 3, (0, 5, 5, 5, 0), 0, None),
         (GEAR_SHELL, 'Turtle Shell', "Master Roshi's training shell. Heavy and slow, but you learn twice as fast.", 13, 0, (0, 0, 20, 20, -20), 256, 120),
-        (GEAR_POUCH, 'Senzu Pouch', "Korin's pouch of Senzu crumbs. Slowly restores your health in battle.", 121, 3, (0, 0, 5, 5, 0), 0, 75))
+        (GEAR_POUCH, 'Senzu Pouch', "Korin's pouch of Senzu crumbs. Slowly restores your health in battle.", 121, 3, (0, 0, 5, 5, 0), 0, 75),
+        # the Garlic Jr. quest's prize (garlic.py): the owner chose +END and +Ki; its picture is the game's Garlic Necklace (row 135), darker
+        (GEAR_NECKLACE, "Garlic Jr.'s Necklace", "Garlic Jr. wore it under the Makyo Star. Raises your Endurance and Ki.", 135, 3, (0, 12, 12, 12, 0), 0, 280))
 GEAR_TABLE, GEAR_COUNT = 0x6F82EC, 162
 GEAR_REFS = (0x2BFC, 0x453C, 0x4814, 0xD528, 0x13E28, 0x16FBC, 0x1D400, 0x1D5F0, 0x1D968, 0x1DC74, 0x1DF88, 0x1FB4C, 0x2BD44, 0x31844, 0x31C3C, 0x321B8, 0x325AC)
 ROSHI_NAME_UI = GT_NAME_UI + 4   # 'Master Roshi', 'Max Power Roshi' (forms.json uses these numbers)
@@ -275,7 +279,7 @@ def new_actor_ids():
     """Ids add_actors will give: actors.json's new actors in order, then Super 13 and Android 13. Checked after the build."""
     cfg = json.load(open('ultimate/actors.json'))
     n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a)
-    return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}, 'goku_black': n + 32, 'goku_rose': n + 33, **{k: n + 34 + i for i, k in enumerate(gt.ACTORS)}}
+    return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}, 'goku_black': n + 32, 'goku_rose': n + 33, **{k: n + 34 + i for i, k in enumerate(gt.ACTORS)}, **{k: n + 34 + len(gt.ACTORS) + i for i, k in enumerate(garlic_art.ACTORS)}}
 
 
 DEATH_SCRIPT = 'assets/scripts/gUnknown_0877C5A4.evt'
@@ -311,12 +315,15 @@ step 3 code
 
 
 def quest_npc(src):
-    """The resident's list, with the Battle of Gods' scenes after it (ultimate/bog.py): step 1 first asks whether you're at Capsule
-    Corporation or in one of the movie's rooms (Whis, Beerus, King Kai and the party guests all point at this list), and goes there."""
-    import zone26, bog
+    """The resident's list, with the Battle of Gods' scenes (ultimate/bog.py) and the Garlic Jr. quest's (ultimate/garlic.py) after it: step 1
+    first asks whether you're at Capsule Corporation or in one of the movies' places (Whis, Beerus, King Kai and the party guests, Dende,
+    Korin, Hercule, Garlic Jr. and his scene rooms all point at this list), and goes there."""
+    import zone26, bog, garlic
     text = quest_npc_story(src)
-    m = len(re.findall(r'(?m)^step ', text))                   # steps so far: the Battle of Gods' are numbered on from here (counted from 0)
-    steps = bog.steps(zone26.MORE_GET, zone26.MORE_PUT)
+    m = len(re.findall(r'(?m)^step ', text))                   # steps so far: the quests' are numbered on from here (counted from 0)
+    rooms = zone26.garlic_rooms()
+    chars = {k: v + 9 for k, v in new_actor_ids().items() if k in garlic_art.ACTORS}
+    steps = bog.steps(zone26.MORE_GET, zone26.MORE_PUT) + garlic.steps(zone26.MORE_GET, zone26.MORE_PUT, rooms, chars)
     number = {n: m + k for k, (n, _) in enumerate(steps)}; number['END'] = m + len(steps)
     # The story steps end the list with `push m` (one past their last step). With the scenes appended that is the first scene,
     # so every such end now goes past the scenes instead: before Nov 9's fix, talking to the resident after the ending ran the
@@ -327,6 +334,8 @@ def quest_npc(src):
     get = lambda f: '    pushn %d\n    call 0x%X\n' % (f, zone26.MORE_GET)
     here = [bog.CAPSULE, bog.KAI]                               # the quest's people stand at Capsule Corporation and on Grand Kai's Planet
     branch = ''.join(get(bog.Q_AREA) + '    pushn %d\n    eq\n    jz G%d\n    push %d\n    end\nG%d:\n' % (a << 8 | w, k, number['bog'], k) for k, (w, a) in enumerate(here))
+    branch += ''.join(get(garlic.Q_AREA) + '    pushn %d\n    eq\n    jz Q%d\n    push %d\n    end\nQ%d:\n' % (a << 8 | w, k, number['garlic'], k)
+                      for k, (w, a) in enumerate(garlic.places(rooms)))
     if text.count('step 1 code\n') != 1: sys.exit("the resident's script changed")
     text = text.replace('step 1 code\n', 'step 1 code\n' + branch, 1)
     return text.rstrip() + '\n' + ''.join('step auto %s' % re.sub(r'\{(\w+)\}', lambda q: str(number[q.group(1)]), t) for _, t in steps)
@@ -623,8 +632,9 @@ def death_script(src):
     line, body = rest.split('\n', 1)
     home = zone26.spar_off() + '    call max_hp\n    set hp\n    pushn 0, 0\n    call 0x3C\n    call 0xF7(5)\n    call 0x78(30)\n    pushn 6, 1, 1, %d, %d\n    call 0x77\n    call 0x79(30)\n    push 4\n    end\n' % zone26.SPAR_HOME     # steps count from 0 here: 4 is the list's end, while just `end` would run on into the next step and the game over
     new = '    pushn %d\n    call flag\n    pushn %d\n    call flag\n    and\n    jz L9\n' % zone26.CELL_COUNT + home + 'L9:\n'
-    import bog
+    import bog, garlic
     gods = bog.death_branch(zone26.MORE_PUT, zone26.MORE_GET)       # a Beerus fight lost: the story goes on
+    gods = garlic.death_branch(zone26.MORE_PUT, zone26.MORE_GET) + gods    # a Garlic Jr. quest fight lost: back to the Lookout or the main street
     endless = gods + '    pushn 1\n    call 0x%X\n    jz L8\n    pushn 3\n    call 0x%X\n    call max_hp\n    set hp\n    pushn 0, 0\n    call 0x3C\n    call 0xF7(5)\n    call 0x78(30)\n    pushn 3, 1, 1, 208, 134\n    call 0x77\n    call 0x79(30)\n    push 4\n    end\nL8:\n' % (zone26.LADDER, zone26.LADDER)
     return head + first + line + '\n' + endless + new + body
 
@@ -1333,6 +1343,19 @@ def add_actors(rom, clean):
     cfg['goku_black'] = {'template': goku_black.SOURCE['black'], 'raw_frames': {str(k): v for k, v in looks['black'].items()}}
     cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg.update(gt.actors(clean, pal, lengths))      # GT: Black Star Odyssey's fighters (bso_import.py; BFU_BSO points at the owner's sheet)
+    # The Garlic Jr. quest (garlic.py; lib/garlic_art.py): Garlic Jr. is kid Goten's frames with his head on Pilaf's (the owner's choice) and his
+    # cloak, cassock and shoes; Super Garlic Jr. is Spopovich's frames made his (the owner's choice); the Spice Boys and the Makyans are fighters of the
+    # same build recoloured. Each keeps the record (and so the slots) of the fighter whose behaviour row it fights with. Right after the GT
+    # actors, so their ids are fixed (new_actor_ids): the quest's scenes name them.
+    frames, conv = garlic_art.garlic_jr_frames(clean, sprites.ACTOR_LIST)
+    print('garlic_jr: heads placed %d (%d by hand), missed %d' % (conv.hits, conv.manual, conv.misses))
+    if conv.misses: sys.exit('garlic_jr: Goten\'s head not found in %d frames (add them to garlic_art.MANUAL)' % conv.misses)
+    cfg['garlic_jr'] = {'template': garlic_art.GARLIC_BODY, 'raw_frames': {str(k): v for k, v in sorted(frames.items())}, 'compress': True, 'high': True}
+    for name, (src, fn) in garlic_art.TINTS.items():
+        cfg[name] = {'tint_of': src, 'tint': fn, 'high': True}
+    sg = super_garlic.Converter(clean, sprites.ACTOR_LIST)       # Super Garlic Jr.: Spopovich's frames, the singlet off, the brain's folds, ears
+    cfg['super_garlic'].update(tint=sg, by_view=True)           # (lib/super_garlic.py; the owner's choice of base, Nov 9)
+    cfg['spice']['fill'] = {'11': 0}          # Majin Vegeta's row (Spice's behaviour) is for his Super Saiyan figure, which has slot 11; BF Vegeta's has not
     cfg['gohan_gt_ss2'] = {'same_as': 'gohan_gt_ssj'}     # GT Gohan's Super Saiyan 2: his Super Saiyan's figure, with the crackle (outfit.c)
     hair = ssb_hair(one)
     for n, (_, _, _, src, _) in SSB_LOOKS.items():
@@ -1529,7 +1552,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -2251,7 +2274,7 @@ def main():
     open('%s/%s.bps' % (OUT, name), 'wb').write(bps.make(clean, out))
     open('%s/%s_PERSONAL_USE_ONLY.gba' % (OUT, name), 'wb').write(out)
     ss2_lists = {str(u['flag']): symbol(u['list']) - ROM_BASE for u in json.load(open('ultimate/outfits.json'))['unlocks'] if u['flag'] >= SS2_FLAG}
-    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists, 'actors': {k: actors[k] for k in ('beerus', 'whis')}}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
+    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists, 'actors': {k: actors[k] for k in ('beerus', 'whis', 'garlic_jr', 'super_garlic', 'spice', 'vinegar', 'mustard', 'salt', 'makyan')}}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
     print('%s: %d bytes, sha1 %s, patch %d bytes, forms %s' % (name, len(out), hashlib.sha1(out).hexdigest(),
           os.path.getsize('%s/%s.bps' % (OUT, name)), index))
 

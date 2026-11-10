@@ -287,7 +287,11 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             continue
         if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
             src = a['tint_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
-            rec = tinted_actor(ins, rom, src - BASE, a['tint']); ids[name] = len(table); table.append(ins.put(bytes(rec)))
+            rec = (viewed_actor if a.get('by_view') else tinted_actor)(ins, rom, src - BASE, a['tint'])     # by_view: the tint sees the view
+            for slot, frm in a.get('fill', {}).items():    # a slot the copy's behaviour may play that its figure never had: another of its own
+                if int(slot) < rec[0] and not struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]:
+                    struct.pack_into('<I', rec, 0x54 + 4 * int(slot), struct.unpack_from('<I', rec, 0x54 + 4 * frm)[0])
+            ids[name] = len(table); table.append(ins.put(bytes(rec)))
             continue
         if 'proto_actor' in a:                             # whole actor copied from the Prototype D cart
             if proto is None: continue

@@ -229,6 +229,8 @@ TRIAL2_HP, TRIAL2_STATS, TRIAL2_PRIZE, TRIAL2_GEAR = 70000, (153, 85, 80, 85), 6
 MORE_WAVE, MORE_T2_WON, MORE_T2_PAID, MORE_T2_ALL = 32, 38, 42, 46        # more flags 32-37 a wave cleared once, 38-41 Trials II won, 42-45 paid, 46 all paid
 import bog                                          # Battle of Gods (more flags 49-57, its people and Beerus in the real areas: add_bog)
 from bog import MORE_BOG_DONE
+import garlic                                       # the Garlic Jr. quest (more flags 58-63; its people in the real areas, its fights in copies
+                                                    # of the Lookout: add_garlic, garlic_rooms)
 MORE_POINTS = 255                                   # more_put(MORE_POINTS, n): n stat points to whoever is playing
 # Time Chamber waves (Mr. Popo, Waves): a category's four partners in a row, no rest between, 1.5x their health. The first clear of each gives WAVE_POINTS stat points, later ones Zenie.
 WAVE_HP, WAVE_POINTS, WAVE_ZENIE = (3, 2), 3, 30000
@@ -352,6 +354,15 @@ def challenge_room(name, k=0):
         if c['who'] == name: return n + k
         n += len(c['fights'])
     raise KeyError(name)
+
+
+def garlic_first():
+    """The Garlic Jr. quest's first room (garlic.ROOMS: copies of the Lookout), after the challenges'."""
+    return hercule_room() + 1 + sum(len(c['fights']) for c in CHALLENGES)
+
+
+def garlic_rooms():
+    return {r: garlic_first() + k for k, r in enumerate(garlic.ROOMS)}
 
 
 def black_room(k=0):
@@ -494,6 +505,14 @@ def rush_rows(W, rom, harmless=False):
         then = bog.after_fight(k, MORE_PUT, False) + ('    call 0x2F\n    call 0x33(0)\n' if k == len(bog.ROWS) - 1 else '') + '    end\n'
         struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
         rows += r
+    rooms = garlic_rooms()                         # the Garlic Jr. quest: the Makyans' row, then the Lookout's fights (garlic.FIGHTS)
+    for name, base, hp, stats in (garlic.MAKYAN,) + garlic.FIGHTS:
+        r = bytearray(rom[STATS + 28 * base:STATS + 28 * (base + 1)])
+        struct.pack_into('<I', r, 4, hp); r[0xC:0x10] = bytes(stats)        # (never harmless: test_garlic.py loses as well as wins)
+        if name == 'super_garlic': r[0x10] = garlic.SUPER_PHYS
+        then = garlic.makyan_fall(MORE_PUT, MORE_GET) if name == 'makyan' else garlic.fight_fall(name, rooms, MORE_PUT)
+        struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
+        rows += r
     at = W.put(bytes(rows))
     for o in STATS_REFS:
         if struct.unpack_from('<I', rom, o)[0] != BASE + STATS:
@@ -535,7 +554,7 @@ def set_actors(W, rom, e, ptrs):
     struct.pack_into('<I', rom, e + 0x14, W.put(struct.pack('<%dI' % len(ptrs), *ptrs))); rom[e + 4] = len(ptrs)
 
 
-NPC_SPAWN, ENEMY_SPAWN = 0x08017DA3, 0x0800FD55
+NPC_SPAWN, ENEMY_SPAWN, WANDER_SPAWN = 0x08017DA3, 0x0800FD55, 0x080111A9     # (a wandering resident: +1 condition, +3 character)
 
 
 def unless(W, rom, cond, text):
@@ -579,6 +598,54 @@ def add_bog(W, rom, actor_ids, quest_list, bog_row):
                      + g(bog.MORE_BOG_TOLD) + '    or\n    end\n')
     e, ptrs = area_actors(rom, bog.CAPSULE)
     set_actors(W, rom, e, ptrs + [W.put(struct.pack('<8I', NPC_SPAWN, cond, bog.WHIS_AT[1] << 16 | bog.WHIS_AT[0], quest_list, who('whis'), 1, 0x080716EC, 0))])
+
+
+GARLIC_KEEP = (192, 205)                            # Hercule City's tournament official (hub_person): he keeps his post through the mist
+
+
+def add_garlic(W, rom, actor_ids, quest_list, row):
+    """The Garlic Jr. quest (garlic.py) in the game's own areas, all by spawn conditions on new copies of the records:
+      Hercule City (3-01): while the mist is up (started, not cured) its people and foes stand aside (all but the tournament official);
+        the two Makyans (the second alone once one has fallen); Hercule from the street's clearing until the quest ends.
+      Korin's Tower (6-0D): while the town needs his water, the quest's Korin stands in his place.
+      The Lookout (6-01): Dende gives way to the quest's Dende from the ending until the cure, and to no one until the quest ends (he is
+        Garlic Jr.'s prisoner, as Mr. Popo is); then Garlic Jr. stands there, with the Spice Boys until they are beaten."""
+    g = lambda f: '    pushn %d\n    call 0x%X\n' % (f, MORE_GET)
+    G = garlic
+    when = lambda on, off, story=None: condition(W, G.when(MORE_GET, on, off, story))
+    def npc(char, at, cond): return W.put(struct.pack('<8I', NPC_SPAWN, cond, at[1] << 16 | at[0], quest_list, char, 1, 0x080716EC, 0))
+    def aside(area, test, keep=()):
+        e, ptrs = area_actors(rom, area); new = []
+        for p in ptrs:
+            w = list(struct.unpack_from('<8I', rom, p - BASE))
+            char = w[4] if w[0] == NPC_SPAWN else w[3] if w[0] == WANDER_SPAWN else w[4] if w[0] == ENEMY_SPAWN else None
+            if w[0] in (NPC_SPAWN, ENEMY_SPAWN, WANDER_SPAWN) and w[1] != 1 and char not in keep and test(w, char):
+                w[1] = unless(W, rom, w[1], test_text[area]); p = W.put(struct.pack('<8I', *w))
+            new.append(p)
+        set_actors(W, rom, e, new)
+    test_text = {
+        G.SATAN: g(G.GJ_START) + '    push 0\n    eq\n' + g(G.GJ_CURED) + '    or\n',          # shown unless the mist is up
+        G.KORIN: g(G.GJ_MIST) + '    push 0\n    eq\n' + g(G.GJ_CURED) + '    or\n',          # Korin himself unless the quest's is there
+        G.LOOKOUT: '    pushn %d\n    call flag\n    push 0\n    eq\n' % G.ENDING + g(G.GJ_DONE) + '    or\n'}   # Dende: before the ending, or after
+    aside(G.SATAN, lambda w, c: True, GARLIC_KEEP)
+    e, ptrs = area_actors(rom, G.SATAN)
+    makyan = actor_ids['makyan'] + 9
+    foes = [W.put(struct.pack('<8I', ENEMY_SPAWN, when([G.GJ_START], [G.GJ_MIST, G.GJ_FIGHT], G.ENDING), row, G.MAKYANS[0][1] << 16 | G.MAKYANS[0][0], makyan, 0x080555A0, 1, 0x080716EC)),
+            W.put(struct.pack('<8I', ENEMY_SPAWN, when([G.GJ_START], [G.GJ_MIST], G.ENDING), row, G.MAKYANS[1][1] << 16 | G.MAKYANS[1][0], makyan, 0x080555A0, 1, 0x080716EC))]
+    set_actors(W, rom, e, ptrs + foes + [npc(G.HERCULE, G.HERCULE_AT, when([G.GJ_MIST], [G.GJ_DONE]))])
+    aside(G.KORIN, lambda w, c: c == G.KORIN_CHAR)
+    e, ptrs = area_actors(rom, G.KORIN)
+    set_actors(W, rom, e, ptrs + [npc(G.KORIN_CHAR, G.KORIN_AT, when([G.GJ_MIST], [G.GJ_CURED]))])
+    aside(G.LOOKOUT, lambda w, c: c == G.DENDE)
+    e, ptrs = area_actors(rom, G.LOOKOUT); new = []
+    for p in ptrs:                                  # Mr. Popo, held prisoner from the cure until the quest ends
+        w = list(struct.unpack_from('<8I', rom, p - BASE))
+        if w[0] == NPC_SPAWN and w[4] == G.POPO:
+            w[1] = unless(W, rom, w[1], g(G.GJ_CURED) + '    push 0\n    eq\n' + g(G.GJ_DONE) + '    or\n'); p = W.put(struct.pack('<8I', *w))
+        new.append(p)
+    people = [npc(G.DENDE, G.DENDE_AT, when([], [G.GJ_CURED], G.ENDING)), npc(actor_ids['garlic_jr'] + 9, G.GARLIC_AT, when([G.GJ_CURED], [G.GJ_DONE]))]
+    people += [npc(actor_ids[n] + 9, at, when([G.GJ_CURED], [G.GJ_SPICE, G.GJ_DONE])) for n, at in zip(('spice', 'vinegar', 'mustard', 'salt'), G.SPICE_AT)]
+    set_actors(W, rom, e, new + people)
 
 
 def add_balls(W, rom, actor_ids, popo_list):
@@ -730,8 +797,23 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
         struct.pack_into('<I', st, 4, 1); struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e))); struct.pack_into('<I', st, 0x10, 0)
         rows.append(bytes(st))
     bog_row = tier_row + 1 + len(fights)
+    garlic_row = bog_row + len(bog.ROWS)            # the Makyans' row; the Lookout's fights follow it
+    look = next(rom[AREAS + 56 * q:AREAS + 56 * q + 56] for q in range(COUNT) if (rom[AREAS + 56 * q], rom[AREAS + 56 * q + 1]) == garlic.LOOKOUT)
+    for room, number in garlic_rooms().items():     # the Lookout (fighting on), empty but for the foe, or a scene that plays as you arrive
+        st = bytearray(look); st[0] = 26; st[1] = number
+        if room in garlic.FIGHT_ROOMS:
+            k = garlic.FIGHT_ROOMS.index(room); x, y = garlic.LOOK_FOE
+            e = W.put(struct.pack('<8I', ENEMY_SPAWN, 0, garlic_row + 1 + k, y << 16 | x, actor_ids[room] + 9, 0x080555A0, 1, 0x080716EC))
+            st[3] = 0; struct.pack_into('<I', st, 0x10, 0)
+            st[4] = 1; struct.pack_into('<I', st, 0x14, W.put(struct.pack('<I', e)))
+        else:
+            ring = W.put(struct.pack('<2I4HI', TRIGGER[0], TRIGGER[1], 0, 0, 1024, 1024, quest_list))
+            st[3] = 1; struct.pack_into('<I', st, 0x10, W.put(struct.pack('<II', 0, ring)))
+            st[4] = 0; struct.pack_into('<I', st, 0x14, 0)
+        rows.append(bytes(st))
     add_bog(W, rom, actor_ids, quest_list, bog_row)
     hub_person(W, rom)
+    add_garlic(W, rom, actor_ids, quest_list, garlic_row)
     add_balls(W, rom, actor_ids, popo_list)
     if debug_door:          # debug: on Snake Way, Down on the very spot you start reaches 26:1 and the rest of the road stays walkable; x 48-96 walk up reaches Broly; x<48 starts the ending
         e = next(AREAS + 56 * k for k in range(COUNT) if rom[AREAS + 56 * k] == 1 and rom[AREAS + 56 * k + 1] == 1)

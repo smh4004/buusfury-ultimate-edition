@@ -215,6 +215,49 @@ official warps to Capsule Corporation: `BFU_HUB_WARP="4, 20, 1, 192, 196"`).
 - The suite's route tests had waited 110 frames after the zone 26 door before teleporting to a West City resident; Goku's walk into the
   city ends about frame 117 (it starts a frame later since Super Saiyan God's commit), so the walk carried him off the talk spot. They wait
   150 now (`WALK_IN`; `test_zone26.go(settle=150)`).
+- Made thorough like Garlic Jr.'s (the owner, Nov 9: "Same for Battle of Gods too if possible"): Beerus waking and the Oracle Fish's
+  prophecy, King Kai's warning, Vegeta's Bingo dance, Buu and the pudding, the others falling at the party, Whis as Beerus's teacher, the
+  god ki fading but staying with Goku (58 steps). Battle of Gods now waits for the Garlic Jr. quest (`outfit.c` `more_get(253)` needs
+  `MORE_GJ_DONE`).
+
+## The Garlic Jr. quest (Nov 9, post-game, before Battle of Gods)
+The owner: "adapt the Garlic Jr Dead Zone movie a bit ... condense it like how the Broly fight is", Garlic Jr. "based off Pilaf/Yakon",
+"make sure his outfit is accurate". `ultimate/garlic.py` holds the quest (66 steps, 39 lines, 2,500 characters in dialogue bank 8);
+`test_garlic.py` plays all of it (its rig's official warps to the Lookout: `BFU_HUB_WARP="6, 1, 1, 312, 400"`).
+- After the ending, Dende and Mr. Popo on the Lookout tell the Dead Zone story (Garlic Jr.'s wish for immortality, Kami, Gohan sealing him)
+  and of the Makyo Star; Mr. Popo's carpet takes Goku to Hercule City under the Black Water Mist: the street's people stand aside, two
+  Makyans fight (beat one: the count; lose to the other: both back; both down: the street clears and Hercule comes out). Hercule sends Goku
+  up Korin's Tower; Korin's Sacred Water cures the town; Hercule sends him to the Lookout, which Garlic Jr. and the Spice Boys hold (Dende
+  and Mr. Popo his prisoners, Piccolo's line about his father and the guardian's post). The Spice Boys one by one with a scene between
+  each (lost: back to the Lookout, from Spice again), Garlic Jr. himself (lost: from him again), the Makyo Star's change, Super Garlic Jr.,
+  and the Dead Zone seal as in the movie (the press-fast meter), Dende and Mr. Popo freed, Garlic Jr.'s Necklace (gear 167) and 300,000
+  Zenie. More flags 58-63; the Lookout's fights and scenes are twelve copies of the Lookout in zone 26 (a dialogue box with a boss loaded
+  resets the game, so every scene has its own room).
+- Garlic Jr. (`lib/garlic_art.py`): Pilaf's head on kid Goten's fighting body (every slot; no fusion or Super Saiyan frames, "he doesn't
+  need them"), the white cloak with its red lining, the black cassock with the castle shield, cyan cuffs and hem, blue shoes (Budokai
+  Tenkaichi 2's artwork and Dead Zone stills). The Spice Boys and the Makyans are fighters of the same build recoloured (ranked search):
+  Spice = BF Vegeta, Vinegar = Olibu, Mustard = Idasa, Salt = kid Trunks, the Makyans = the Majin fighter.
+- Super Garlic Jr. (`lib/super_garlic.py`; the owner: "make his Brain look right remove the back spikes give him his big ears ... if you
+  gotta use someone else like Spopovich legs and frames try it", "Remove the singlet too and use the half of his body without the singlet
+  to duplicate ... fill his abs in PERFECTLY accurate to the art style, and then remove the majin head symbol and give him the brain
+  grooves", "Fix the pants and waistband too and don't let it ever overlap the arms"): Spopovich's frames (actor 243; Yakon's had one
+  three-quarter figure for every view and spikes on his back). Per frame and view (`sprites.viewed_actor`, `tint_of` with `by_view`):
+  the singlet off (front and back: the bare half mirrored about the body's measured axis; what the mirror can't give, and side views, his
+  own skin reflected across the gap's edge), the Majin mark found and replaced by the cranium's folds (a central crease, grooves curving
+  down the sides), broad pointed ears drawn only where they meet his head, a snarl with fangs over a shut mouth; below the waist the skin is
+  shared between arms and legs by a walk from his upper body and from his boots that never crosses an outline (an arm wins a tie), so the
+  baggy black trousers and the white sash (with its cord in front) never cover an arm; teal skin, pale teal boots. `FRAMES` holds what
+  can't be measured in nine of the 57 frames (flying, kneeling, a head hidden). He fights on Spopovich's row 112 (also the spar's).
+  `test_frames.py` checks every frame: Spopovich's slots, no tan skin or yellow boots, no Majin mark, teal, the sash, the ears.
+- Balance (the owner: "Test these with a level 150 Goku or something so he doesnt die so much and has some balancing"): `fightrig.py`
+  makes the tests' Goku a level 150 fighter the game's way (EXP at the cap, health and ki grown by the game's level-up formula with
+  average rolls: 7,503 and 3,540; the 420 points spent evenly: Strength, Power, Endurance 167/167/166) and measures each fight with a real
+  exchange. The old tests poked Goku's health to 0x7FFF, which the quests' level-ups pushed past 32767 into negative numbers. At level 150
+  he needs about 10 hits for a Makyan (30,000 HP), 16-24 for a Spice Boy (40,000), 25 for Garlic Jr. (55,000) and 42 for Super Garlic Jr.
+  (75,000); their hits take 2-9% of his health, Super Garlic Jr.'s about 7%, no more than Beerus's (3-9%; his god fight's legs take
+  22-43 seconds of mashing each, measured the same way in `test_bog.py`). `test_garlic.py` checks these ranges.
+- Found on the way: a defeat script waits while a level-up box is open (the Makyans' count looked broken in the tests until the box was
+  closed), and a test that poked Goku to 1 HP after the game had already revived him walked him into the next fight at 1 HP.
 
 ## Zone 26 and Super 13
 
