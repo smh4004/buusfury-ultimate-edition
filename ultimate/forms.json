@@ -1,10 +1,10 @@
 {
- "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS).",
+ "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS). rows_after: rows placed after the build's own (Kaioken, Blue, God, Full Power and the shelved Great Ape at 159-161), so no saved form id moves: new forms go there, from 162.",
  "rows": [
   {
    "id": "broly",
    "copy": 47,
-   "character": 38,
+   "actor": "broly_player",
    "owner": 8,
    "name": 1034,
    "portrait": 16,
@@ -751,6 +751,17 @@
    "flags": 81,
    "down": "roshi",
    "portrait": 97
+  }
+ ],
+ "rows_after": [
+  {
+   "id": "saiyaman_from_armor",
+   "copy": 14,
+   "character": 111,
+   "owner": 1,
+   "name": 1186,
+   "up": 255,
+   "down": "gohan_armor"
   }
  ],
  "edit": {

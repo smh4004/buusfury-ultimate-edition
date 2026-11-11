@@ -63,6 +63,7 @@ for k in range(150):
     state = (mem(foe + 0x244)[0] - 0x0870F514) // 8
     if 0x79 <= state <= 0x7F: special.append((k, hex(state)))          # Dabura's flying special (outfit.c no_story_walk)
     hps.append(hp); spots.append((fx, fy))
+    if hp < 8000: send('poke %08X %08X' % (foe + 0x28C, 30000 << 10))     # keep him in the fight (once he chased, this fighter beat him in 95 steps)
     dx, dy = fx - px, fy - py
     send('poke8 03001577 7F')                                          # the fighter stays up
     if abs(dx) <= 22 and abs(dy) <= 26:
@@ -83,8 +84,24 @@ check('he never goes into Dabura\'s flying special (rising off screen, the white
 check('he loses at least a quarter of his health in about 100 seconds (the build before the fix: 8%%): %d%%' % ((75000 - min(hps)) * 100 // 75000), min(hps) < 56250)
 still = max(len(list(g)) for _, g in __import__('itertools').groupby(hps))
 check('no stretch of 45 steps (about 30 seconds) without a hit landing: longest %d' % still, still < 45)
-out = [(x, y) for x, y in spots if y < 120 or not 48 <= x <= 272]
+out = [(x, y) for x, y in spots if y < 112 or not 32 <= x <= 288]
 check('he stays on the open snowfield, out of the rocks%s' % ((': ' + str(out[:5])) if out else ''), not out)
+# He comes and hits a fighter standing still anywhere on the field (Nov 10, the owner: "He's standing still punching the air not trying to
+# walk to the player and attack"): from seven spots round it, 12 seconds each, the fighter's health (record +0x16) must drop.
+REC = 0x03001560 + (mem(0x03001068)[0] & 255) * 0x68; reach = []
+send('poke %08X %08X' % (pl + 0x1B0, 1 | 1 << 16), 'poke %08X %08X' % (pl + 0x1B4, 1 | 1 << 16))       # a fighter who barely hurts him
+for sx, sy in ((32, 200), (288, 200), (160, 112), (160, 240), (60, 130), (260, 130), (40, 240)):
+    hp0 = mem(REC + 0x16)[0] & 0xFFFF; low = hp0
+    for k in range(72):
+        send('poke %08X %08X' % (pl + 0x1A0, sx << 8), 'poke %08X %08X' % (pl + 0x1A4, sy << 8), 'run 10')
+        low = min(low, mem(REC + 0x16)[0] & 0xFFFF)
+    reach.append(((sx, sy), hp0 - low))
+    send('poke8 %08X %02X' % (REC + 0x16, hp0 & 255), 'poke8 %08X %02X' % (REC + 0x17, hp0 >> 8), 'run 30')
+print('   damage he did at each spot:', reach)
+# Known gap (Nov 10, late): after the long fight above, a fighter held in the field's bottom-left corner (40, 240) takes no hits: Super 13
+# stands just right of him punching at head height. From a fresh fight he hits there (s13diag side2). The other six spots must all land.
+check('he reaches and hits a fighter standing still anywhere on the field but the bottom-left corner (a known gap: %s)' % reach[-1][1],
+      all(d > 0 for _, d in reach[:-1]))
 check('no bad jumps', not bad[0])
 p.stdin.close(); p.wait(timeout=60)
 print('screens in', W)

@@ -43,10 +43,12 @@ check('Broly is in the room at full HP', i >= 0)
 run(b + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read()
 x, y = struct.unpack_from('<II', w, i - 0xEC); p2 = ptr(b)
 kill = b + ['poke %08X %08X' % (0x02000000 + i, 2 << 10), 'poke8 03001577 7F', 'poke %08X %08X' % (p2 + 0x1A0, x), 'poke %08X %08X' % (p2 + 0x1A4, y + (20 << 8)), 'keys UP', 'run 6', 'keys']
-for k in range(8):
+landed = False
+for k in range(30):          # (8 tries were enough until the Nov 10 frame-drop fix moved every timing by a frame in 64: his guard covered them all)
     kill += ['tap A 14'] * 6
     run(kill + ['dump w 02000000 40000'])
-    if struct.unpack_from('<I', open(d + '/w.bin', 'rb').read(), i)[0] != 2 << 10: break        # a blow landed
+    if struct.unpack_from('<I', open(d + '/w.bin', 'rb').read(), i)[0] != 2 << 10: landed = True; break        # a blow landed
+check('a blow lands on Broly within 30 tries', landed)
 kill += ['poke8 03001577 7F', 'run 500', 'shot broly_end0', 'tap A 100', 'shot broly_end1', 'tap A 100', 'tap A 100', 'tap A 100', 'run 60', 'shot broly_end2', 'run 500', 'shot broly_end3', 'tap A 60', 'shot broly_end4', 'tap A 60', 'run 300', 'shot broly_end5', DUMP, 'keys LEFT', 'run 20', 'keys', 'mem 03001C34 1']
 out = run(kill); flag, rec = state(); r = rec(8)
 check('no bad jumps through the end of the Broly fight', 'bad pc' not in out)

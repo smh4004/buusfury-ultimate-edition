@@ -313,5 +313,125 @@ for k in range(3):
     if best[1] > 2 or (k == 2 and np.isin(upper, [151, 169]).sum() < 12): bad.append((k, best[1], int(np.isin(upper, [151, 169]).sum())))
 check('Super Saiyan 4 Vegeta\'s Final Shine wind-up seen from the side: nothing see-through where BF Vegeta has his body, his glove lavender%s' % (': %s' % bad if bad else ''), not bad)
 
+# 10-13. Every playable figure's moves (Nov 10, the owner: armour Gohan "both transformation frames are messed up", "when he destransforms it
+# shows great saiyaman outfit", Trunks "Also shows kid trunks on de transforming", armour Vegeta "big bang attack frames fucked, final flash frames
+# fucked", Android 17 and 18 "blast attack frames fucked, run frames fucked", Krillin "Destructo disc frames fucked", Broly "eraser cannon
+# attack frames still fucked", "stop letting all these bugs slip through").
+clean = open('baserom.gba', 'rb').read(); cu = lambda o: struct.unpack_from('<I', clean, o)[0]
+CL = cu(0x3C0) - BASE - 4; n_retail = 0
+while BASE < cu(CL + 4 * n_retail) < BASE + len(clean): n_retail += 1
+retail_of = {}
+for a in range(n_retail):
+    rec = cu(CL + 4 * a) - BASE
+    for sl in range(clean[rec]):
+        ap = cu(rec + 0x54 + 4 * sl)
+        if not BASE < ap < BASE + len(clean) or cu(ap - BASE) > 64: continue
+        for i in range(4 * cu(ap - BASE)): retail_of.setdefault(cu(ap - BASE + 4 + 4 * i), set()).add(a)
+def slots_of(actor):
+    rec = u(LIST + 4 * actor) - BASE
+    return [s for s in range(rom[rec]) if (s < 25 or s == 31) and u(rec + 0x54 + 4 * s)]
+def all_views(actor, slot):
+    rec = u(LIST + 4 * actor) - BASE; a = u(rec + 0x54 + 4 * slot) - BASE
+    return [[u(a + 4 + 16 * i + 4 * d) for d in range(4)] for i in range(u(a))]
+playable = sorted({(n, f) for n, f in forms.items() if f >= 54 and rom[0x800000 + 24 * f + 0x0C] <= 8 and actor_of(f) >= FIRST_NEW and not n.startswith('shelved')}, key=lambda x: x[1])
+# 10. No frame of another retail character left in a figure: every retail frame it shows comes from a retail figure that also draws its stance
+# or walk (a copy of Janemba is Janemba's; LoG2 and sheet figures have none). Saiyaman's costume change (actor 102) is Gohan's own.
+left = []
+FLASH = {('gohan_armor', 19): {98}}      # armour Gohan's Great Saiyaman change ends in the school uniform's flash (a white figure, then the costume)
+for n, f in playable:
+    a = actor_of(f); own = set()
+    for s in (0, 1):
+        for fr in (all_views(a, s) if s in slots_of(a) else []): own |= set().union(*(retail_of.get(p, set()) for p in fr))
+    if rom[0x800000 + 24 * f + 0x0C] == 1: own.add(102)
+    for s in slots_of(a):
+        src = set().union(*(retail_of.get(p, set()) for fr in all_views(a, s) for p in fr))
+        src -= FLASH.get((n, s), set())
+        if src - own: left.append('%s slot %d <- %s' % (n, s, sorted(src - own)))
+check('no playable figure shows another character\'s retail frames (template leftovers)%s' % ((': %s' % left[:10]) if left else ''), not left)
+# 11. Big Bang's code (Big Bang, Eraser Cannon, SS Deadly Bomber, Blitz, Destructo Disc) shows slot 18's frames 0 and 1 by turns while held:
+# for every form that holds one they are the same pose (one arm out), not a wind-up and a thrust flickering.
+BB = {'broly', 'broly_fp', 'android13', 'android17', 'super17', 'android18', 'krillin', 'tien', 'krillin_kaioken', 'tien_kaioken'}
+BB |= {n for n, f in playable if rom[0x800000 + 24 * f + 0x0C] == 4}
+flick = []
+for n in sorted(BB):
+    a = actor_of(forms[n]); fr = all_views(a, 18) if 18 in slots_of(a) else []
+    if len(fr) < 2: flick.append('%s: %d frames' % (n, len(fr))); continue
+    i0, i1 = image(fr[0][2]), image(fr[1][2])
+    if i0 is None or i1 is None: continue
+    m0, m1 = np.zeros((96, 96), bool), np.zeros((96, 96), bool)
+    m0[:i0.shape[0], :i0.shape[1]] = i0 > 0; m1[:i1.shape[0], :i1.shape[1]] = i1 > 0
+    if (m0 ^ m1).sum() > 0.25 * max(m0.sum(), 1): flick.append(n)
+check('slot 18\'s first two frames are one held pose for every Big Bang-code user%s' % ((': %s' % flick) if flick else ''), not flick)
+# 12. Hit, run and ki blast are different animations (a LoG2 figure's run was its being-hurt frames, its hit reaction its ki pose).
+mixed = []
+for n, f in playable:
+    a = actor_of(f); sl = slots_of(a)
+    if not {2, 3, 9} <= set(sl): continue
+    fp = {s: {fr[2] for fr in all_views(a, s)} for s in (2, 3, 9)}
+    for x, y in ((2, 9), (3, 9)):          # (a walk or run may pass through the stance, and a hit reaction be the stance: one shared frame is fine)
+        if len(fp[x] & fp[y]) >= 2 or (fp[x] & fp[y] and fp[x] == fp[y]): mixed.append('%s %d/%d' % (n, x, y))
+check('no figure runs or throws a ki blast with its being-hit frames%s' % ((': %s' % mixed[:10]) if mixed else ''), not mixed)
+# ... nor fires a beam or a ball with them (Pikkon's slot 18 was filled with his slot 9): every form holding a slot-18 move
+held18 = []
+for n in sorted(BB | {'pikkon', 'piccolo', 'yamcha', 'goku_black', 'goku_rose', 'uub', 'majuub', 'roshi', 'roshi_max', 'future_trunks', 'future_trunks_ss'}):
+    a = actor_of(forms[n]); sl = slots_of(a)
+    if 18 in sl and 9 in sl and {fr[2] for fr in all_views(a, 18)} & {fr[2] for fr in all_views(a, 9)}: held18.append(n)
+check('no beam or ball is fired with being-hit frames%s' % ((': %s' % held18) if held18 else ''), not held18)
+# Great Saiyaman's change (slot 19) on every Gohan outfit is a costume change, not a move: none of the outfit's ki, beam or punch frames
+# (armour Gohan's was ten frames of his ki push), and it ends on Great Saiyaman (the frames after it are the costume's own).
+outfits1 = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'outfits.json')))['characters']['1']
+costume = []
+for o in outfits1:
+    f = o['form'] if isinstance(o['form'], int) else forms[o['form']]; a = actor_of(f); sl = slots_of(a)
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None    # by its pixels: a copy is the same pose
+    moves = {look(fr[2]) for m in (3, 4, 5, 18, 31) if m in sl for fr in all_views(a, m)}
+    if 19 not in sl or {look(fr[2]) for fr in all_views(a, 19)} & moves: costume.append(o['form'])
+check('every Gohan outfit changes into Great Saiyaman with a costume change, not a move%s' % ((': %s' % costume) if costume else ''), not costume)
+# The guests' charged ki ball (skill 8) and Gogeta's skill 5 show slot 19's frames 0-3 by number, then 2 and 3 in turn while held: those two
+# are a move, not the stance or a step (Pikkon, Kid Buu and Android 13 stood; Blue Gogeta's four frames were spread over ten, DBS Gogeta's
+# slot 19 was his stance).
+S19 = ['goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'goten_gt_green_ssj', 'gogeta_ssj4', 'broly', 'broly_fp', 'android13', 'super13', 'android17', 'super17', 'pikkon', 'uub', 'majuub', 'roshi', 'roshi_max', 'kid_buu', 'majin_buu',
+       'super_janemba', 'pan', 'pan_ssj', 'pan_nobandana', 'pan_ssj_spiky', 'pan_bug', 'pan_gi_tan', 'pan_gi_red', 'pan_brapan', 'gogeta_dbs',
+       'gogeta_dbs_ss', 'gogeta_ssb', 'gogeta_ssb_skin']
+still = []
+for n in S19:
+    if n not in forms: continue
+    a = actor_of(forms[n]); sl = slots_of(a)
+    if 19 not in sl: still.append(n); continue
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    rest = {look(fr[2]) for m in (0, 1) if m in sl for fr in all_views(a, m)}
+    v19 = [look(fr[2]) for fr in all_views(a, 19)]; held = v19[2:4]
+    vanish = any(fr[2] and sprites.frame_image(rom, fr[2]) is not None and (sprites.frame_image(rom, fr[2]) > 0).sum() < 60 for fr in all_views(a, 19)[:4])
+    spread = held[0] == v19[0] and n not in ('super13', 'majin_buu', 'super_janemba')   # frame 2 the same as 0: spread out (those three on purpose)
+    if len(held) < 2 or any(h in rest for h in held) or spread or vanish: still.append(n)
+
+check('the charged ki ball and Gogeta\'s skill 5 hold a move, not the stance%s' % ((': %s' % still) if still else ''), not still)
+# 14. Super Saiyan into 2 plays the Super Saiyan figure's slot 10 (Goku's: 30, outfit.c to_ss2): his power-up (slot 13's crouch, then arms
+# up), not a change from base again (GT Gohan's went back to black hair and glasses and turned Super Saiyan again; Goku's grew Super Saiyan
+# 3's hair). Armour Gohan's Super Saiyan has LoG2's own change into 2.
+inv = {f: n for n, f in forms.items()}
+again = []
+for n, f in sorted(forms.items(), key=lambda x: x[1]):
+    row = rom[0x800000 + 24 * f:0x800000 + 24 * f + 24]; up = row[0x16]
+    if not (row[0] & 1) or up == 255 or not inv.get(up, '').endswith(('_ss2', '_ss2_b')) or n == 'gohan_armor_ss': continue
+    a = actor_of(f); sl = slots_of(a); ch = 30 if anim(a, 30) else 10           # (slots_of leaves out 25-30)
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    if (ch == 10 and 10 not in sl) or 13 not in sl: again.append(n); continue
+    if look(all_views(a, ch)[0][0]) != look(all_views(a, 13)[0][0]): again.append(n)
+check('Super Saiyan into 2 is a power-up, not the change from base again%s' % ((': %s' % again) if again else ''), not again)
+# 13. Changing form (slot 10) and powering down (slot 11) on the mod's figures show the front in every view, as GT Vegeta's change (approved
+# Nov 10): played in whatever view he faces, a side or back view of a change looked like an attack.
+views = []
+locked = set(json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'locked.json')))['forms'])     # approved as they are
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bso_import
+locked |= set(bso_import.SHEETS)                 # the owner's every-frame sheets, drawn as he sent them
+for n, f in playable:
+    if n in locked: continue
+    a = actor_of(f); row = rom[0x800000 + 24 * f:0x800000 + 24 * f + 24]
+    for s, want in ((10, row[0x16] != 255), (11, row[0] & 1 and row[0x17] != 255)):
+        if not want or s not in slots_of(a): continue
+        if any(len(set(fr)) != 1 for fr in all_views(a, s)): views.append('%s %d' % (n, s))
+check('every mod figure\'s change and power-down show one view%s' % ((': %s' % views[:12]) if views else ''), not views)
+
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

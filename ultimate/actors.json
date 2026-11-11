@@ -1,16 +1,16 @@
 {
- "_note": "LoG2 Saiyan armor actors. Slots: BF animation slot -> LoG2 animation (0 idle, 1 walk, 2 run, 3 hurt and fall, 4 charge, 5 ki, 6-8 melee). Beams and energy moves (18, 19) use the ki pose: LoG2's only arm-out frames, and the only ones that face the way the move goes. Moves LoG2 lacks reuse the nearest animation until art exists. extra_slots: 22 = charge pose (LoG2 animation 13), 23 = charged hit (LoG2 animation 16); Vegeta's 24 = LoG2's ki charge, hands together (animation 14; the Super Saiyan record has none), for the armour Vegetas' Galick Gun pose (build.py armour_pose). Without them a character uses slot 13 and a normal melee animation.",
+ "_note": "LoG2 armour and fighter figures. Slots: BF animation slot -> LoG2 animation. LoG2's own numbering (Nov 10, read off the frames): 0 idle, 1 walk, 2 hurt (sweat marks), 3 hit and fall, 4 flinch, 5 ki (fist in, palm out, arm out), 6-8 melee, 9 changing into the next form (only the records that change), 11 power-up (fists in, then both arms up; front only), 12 flying, 13 dash (the run; only the player-style records), 16 charged hit, 18 the record's own firing pose where it has one (the armour records' 18 is a slash). build.py fills the slots that depend on what a record has: 2 run (13, or the walk), 13 power-up (11, or the idle), 15 flying (12), 10 the change (9 where the record has it; fighter_poses does the rest). Beams and balls held (18) show the arm out (ki frame 2); Kamehameha-code moves use slot 31 (fighter_poses: the fist in, then the arm out). extra_slots: 22 = the dash (LoG2 13) for the charged melee's run-in, 23 = charged hit (16); Vegeta's 24 = LoG2's ki charge, hands together (14) for the armour Vegetas' Galick Gun pose (build.py armour_pose).",
  "_slots": {
   "0": 0,
   "1": 1,
   "2": 2,
-  "3": "4@0:3",
+  "3": "5@0:3",
   "4": 6,
   "5": 7,
   "6": 8,
   "7": "3@0:1",
   "8": 5,
-  "9": 5,
+  "9": 2,
   "10": 4,
   "12": 0,
   "13": 4,
@@ -18,7 +18,7 @@
   "15": "3@0:1",
   "16": 3,
   "17": 3,
-  "18": "5@0,1,2,1,2,1,2",
+  "18": "5@2,2,2",
   "19": "5@0,1,2,2,2,2,2,2,2,2",
   "20": 6,
   "21": 5
@@ -71,11 +71,11 @@
  },
  "gohan_armor_ss": {
   "template": 105,
-  "log2_record": "r55",
+  "log2_record": "r56",
   "stretch": true,
   "extra_slots": {
-   "22": "r55:13",
-   "23": "r55:16"
+   "22": "r56:13",
+   "23": "r56:16"
   }
  },
  "goku_106": {
@@ -133,17 +133,16 @@
   },
   "log2_overrides": {
    "18": 18,
-   "9": 5,
    "21": 5
   }
  },
  "gohan_armor_ss2_art": {
   "template": 105,
-  "log2_record": "r56",
+  "log2_record": "r55",
   "stretch": true,
   "extra_slots": {
-   "22": "r56:13",
-   "23": "r56:16"
+   "22": "r55:13",
+   "23": "r55:16"
   }
  },
  "android17": {
@@ -152,9 +151,6 @@
   "log2_record": "r6",
   "log2_overrides": {
    "3": "5@0:3",
-   "9": 5,
-   "10": 5,
-   "13": 5,
    "21": 5
   },
   "extra_slots": {
@@ -167,11 +163,7 @@
   "stretch": true,
   "log2_record": "r8",
   "log2_overrides": {
-   "9": 5,
-   "21": 5,
-   "10": "5@0,0",
-   "13": "5@0,0",
-   "3": "5@0:1"
+   "21": 5
   },
   "extra_slots": {
    "22": "r8:5",
@@ -186,7 +178,6 @@
    "4": 6,
    "5": 6,
    "6": 6,
-   "9": 5,
    "14": 6,
    "20": 6,
    "21": 5
@@ -312,7 +303,6 @@
    "4": 6,
    "5": 6,
    "6": 6,
-   "9": 5,
    "14": 6,
    "20": 6,
    "21": 5

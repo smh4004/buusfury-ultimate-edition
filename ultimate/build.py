@@ -257,7 +257,8 @@ OLD_SUPER_BLUE = 21              # where it was before: saves holding it are mov
 BROLY_DEFEAT = 'assets/scripts/gUnknown_0879321C.evt'
 DEBUG_NATIVE = 0xDB              # debug builds only: "save to slot 1". No script calls 0xDB (equipment uses 0xDF-0xE8 and 0xF5, the death script 0xF7)
 OUT = os.environ.get('BFU_OUT', 'ultimate/out')
-SAIYAMAN = [(10, 14), (15, 'saiyaman_from_green'), (13, 'saiyaman_from_orange'), ('gohan_gt', 'saiyaman_from_gt'), ('gohan_gt_noglasses', 'saiyaman_from_gt_ng')]
+SAIYAMAN = [(10, 14), (15, 'saiyaman_from_green'), (13, 'saiyaman_from_orange'), ('gohan_gt', 'saiyaman_from_gt'), ('gohan_gt_noglasses', 'saiyaman_from_gt_ng'),
+            ('gohan_armor', 'saiyaman_from_armor')]       # Nov 10: armour Gohan came back from the costume in the school uniform
 ACTORS_FILE = 'assets/areas/a033_w01_01_Snakeway.actors'
 INTRO = 'assets/scripts/gUnknown_0877CBF0.evt'
 ENDING = 'assets/scripts/gUnknown_08796114.evt'
@@ -480,19 +481,21 @@ step auto code
     call 0x2A
     push 120
     set 0x04
-    push 236
+    push 250
     set 0x05
     push 6
     set 0x06
-    push 42
+    call 0xFB(40)
+    push 58
     loop_begin
 L1:
     call 0x04
     call 0x05
     call 0x06
-    call 0xFC
+    call 0xF4(255)
     call 0xFB(1)
     inc 0x06
+    dec 0x05
     call wait(2)
     loop L1
     end
@@ -509,9 +512,8 @@ L1:
     call 0x04
     call 0x05
     call 0x06
-    call 0xFC
+    call 0xF4(255)
     call 0xFB(1)
-    dec 0x05
     call wait(1)
     loop L1
     pushn %d, 9, 0
@@ -522,7 +524,7 @@ L3:
     call 0x04
     call 0x05
     call 0x06
-    call 0xFC
+    call 0xF4(255)
     call 0xFB(1)
     call 0x19(10)
     push 0
@@ -537,20 +539,17 @@ L4:
     pushn %d, 16, 0
     call 0x51
     call play_sfx(24)
-    call 0xFB(2)
-    call wait(3)
-    call 0xFB(5)
-    call wait(3)
-    call 0xFB(8)
-    call wait(3)
-    call 0xFB(11)
-    push 5
-    loop_begin
-L2:
-    pushn 5, 200, 200, 255, 10
-    call 0x4C
-    call wait(15)
-    loop L2
+    call 0x7A(3)
+    pushn 400, 400, 1
+    call 0xF4(255)
+    call 0x7B(10)
+    call play_sfx(24)
+    call 0x7A(3)
+    call 0x7B(10)
+    call 0x7A(4)
+    call wait(20)
+    call 0x7B(40)
+    call wait(30)
     call 0xFB(0)
     pushn 882
     call set_flag
@@ -1118,7 +1117,8 @@ def find_once(rom, needle, what):
 
 
 ANDROID13_SLOTS = {str(s): 'a13_idle' for s in range(22)}
-ANDROID13_SLOTS.update({'10': 'a13_absorb!front', '1': 'a13_walk', '2': 'a13_walk', '4': 'a13_lunge', '5': 'a13_lunge', '6': 'a13_lunge', '9': 'a13_lunge', '18': 'a13_lunge', '19': 'a13_lunge', '20': 'a13_lunge', '21': 'a13_lunge'})
+ANDROID13_SLOTS.update({'10': 'a13_absorb!front', '1': 'a13_walk', '2': 'a13_walk', '4': 'a13_lunge', '5': 'a13_lunge', '6': 'a13_lunge', '9': 'a13_idle', '18': 'a13_hold', '19': 'a13_lunge', '20': 'a13_lunge', '21': 'a13_lunge', '3': 'a13_blast'})
+A13_PAD = 8                      # columns of the sheet's background either side of a cell, for an arm drawn out past it (a13_pose)
 
 
 def android13_frames(out, usable, pal):
@@ -1128,17 +1128,21 @@ def android13_frames(out, usable, pal):
     bg = sheet[0, 0]
     cols, rows = ((75, 93), (99, 117), (123, 141)), ((1, 32), (33, 64), (66, 96), (97, 128))
     u = np.array(usable); p = pal[u].astype(int)
-    def cell(r, c):
+    PAD = A13_PAD
+    def cell(r, c, edit=None):
         (y0, y1), (x0, x1) = rows[r], cols[c]
-        a = sheet[y0:y1, x0 - 1:x1 + 1]; m = (a != bg).any(2)
+        a = sheet[y0:y1, x0 - 1:x1 + 1].copy(); w = a.shape[1]
+        side = np.tile(bg, (a.shape[0], PAD, 1)); a = np.concatenate([side, a, side], 1)
+        if edit: edit(a, bg)
+        m = (a != bg).any(2)
         black = (a.sum(2) == 0)
         foot = m.shape[0] - 5                               # the shadow: pure black in the bottom rows
         m[foot:][black[foot:]] = False
         ys = np.nonzero(m.any(1))[0]; h = ys[-1] + 1
-        img = np.zeros((32, 32), np.uint8); w = a.shape[1]; ox = (32 - w) // 2; oy = 32 - h
+        img = np.zeros((32, 32), np.uint8); ox = (32 - w) // 2 - PAD; oy = 32 - h
         for y in range(h):
-            for x in range(w):
-                if m[y, x]:
+            for x in range(a.shape[1]):
+                if m[y, x] and 0 <= x + ox < 32:
                     q = a[y, x]; ch = lambda v: np.stack([v[..., 0] - v[..., 1], v[..., 1] - v[..., 2]], -1)
                     d = ((p - q) ** 2).sum(1) + 6 * ((ch(p) - ch(q)) ** 2).sum(1)
                     img[y + oy, x + ox] = u[d.argmin()]
@@ -1150,6 +1154,13 @@ def android13_frames(out, usable, pal):
     save('a13_idle', [cell(d, 1) for d in (DOWN, UP, RIGHT)])
     save('a13_walk', [cell(d, c) for d in (DOWN, UP, RIGHT) for c in (1, 0, 1, 2)])
     save('a13_lunge', [cell(d, c) for d in (DOWN, UP, RIGHT) for c in (0, 2)])
+    # His attacks (Nov 10, the owner: "Android 13 bombers attack frames still fucked": the sheet has only his walk, so every move showed his stance
+    # or a step): his own standing frames with the near arm redrawn (a13_pose), in the sheet's colours. Ki blast: the fist back, the arm out, then
+    # both arms out (the Electric Kamehameha's push: held_poses makes his slot 31 of frames 0, 2, 2). Held balls (SS Deadly Bomber): the arm out.
+    import a13_pose as A
+    save('a13_blast', [cell(DOWN, 1, A.front_windup), cell(DOWN, 1, A.front_thrust), cell(DOWN, 1, A.front_thrust)] + [cell(UP, 1)] * 3 +
+         [cell(RIGHT, 1, A.side_windup), cell(RIGHT, 1, A.side_thrust), cell(RIGHT, 1, A.side_push)])
+    save('a13_hold', [cell(DOWN, 1, A.front_thrust), cell(UP, 1), cell(RIGHT, 1, A.side_thrust)])
     for i in range(6):                                      # absorbing 14's and 15's cores: the owner's sheet as cleaned for Gero's Legacy, already in the game's OBJ colours
         Image.fromarray(np.array(Image.open('ultimate/art/android13_absorb/a%d.png' % i))).save('%s/a13_absorb_%02d.png' % (out, i))
 
@@ -1163,7 +1174,7 @@ BROLY_FRAMES = {
     'strike': (((756, 804), (817, 858)), ((754, 801), (816, 857)), ((750, 788), (822, 871))),
 }
 BROLY_SLOTS = {str(s): 'bfp_idle' for s in range(22)}
-BROLY_SLOTS.update({'1': 'bfp_walk', '2': 'bfp_walk', '4': 'bfp_combo', '5': 'bfp_strike', '6': 'bfp_slam', '8': 'bfp_slam', '9': 'bfp_strike', '10': 'bfp_slam', '13': 'bfp_slam', '14': 'bfp_strike', '20': 'bfp_strike', '21': 'bfp_slam'})
+BROLY_SLOTS.update({'1': 'bfp_walk', '2': 'bfp_walk', '4': 'bfp_combo', '5': 'bfp_strike', '6': 'bfp_slam', '8': 'bfp_slam', '9': 'bfp_idle', '10': 'bfp_slam', '13': 'bfp_slam', '14': 'bfp_strike', '20': 'bfp_strike', '21': 'bfp_slam'})
 # Firing: the strike's wind-up, then his open hand thrust out, held (Nov 10, the owner: "Why doesn't Broly have attack frames for shooting his eraser
 # cannon": slots 3, the ki blast, and 18, the pose Eraser Cannon's Big Bang code holds, were his idle). Each keeps its frame numbers, the hand
 # out from the second frame on (cfg 'indexed'), as a retail ki blast's.
@@ -1307,7 +1318,7 @@ def add_actors(rom, clean):
     cfg['broly_fp'] = {'template': 29, 'slots': BROLY_SLOTS, 'big': True, 'stretch': True, 'origin_dy': 8, 'indexed': BROLY_INDEXED}
     # and no ground shadow for either Broly (the owner, same day: "Remove the shadow beneath Broly's feet too cause it looks off"): BF's
     # 24x10 oval, the biggest the game has, sat out past his boots in every pose. The story's Broly is the same record (actor 29).
-    cfg['_no_shadow'] = [29, 'broly_fp']
+    cfg['_no_shadow'] = [29, 'broly_fp', 'broly_player']
     one = indexer(usable, pal); lengths = player_anim_lengths(clean)
     cfg['broly_fp']['grow'] = lengths
     for actor, form in (('gogeta_dbs', 'base'), ('gogeta_dbs_ss', 'ssj')):
@@ -1321,16 +1332,32 @@ def add_actors(rom, clean):
                          'compress': True, 'high': True, 'grow': lengths}
     for name in ('piccolo', 'android17', 'android18', 'krillin', 'future_trunks', 'future_trunks_ss', 'videl_player', 'kid_buu_player', 'majin_buu_player', 'super_janemba_player', 'tien_player', 'yamcha_player', 'pikkon_player', 'hercule_player'):
         cfg[name]['grow'] = lengths
-    for a in cfg.values():      # slot 18 is the pose held while firing a skill: LoG2's own firing pose when it has one, else its ki pose
-        if isinstance(a, dict) and 'log2_record' in a and 'replace' not in a:
-            rec = sprites.log2_rec(combo[0x800000:], a['log2_record'])
-            has = struct.unpack_from('<I', combo, 0x800000 + rec + 0x4C + 16 * 18 + 8)[0]
-            a.setdefault('log2_overrides', {}).setdefault('18', 18 if 0x08800000 <= has < 0x09000000 else 5)
+    # Slot 19 frames stay in place (sprites.INDEXED, Nov 10: the charged ball holds frames 2 and 3), but Majin Buu's, Janemba's and Super 13's
+    # are their boss records' longer attacks: spread out, the hold stays on the ball overhead, the sword raised, the crouch (as approved).
+    for name in ('majin_buu_player', 'super_janemba_player'):
+        cfg[name]['even'] = [19]
+    # The LoG2 figures' slots that depend on what their record has (Nov 10, the owner on armour Gohan, Trunks and Vegeta, Future Trunks,
+    # Android 17 and 18: run, ki blast, Big Bang, Final Flash and transformation frames "fucked"). Read off the frames: LoG2's 2 is being hurt
+    # (it was the run), 13 the dash (the run; NPC records have none: their walk), 11 the power-up (fists in, then arms up), 12 flying, 9 the
+    # change into the next form. Slot 18, held while firing, is the ki pose's arm out (actors.json _slots): LoG2's own animation 18 is a sword
+    # or ki slash on the armour and Trunks records (Big Bang threw a slash), and only Piccolo's is a firing pose (his override).
+    l2 = combo[0x800000:]
+    def l2_has(ref, k):
+        rec = sprites.log2_rec(l2, ref)
+        return any(0x08800000 <= struct.unpack_from('<I', l2, rec + 0x4C + 16 * k + 4 * d)[0] < 0x09000000 for d in range(4))
+    for name, a in cfg.items():
+        if name.startswith('_') or name.startswith('cell_') or not isinstance(a, dict) or 'log2_record' not in a or 'replace' in a: continue
+        ov = a.setdefault('log2_overrides', {}); own = set(a.get('keep_own', ()))
+        dyn = {'2': 13 if l2_has(a['log2_record'], 13) else 1, '13': 11 if l2_has(a['log2_record'], 11) else 0}
+        if l2_has(a['log2_record'], 12): dyn['15'] = 12
+        if l2_has(a['log2_record'], 9): dyn['10'] = 9
+        for k, v in dyn.items():
+            if int(k) not in own: ov.setdefault(k, v)
     cfg['android13_player'] = {'template': 93, 'slots': ANDROID13_SLOTS, 'stretch': True, 'grow': lengths, 'reserve': 4096}    # the boss's small record can't carry a playable form
     # His beam (the Electric Kamehameha's code: slot 18 frame 0 while charging, then 1 and 2 by turns): the prototype's slot 18 has the charge,
     # the thrust, then four frames of him flexing with his arms up, so the thrust and a flex flickered by turns (Nov 10, the owner: "Why the fuck
     # is super android 13s beam attack frames so glitched out"). The charge, then the thrust held ('reframe').
-    cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths,
+    cfg['super13_player'] = {'proto_actor': 230, 'stance_back': True, 'even': [19], 'fill': {8: 9, 10: 9, 11: 0, 12: 0, 13: 9, 14: 4, 15: 7, 16: 17}, 'grow': lengths,
                              'reframe': {'18': [0, 1, 1, 1, 1, 1]}}
     for name, source in (('goku_ss2', 109), ('goku_ss2_b', 110), ('gohan_ss2', 104), ('gohan_green_ss2', 105), ('vegeta_ss2', 273), ('vegeta_ss2_b', 274), ('vegeta_armor_ss2', 'vegeta_armor_ss'), ('gohan_armor_ss2', 'gohan_armor_ss2_art'), ('trunks_ss2', 261), ('trunks_armor_ss2', 'trunks_armor_ss'), ('vegito_ss2', 276)):
         cfg[name] = {'same_as': source}
@@ -1388,9 +1415,92 @@ def add_actors(rom, clean):
     # Full Power Mystic: the orange gi's own figure (actor 101) under its own id; its lightning is the crackle (outfit.c), its power-up the orange gi's (_powerup)
     for n, (_, _, src) in FP_LOOKS.items():
         cfg[n] = {'same_as': src}
-    cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'gohan_armor_ss', 'trunks_armor_ss', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb']
+    cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'trunks_armor_ss', 'future_trunks_ss', 'gohan_armor_ss2_art', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb',
+                      'gohan_gt_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
+                                          # was the base's change, so into 2 he went back to black hair and glasses first (test_frames 14)
+    cfg['broly_player'] = {'template': 29}       # the playable Broly's own copy of the story's figure: his slot 18 is the Eraser Cannon's pose (fighter_poses), the boss keeps his. Last: scripts name the ids before it
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
-    return ids, powerup_frames(rom, ids, end)
+    return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
+
+
+# The LoG2 figures' changes of form (Nov 10, the owner: armour Gohan "ssj1 he lifts his arms ssj2 he punches while transforming", "when he
+# destransforms it shows great saiyaman outfit", Trunks "Same shit ... Also shows kid Trunks on de transforming", armour Vegeta "transformation
+# frames fucked"). (figure, the next form's figure or None, the form it powers down to or None.) A change plays slot 10 on the figure it starts
+# from, in whatever view he faces, and powering down plays slot 11 on the figure it leaves: every view gets the front frames, as GT Vegeta's
+# change (approved Nov 10). Slot 10: LoG2's own change where the record has one (actors.json: its animation 9; base Vegeta, Trunks and Future
+# Trunks to Super Saiyan, armour Gohan's Super Saiyan to 2), else his fists-in power-up frame twice, the next form's eight times, then the next
+# form's stance. Slot 11 was the template's (retail Gohan's, kid Trunks'): now LoG2's change played backwards where the base has one (Super Saiyan
+# fading to base), else his stance twice and the base's twice, as retail's four-frame power-down.
+LOG2_CHANGES = (('gohan_armor', 'gohan_armor_ss', None), ('gohan_armor_ss', 'gohan_armor_ss2_art', 'gohan_armor'), ('gohan_armor_ss2_art', None, 'gohan_armor'),
+                ('trunks_armor', 'trunks_armor_ss', None), ('trunks_armor_ss', None, 'trunks_armor'), ('vegeta_armor', 'vegeta_armor_ss', None),
+                ('vegeta_armor_ss', None, 'vegeta_armor'), ('vegeta_armor_ssb', None, 'vegeta_armor'), ('future_trunks', 'future_trunks_ss', None),
+                ('future_trunks_ss', None, 'future_trunks'), ('android17', 'super17', None))
+LOG2_OWN_CHANGE = ('gohan_armor_ss', 'trunks_armor', 'vegeta_armor', 'future_trunks')     # their slot 10 is LoG2's animation 9
+MASENKO_FIGURES = ('gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2_art', 'piccolo')     # the Masenko (Gohan's, Piccolo's) plays slot 12: arms up, then the arm out; LoG2 figures had their stance
+
+
+def fighter_poses(rom, ids, at):
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    def put(data):
+        nonlocal at
+        at = (at + 3) & ~3; rom[at:at + len(data)] = data; at += len(data)
+        return ROM_BASE + at - len(data)
+    def rec_of(name): return u(ACTORS_AT + 4 * ids[name]) - ROM_BASE
+    def anim(rec, slot):
+        ap = u(rec + 0x54 + 4 * slot) if slot < rom[rec] else 0
+        if not ap: return None
+        a = ap - ROM_BASE
+        return [[u(a + 4 + 16 * k + 4 * v) for v in range(4)] for k in range(u(a))]
+    def need(name, slot, k):
+        an = anim(rec_of(name), slot)
+        if not an or len(an) <= k: sys.exit('%s: slot %d has no frame %d' % (name, slot, k))
+        return an[k]
+    def set_slot(name, slot, frames):                     # frames: [[4 views]...]
+        rec = rec_of(name)
+        if slot >= rom[rec]: sys.exit('%s: no slot %d' % (name, slot))
+        struct.pack_into('<I', rom, rec + 0x54 + 4 * slot, put(struct.pack('<I', len(frames)) + b''.join(struct.pack('<4I', *f) for f in frames)))
+    front = lambda f: [f[0]] * 4
+    for fig, nxt, down in LOG2_CHANGES:
+        if fig in LOG2_OWN_CHANGE:
+            ten = anim(rec_of(fig), 10)
+            if not ten: sys.exit('%s: no LoG2 change' % fig)
+            set_slot(fig, 10, [front(ten[i * len(ten) // 11]) for i in range(11)])     # 11 frames, as a retail power-up
+        else:
+            to = nxt or fig
+            set_slot(fig, 10, [front(need(fig, 13, 0))] * 2 + [front(need(to, 13, 0 if nxt else 1))] * 8 + [front(need(to, 0, 0))])
+        if down:
+            base10 = anim(rec_of(down), 10) if down in LOG2_OWN_CHANGE else None
+            if base10 and fig != 'vegeta_armor_ssb':          # (Blue fades through his own stance: the base's change has gold hair)
+                k = len(base10)
+                set_slot(fig, 11, [front(base10[k - 1 - i * k // 4]) for i in range(4)])     # its change backwards, in four frames
+            else:
+                set_slot(fig, 11, [front(need(fig, 0, 0))] * 2 + [front(need(down, 0, 0))] * 2)
+    for fig in MASENKO_FIGURES:
+        set_slot(fig, 12, [need(fig, 13, 1), need(fig, 3, 2)])
+    # Base Broly's Eraser Cannon (Big Bang's code shows slot 18 frames 0 and 1 by turns while held, then 1): BF's Broly's slot 18 is his boss
+    # moves (arms crossed, a fist up). His ki blast's hand out, held (Nov 10, the owner: "broly eraser cannon attack frames still fucked").
+    set_slot('broly_player', 18, [need('broly_player', 3, 1)] * 3)
+    # Pikkon's figure (BF's actor 215) has no firing pose: slot 18 was filled with his being-hit frames, so his wave played a recoil. His ki
+    # blast's thrust, held.
+    # (six frames, as long as a retail player's slot 18: skills pick its frames by number)
+    set_slot('pikkon_player', 18, [need('pikkon_player', 3, 1)] * 6)
+    # Armour Gohan's Great Saiyaman change (slot 19) was ten frames of his ki push from LoG2's default slot map: his arms up, as his power-up,
+    # then the school uniform's flash into the costume (retail Gohan, actor 98: frames 4-9, a white figure and Great Saiyaman coming out of it).
+    flash = anim(u(ACTORS_AT + 4 * 98) - ROM_BASE, 19)
+    if not flash or len(flash) != 10: sys.exit('retail Gohan (actor 98): no ten-frame Great Saiyaman change')
+    set_slot('gohan_armor', 19, [need('gohan_armor', 13, 0)] + [need('gohan_armor', 13, 1)] * 3 + flash[4:])
+    # The charged ki ball (skill 8) shows slot 19's frames 0-3 by number, then 2 and 3 in turn while held. Pikkon, Kid Buu and Android 13 had
+    # their stance there (filled from slot 0), Full Power Broly his sheet's idle: their ki blast's wind-up, then its arm out held (ten frames,
+    # a retail player's slot 19: the Ghost Attack once read past a shorter one). test_frames.
+    for name in ('pikkon_player', 'kid_buu_player', 'android13_player', 'broly_fp'):
+        set_slot(name, 19, [need(name, 3, 0)] * 2 + [need(name, 3, 1)] * 8)
+    # GT Goten's (from his BSO figure) is a flying kick and a spin, and Super Saiyan 4 Gogeta's (the owner's sheet) a vanish, so the hold
+    # showed a kick or nothing: the stance, their ki blast's wind-up, then its arm out held.
+    for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'gogeta_ssj4'):
+        set_slot(name, 19, [need(name, 0, 0), need(name, 3, 0)] + [need(name, 3, 1)] * 8)
+    # Full Power Broly's (approved Nov 10 as the strike's wind-up, then the hand out) flickered the same way: frame 0 is the wind-up. The hand out.
+    set_slot('broly_fp', 18, [need('broly_fp', 18, 1)] * len(anim(rec_of('broly_fp'), 18)))
+    return at
 
 
 def powerup_frames(rom, ids, at):
@@ -1546,6 +1656,8 @@ def add_outfits(rom, clean, at, art):
         form = lambda v: v if isinstance(v, int) else fm[v]
         table += ['{%d,%d,%d,(const u16 *)L"%s"}' % (form(o['form']), form(o.get('also', 255)), o['flag'], o['name']) for o in lst]
     d = tempfile.mkdtemp()
+    lost = [o['form'] for o in cfg['1'] if o['form'] not in [b for b, _ in SAIYAMAN]]
+    if lost: sys.exit('Great Saiyaman has no way back to these Gohan outfits (build.py SAIYAMAN, a saiyaman_from_ row in forms.json): %s' % lost)
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
     c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
@@ -1560,7 +1672,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DSS2_SKILL=%d' % SS2_SKILL, '-DGOGETA_FLAG=%d' % json.load(open('ultimate/outfits.json'))['characters']['7'][0]['flag'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1591,6 +1703,7 @@ def add_outfits(rom, clean, at, art):
     rom[IN:IN + 10] = bytes.fromhex('0149fe460847') + struct.pack('<I', sym['saiyaman_hook_in'] | 1)
     rom[OUT_SITE:OUT_SITE + 12] = bytes.fromhex('0149fe460847') + struct.pack('<I', sym['saiyaman_hook_out'] | 1) + bytes.fromhex('c046')
     patch_slot_read(rom, sym)
+    hud_icon_hook(rom, sym)
     vt = sym['spirit_vt'] - ROM_BASE                      # 0 delete, 2 update every frame, others do nothing
     for k, name in enumerate(('spirit_destroyed', 'spirit_nop', 'spirit_update', 'spirit_nop', 'spirit_nop', 'spirit_nop')):
         struct.pack_into('<i', rom, vt + 4 * k, (sym[name] | 1) - (ROM_BASE + vt))
@@ -1617,6 +1730,11 @@ def add_outfits(rom, clean, at, art):
     for slot, want, name in ((1, 0x080171A9, 'skilltab_setup'), (10, 0x080175FD, 'skilltab_keys')):
         if ROM_BASE + SKILL_TAB + struct.unpack_from('<i', rom, SKILL_TAB + 4 * slot)[0] != want: sys.exit('Skills tab vtable changed')
         struct.pack_into('<i', rom, SKILL_TAB + 4 * slot, (sym[name] | 1) - (ROM_BASE + SKILL_TAB))
+    # The Skills tab shows two rows of two (+0x11C the first shown, +0x120 the cursor). Its draw (sub_08017350) kept the first shown no more
+    # than 4 before the cursor's row, so with six skills the cursor on 5 or 6 sat in a third row off the window (Nov 10, the owner: "you can't
+    # scroll down to view the other 2 or swap them"; retail fighters hold four). 2: the cursor's row is always the second shown.
+    if rom[0x17392:0x17394] != b'\x04\x39': sys.exit('Skills tab scroll changed')
+    rom[0x17392] = 0x02
     if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xD8, sym['trailer_warp'] | 1)
     if '--trailer' in sys.argv: struct.pack_into('<I', rom, tab + 4 * 0xCA, sym['trailer_slot'] | 1)
     row = SKILLS + 24 * SPIRIT_SKILL                     # an unused skill row: its stubs become the Spirit Bomb
@@ -1837,6 +1955,80 @@ def beam_poses(rom, put, put_art):
             # Goku's own figures all carry a three-frame Kamehameha but form 1, a 16-slot figure (likely only for scenes), which retail leaves as it is
             if rec is not None and frames(rec, 18) < 3 and not frames(rec, BEAM_POSE) and owner != 0:
                 sys.exit('form %d (figure %d) can hold a Kamehameha-code move but its slot 18 has %d frames' % (f, char, frames(rec, 18)))
+
+
+# Kamehameha-code moves (and the Electric Kamehameha's) on the LoG2 figures: slot BEAM_POSE (outfit.c beam_pose), the fist in while charging,
+# then the arm out (their slot 3: LoG2's ki frames). Slot 18 (Big Bang's code, Eraser Cannon, Blitz, Destructo Disc: frames 0 and 1 by turns
+# while held) is the arm out only (actors.json): with the fist in as frame 0 it flickered between the two (Nov 10, the owner: Android 17's and
+# 18's "blast attack frames fucked", Krillin's "Destructo disc frames fucked"). Armour Vegeta's Final Flash (slot 19: frames 0-1 charging, 2,
+# then 3-4 firing) is his Galick Gun pose's frames (approved Nov 10): the charge, then both hands out; it was LoG2's one-armed ki frames.
+SS2_POSE = 30                    # outfit.c SS2_POSE: Goku's Super Saiyan figures' change into Super Saiyan 2
+BEAM_FORMS = ('android13', 'krillin', 'krillin_kaioken', 'tien', 'tien_kaioken', 'future_trunks', 'future_trunks_ss', 'android17', 'super17', 'android18',
+              'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2')
+
+
+def held_poses(rom, put_art):
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    fm = json.load(open(OUT + '/_forms.json'))
+    def record(name):
+        char = struct.unpack_from('<H', rom, SPACE + FORM_SIZE * fm[name] + 0x0E)[0]
+        return char, u(ACTORS_AT + 4 * (char - 9)) - ROM_BASE
+    def frames(rec, slot):
+        ap = u(rec + 0x54 + 4 * slot) if slot < rom[rec] else 0
+        if not ap: return []
+        return [[u(ap - ROM_BASE + 4 + 16 * k + 4 * v) for v in range(4)] for k in range(u(ap - ROM_BASE))]
+    done = set()
+    for name in BEAM_FORMS:
+        char, rec = record(name)
+        if char in done: continue
+        if frames(rec, BEAM_POSE): sys.exit('%s: already has a beam pose' % name)
+        ki = frames(rec, 3)
+        if len(ki) < 3: sys.exit('%s: no three ki frames' % name)
+        pose = put_art(struct.pack('<I', 3) + b''.join(struct.pack('<4I', *f) for f in (ki[0], ki[2], ki[2])))
+        n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * (BEAM_POSE + 1 - n))
+        new[0] = BEAM_POSE + 1; struct.pack_into('<I', new, 0x54 + 4 * BEAM_POSE, pose)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
+        done.add(char)
+    # Goku's change from Super Saiyan to 2 (outfit.c to_ss2, slot SS2_POSE): his Super Saiyan figures' slot 10 is BF's change into Super Saiyan 3,
+    # so going up to 2 grew his hair long. His power-up's crouch twice, arms up eight times, his stance, front in every view, as slot 10's 11.
+    for f in (3, 4):                                                   # Super Saiyan Goku, alive and with his halo (actors 109, 110)
+        char = struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0]; rec = u(ACTORS_AT + 4 * (char - 9)) - ROM_BASE
+        up, stand = frames(rec, 13), frames(rec, 0)
+        if len(up) < 2 or len(frames(rec, 10)) != 11: sys.exit('form %d: no power-up or no 11-frame change' % f)
+        pose = put_art(struct.pack('<I', 11) + b''.join(struct.pack('<4I', *[fr[0]] * 4) for fr in [up[0]] * 2 + [up[1]] * 8 + [stand[0]]))
+        n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * max(0, SS2_POSE + 1 - n))
+        new[0] = max(n, SS2_POSE + 1); struct.pack_into('<I', new, 0x54 + 4 * SS2_POSE, pose)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
+    for name in ARMOUR_GALICK:
+        char, rec = record(name)
+        if char in done: continue
+        g = frames(rec, BEAM_POSE)
+        if len(g) != 3: sys.exit('%s: no Galick Gun pose' % name)
+        struct.pack_into('<I', rom, rec + 0x54 + 4 * 19, put_art(struct.pack('<I', 5) + b''.join(struct.pack('<4I', *f) for f in (g[0], g[0], g[1], g[1], g[2]))))
+        done.add(char)
+
+
+def front_changes(rom, put_art):
+    """Every mod figure's change of form (slot 10, a form with one above it) and power-down (slot 11, a Super Saiyan-class form with one below)
+    shows its front in every view, as GT Vegeta's (Nov 10, the owner: "they should all be the same anyways"): the game plays them in whatever
+    view the fighter faces, and a side or back view of a change looked like an attack (armour Gohan "lifts his arms", "punches"). test_frames 13."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    fm = json.load(open(OUT + '/_forms.json')); done = set()
+    locked = {fm[n] for n in json.load(open('ultimate/locked.json'))['forms']}      # approved figures stay as approved (lib/lock.py)
+    import bso_import
+    locked |= {fm[n] for n in bso_import.SHEETS if n in fm}                       # and the owner's own every-frame sheets are drawn as he sent them
+    for f in range(max(fm.values()) + 1):
+        row = rom[SPACE + FORM_SIZE * f:SPACE + FORM_SIZE * f + FORM_SIZE]
+        char = struct.unpack_from('<H', row, 0x0E)[0]
+        if f < FORM_COUNT or row[0x0C] > 8 or char < 9 + ACTOR_BASE or f in locked: continue
+        rec = u(ACTORS_AT + 4 * (char - 9)) - ROM_BASE
+        for slot, want in ((10, row[0x16] != 255), (11, row[0] & 1 and row[0x17] != 255)):
+            if not want or slot >= rom[rec] or not u(rec + 0x54 + 4 * slot) or (rec, slot) in done: continue
+            a = u(rec + 0x54 + 4 * slot) - ROM_BASE; n = u(a)
+            frames = [[u(a + 4 + 16 * i + 4 * v) for v in range(4)] for i in range(n)]
+            if all(len(set(fr)) == 1 for fr in frames): continue
+            struct.pack_into('<I', rom, rec + 0x54 + 4 * slot, put_art(struct.pack('<I', n) + b''.join(struct.pack('<4I', *[fr[0]] * 4) for fr in frames)))
+            done.add((rec, slot))
 
 
 def add_eraser(rom, clean, sym, at, art):
@@ -2062,6 +2254,8 @@ def add_eraser(rom, clean, sym, at, art):
         struct.pack_into('<I', row, 20, sym[name + '_use'] | 1)
         rows[skill] = row
     beam_poses(rom, put, put_art)
+    held_poses(rom, put_art)
+    front_changes(rom, put_art)
     vt = sym['kame_vt'] - ROM_BASE                       # Master Roshi's Kamehameha: the Kamehameha's behaviour with its update wrapped (outfit.c kame_update)
     for k in range(9):
         fn = ROM_BASE + BEAM_VT + struct.unpack_from('<i', clean, BEAM_VT + 4 * k)[0]
@@ -2134,6 +2328,28 @@ def add_eraser(rom, clean, sym, at, art):
     struct.pack_into('<HHII', ssb_row, 12, 1057, 1051, sym['ssb_can'] | 1, sym['ssb_use'] | 1)
     ssb_row[0] = 2
     rows[SUPER_BLUE_SKILL] = bytes(ssb_row)
+    # The Spirit Bomb's icon (Nov 10, the owner: "the fucking spirit bomb has the kamehameha icon still"): its row was a retail stub with the
+    # Kamehameha's. A round ball in the bomb's own colours (spirit_bomb.png: 7 rim, 195 body, 196 core), lit from the top left, on the
+    # Kamehameha icon's frame; the greyed copy uses that icon's greyed colours by brightness.
+    kame_icons = [iconlib.decode(clean[p - ROM_BASE:p - ROM_BASE + 0x200]) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 15 + 4)]
+    def lum(v): return int(pal[v].astype(int).sum())
+    grey_pick = sorted({int(v) for v in np.unique(kame_icons[1][iconlib.WINDOW]) if v != iconlib.BG}, key=lum)
+    spirit = []
+    for k, icon in enumerate(kame_icons):
+        a = icon.copy(); w = a[iconlib.WINDOW]; w[:] = iconlib.BG
+        cy, cx, r = 4.0, 9.0, 4.4                                        # the window is 9 x 18
+        for y in range(w.shape[0]):
+            for x in range(w.shape[1]):
+                d = ((y - cy) ** 2 + (x - cx) ** 2) ** 0.5
+                if d > r: continue
+                lit = ((y - (cy - 1.5)) ** 2 + (x - (cx - 1.5)) ** 2) ** 0.5
+                v = 196 if lit < 1.6 else 195 if d < r - 1.1 else 7
+                if k: v = grey_pick[min(len(grey_pick) - 1, {7: 0, 195: len(grey_pick) // 2, 196: len(grey_pick) - 1}[v])]
+                w[y, x] = v
+        for y, x in ((0, 3), (1, 15), (7, 2), (8, 16), (4, 1), (2, 17)):   # a few motes drawn in
+            w[y, x] = 195 if not k else grey_pick[len(grey_pick) // 2]
+        spirit.append(put_art(iconlib.encode(a)))
+    struct.pack_into('<II', rom, SKILL_ROWS + 24 * SPIRIT_SKILL + 4, *spirit)
     import zone26 as z26
     if ERASER_UI + len(strings) > z26.CELL_NAME_UI: sys.exit('move CELL_NAME_UI up')
     while ERASER_UI + len(strings) < z26.CELL_NAME_UI: strings.append(put(b'\0\0'))
@@ -2321,6 +2537,20 @@ def thumb_bl(at, to):
     return struct.pack('<HH', 0xF000 | (d >> 11 & 0x7FF), 0xF800 | (d & 0x7FF))
 
 
+VENEERS = NATIVES          # the retail native table's old place (it moved: main), free for veneers to the mod's far code
+
+
+def hud_icon_hook(rom, sym):
+    """The HUD's skill icon asks hud_skill_row (outfit.c) for the held skill's row instead of sub_080135A2, through a veneer in reach of a bl."""
+    SITE = 0xBAE6
+    if rom[SITE - 4:SITE + 4] != bytes.fromhex('697d281c') + thumb_bl(SITE, 0x135A2):
+        sys.exit('the HUD skill icon call moved: %s' % rom[SITE - 4:SITE + 4].hex())
+    v = VENEERS
+    if rom[v:v + 8] != open('baserom.gba', 'rb').read()[v:v + 8]: sys.exit('veneer area in use')
+    rom[v:v + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['hud_skill_row'] | 1)
+    rom[SITE:SITE + 4] = thumb_bl(SITE, v)
+
+
 def patch_slot_read(rom, sym):
     """Send the game's three save-slot reads through slot_read. Code that far away is out of bl range, so sub_08004A76's
     18 bytes become two veneers; its one job moves to slot_area."""
@@ -2346,6 +2576,9 @@ def main():
     cfg['rows'] += kaioken_rows(clean)
     if [r['id'] for r in cfg['rows']].index('shelved_ape_kid_goku') + FORM_COUNT != SHELVED_FIRST_FORM:
         sys.exit('the shelved Great Ape forms moved off 159-161 (a Nov 9 save reads them there): keep them there, new forms after them')
+    if len(cfg['rows']) + FORM_COUNT != SHELVED_FIRST_FORM + len(SHELVED_FORMS):
+        sys.exit('a form row was added before the shelved Great Ape forms: saved form ids after it would move (forms.json rows_after)')
+    cfg['rows'] += cfg.pop('rows_after', [])          # new forms (Nov 10 on), from 162
     saved = {p: open(p).read() for p in (INTRO, FIELD, ACTORS_FILE, ENDING)}
     try:
         for p, s in unlock_edits_paths().items():

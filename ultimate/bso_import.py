@@ -45,6 +45,9 @@ PAGES = {
 # actor's page. SSJ4 Gogeta (Nov 10, the owner: "Also replace the SSJ4 Gogeta with this one"): BSO's finished Gogeta, four pages.
 SHEETS = {'gogeta_ssj4': ('gogeta_ssj4_v2', {0: 2, 1: 4, 2: 4, 3: 3, 4: 4, 5: 4, 6: 4, 7: 1, 8: 4, 9: 3, 10: 11, 12: 2, 13: 2, 14: 3, 15: 4, 16: 4,
                                              17: 4, 18: 3, 19: 3})}
+# Pan, every look (Nov 10, 18:31, the owner: "Replace all Pan frames as well with these we fixed her walk frames"): slots 0-20, four pages each.
+PAN_COUNTS = {0: 2, 1: 4, 2: 4, 3: 3, 4: 4, 5: 4, 6: 4, 7: 1, 8: 4, 9: 3, 10: 11, 11: 4, 12: 2, 13: 2, 14: 3, 15: 4, 16: 4, 17: 4, 18: 3, 19: 4, 20: 3}
+SHEETS.update({n: (n + '_v2', PAN_COUNTS) for n in ('pan', 'pan_nobandana', 'pan_bug', 'pan_gi_tan', 'pan_gi_red', 'pan_ssj', 'pan_ssj_spiky', 'pan_brapan')})
 # Slots of a sheet left out: Gogeta's 10 is BSO's change into him from base Gogeta (black hair); the look here never changes form, and his
 # own power-up stands in if a skill plays it (gt.FILL)
 SHEET_SKIP = {'gogeta_ssj4': (10,)}

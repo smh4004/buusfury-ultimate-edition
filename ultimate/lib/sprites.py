@@ -217,7 +217,8 @@ def slot_frames(clean_dir, spec):
 # 3-frame slot over 6 ([0,0,1,1,2,2]) made frame 1 the charge again, so every GT fighter dropped back into the charge pose every few frames while
 # firing (Nov 9, the owner on Majuub: "the head is way too far back in that one side view"). Made longer, these keep every frame at its own
 # number and repeat the last one.
-INDEXED = {18}
+INDEXED = {18, 19}      # skills pick these frames by number: slot 18 the pose held while firing, 19 the charged ball's and Final Flash's (Nov 10:
+                        # Blue Gogeta's four were spread over ten, so his skill 5 never reached the arm out)
 
 
 def longer(k, n, slot=None, indexed=False):
@@ -377,7 +378,9 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             k = struct.unpack_from('<I', rom, ap - BASE)[0]
             if k >= want: continue
             old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
-            idx = [min(i, k - 1) for i in range(want)] if int(slot) in a.get('indexed', ()) else longer(k, want, int(slot))   # 'indexed': as INDEXED, this figure only
+            idx = ([min(i, k - 1) for i in range(want)] if int(slot) in a.get('indexed', ())        # 'indexed': as INDEXED, this figure only
+                   else [i * k // want for i in range(want)] if int(slot) in a.get('even', ())     # 'even': spread out even in an INDEXED slot
+                   else longer(k, want, int(slot)))
             grown = [old[j * 4 + d] for j in idx for d in range(4)]
             struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.put(struct.pack('<I', want) + struct.pack('<%dI' % len(grown), *grown)))
         for slot, idx in a.get('reframe', {}).items():   # an animation's own frames in another order (frame numbers past its end: its last)
@@ -395,16 +398,24 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
     # Transforming plays slot 10, and an empty one draws junk from address 0 over other sprites' tiles. Gohan's orange gi (actor 101) never transformed in the original; here it does.
     # Going from Super Saiyan to Super Saiyan 2 plays the power-up on the Super Saiyan actor, and most have no slot 10 (Goku's does): 11 frames of their own ki pose, as long as a retail power-up.
     ins.high_on = False
+    # The frames: his own power-up (slot 13: the crouch, then arms up), front view in every view, ending on his stance, as GT Vegeta's change
+    # (approved Nov 10). They were his slot 21 or 9, so these figures powered up with punches, kicks, being hit, or Gohan's green gi turning
+    # to stone (Nov 10, the owner: "ssj2 he punches while transforming").
     for key in cfg.get('_powerup', ()):
         at_ = key if isinstance(key, int) else ids[key]
         o = table[at_] - BASE; n = struct.unpack_from('<I', rom, o)[0] & 0xFF; rec = bytearray(rom[o:o + 0x54 + 4 * n])
-        for src in (21, 9):
-            ap = struct.unpack_from('<I', rec, 0x54 + 4 * src)[0] if src < n else 0
-            if ap: break
-        k = struct.unpack_from('<I', rom, ap - BASE)[0]; old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
-        grown = [old[(i * k // 11) * 4 + d] for i in range(11) for d in range(4)]
-        struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', 11) + struct.pack('<44I', *grown)))
+        up, stand = (struct.unpack_from('<I', rec, 0x54 + 4 * s)[0] for s in (13, 0))
+        if not up or struct.unpack_from('<I', rom, up - BASE)[0] < 2: sys.exit('_powerup %s: no two-frame power-up (slot 13)' % key)
+        front = lambda ap, k: struct.unpack_from('<I', rom, ap - BASE + 4 + 16 * k)[0]
+        seq = [front(up, 0)] * 2 + [front(up, 1)] * 8 + [front(stand, 0)]
+        struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', 11) + struct.pack('<44I', *[f for f in seq for d in range(4)])))
         table[at_] = ins.put(bytes(rec))
+    # A same_as actor took its source's record as it was when it was made: point it at the record the source ends up with (_powerup above
+    # makes a new one), or armour Gohan's Super Saiyan 2 kept the template's power-down (retail green-gi Gohan) after his own had changed.
+    for name, a in cfg.items():
+        if isinstance(a, dict) and 'same_as' in a and name not in cfg.get('_powerup', ()):      # (one with a power-up of its own keeps it: Full Power)
+            src = a['same_as']
+            table[ids[name]] = table[src] if isinstance(src, int) else table[ids[src]]
     # Actors drawn with no ground shadow (cfg '_no_shadow': ids or names). Record bytes +0xA/+0xB are the shadow's size, looked up when the
     # object is made (sub_08013E38 in 0x086B759C: 4x2, 10x4, 16x6, 24x10); a size not in the table gives none, and the draw (sub_0800EF94)
     # skips the piece. The record is copied, so nothing else changes.

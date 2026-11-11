@@ -296,6 +296,95 @@ like the kamehameha frames do. Why the fuck is super android 13s beam attack fra
   ("Approve all fixed"). A listed form with no
   fingerprint gets one on the next build; `BFU_RELOCK=<form>[,...]` records a change the owner asked for.
 
+## Fixes from the owner's play, Nov 10 evening
+The owner, 17:19-17:39, with a long list ("Should never be this many issues EVER don't let this happen again TEST THOROUGHLY"). Each fix was
+played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now check the whole cast (below).
+- Fights dropped a frame every 64: `player_input` ran `skills_sync` twice in that frame (the fighter in play and a party member in turn).
+  The party member's runs 32 frames later. Measured: 10 stalls in 640 frames before, none after.
+- Switch Character: Gogeta unfused and left the party when picked. A fusion's time left is record +8 (frames, -1 = no limit; native 0xA8
+  sets it); the HUD counts it down while a fusion form (flags bit 3, his form 41) plays and unfuses at 0. The story's fusion leaves 0 there,
+  and the post-game's join (`party_join`) kept it. Now `gogeta_keep` (from `story_sync` and every frame of Switch Character) gives a
+  post-game Gogeta no limit and puts him back in a party he already left; `party_join` sets it too.
+- The HUD's skill icon shows Super Saiyan 2 when Super Saiyan's skill took him there (`hud_skill_row`: the HUD's call to sub_080135A2 at
+  0x0800BAE6 goes through a veneer in the retail native table's old place, 0x55098, free since the table moved). Super Saiyan 2's mastery
+  trains (checked: 0 to 4 in about 15 seconds).
+- The Skills tab scrolls to a fighter's fifth and sixth skills: its draw kept the first one shown no more than 4 before the cursor's row
+  (0x08017392 `subs r1, #4`), so rows 3 sat off the two-row window; now 2.
+- Super Saiyan 2's ki drained at Super Saiyan's rate (over six minutes): `ss_tick` takes three more units with each one the game takes,
+  4x, about a minute and a half, less what mastery saves.
+- Spirit Bomb's icon was the Kamehameha's (a retail stub row): a round ball in the bomb's colours, its greyed copy in the greyed icon's.
+- Super 13 punched the air: the snow arena kept foes 16 px inside the open field, so a fighter at its edge was out of reach. Now the field's
+  own bounds (x 32-288, y from 112). Dabura's behaviour also waited with his arms crossed while the fighter was far, and walked into the
+  field's curved corner and stayed: `arena_chase` steps a boss that has walked 12 frames without moving straight at the fighter, and starts
+  one walking after 90 frames of waiting. Checked from seven spots round the field: he reaches and hits a fighter standing at each.
+- Super 13's finish: the Kid Buu fight's Spirit Bomb (the game's own disc, native 0xF4, in steady cyan) instead of the sprite, and the
+  screen flashes white on impact (natives 0x7A/0x7B, the change's own flash; 0x4C only tints a character), the disc gone into him.
+  19:39, "make the spirit bomb overlay on top of Super 13 so it looks like its hitting him rather than going behind him": the disc is
+  drawn on BG0 at the fighters' priority (3), so they stood over it. `bomb_fx(40)` raises BG0 to 2 for the scene (`bomb_fx(0)` puts it
+  back), and the bomb grows up from Goku's hands (its bottom edge stays put as it grows), so it covers Super 13 and never Goku or the
+  text boxes.
+- The LoG2 figures (armour Gohan, Trunks and Vegeta, Future Trunks, Android 17 and 18, Krillin, Tien, Piccolo): their slots were mapped from
+  a misread of LoG2's numbering. Read off the frames: 2 is being hurt (it was their run), 4 a flinch (Gohan's and Trunks' ki blast), 5 the
+  ki (fist in, palm out, arm out), 9 the change into the next form, 11 the power-up, 12 flying, 13 the dash (the run), 18 a sword or ki slash
+  (armour Vegeta's Big Bang threw it). `actors.json` and `build.py` now give run 13 (or the walk where a record has none), ki blast 5,
+  hit 2, power-up 11, flying 12, change 9; slot 18, held while Big Bang's code fires (frames 0 and 1 by turns), the arm out only;
+  Kamehameha-code and wave moves a pose of their own in slot 31 (`held_poses`: the fist in, then the arm out; `beam_pose` in every
+  such move's use). Armour Vegeta's Final Flash is his Galick Gun pose's charge and push. Gohan's (and Piccolo's) Masenko, slot 12, is
+  arms up then the arm out. Armour Gohan's two Super Saiyan records were the wrong way round (LoG2's r56 is Super Saiyan, with its
+  change into 2; r55 is 2).
+- Changes and power-downs (`fighter_poses`): LoG2's own change where a record has one (base Vegeta, Trunks and Future Trunks to Super
+  Saiyan; armour Gohan's Super Saiyan to 2), else the GT Vegeta pattern; powering down plays the change backwards, or the stance and
+  the base's. It played the template's: retail green-gi Gohan, Great Saiyaman, kid Trunks. A `same_as` figure (Super Saiyan 2) took
+  its source's record before `_powerup` replaced it, so it kept the template's; `build_actors` now re-points them. `_powerup` (the
+  change on a Super Saiyan figure, into 2) was the figure's slot 21 or 9: punches, kicks, being hit, Gohan's green gi turning to stone;
+  now his own power-up. Every mod figure's change and power-down shows its front in every view (`front_changes`), except approved
+  figures and the owner's every-frame sheets.
+- Broly: the playable one has his own copy of BF's figure (`broly_player`; the story boss keeps his), with his Eraser Cannon pose his
+  ki blast's hand out; Full Power Broly's frame 0 there was the wind-up, so it flickered (relocked); his hit reaction is his stance,
+  not a strike.
+- Android 13 had only a walk sheet, so every move showed his stance or a step: `lib/a13_pose.py` redraws his near arm on his own frames
+  (fist back, arm out, both arms out).
+- Pan, every look (18:31, "Replace all Pan frames as well with these we fixed her walk frames"): the owner's every-frame sheets (bso_import
+  `SHEETS`, folders `pan_v2` ... in `BFU_BSO`).
+- Found by the whole-cast audit after the owner's list: Goku's Super Saiyan into 2 (Super Saiyan's skill again, or 2's) played the change
+  into 3, his hair growing (`ss2_use` changes through `SS3_Use`); now his power-up in a slot of its own, 30 (`SS2_POSE`, `held_poses`;
+  `to_ss2`). Pikkon's wave fired with his being-hit frames (slot 18 filled from 9): his ki blast's thrust, held. GT Gohan's Super Saiyan
+  into 2 went back to black hair and glasses first (his Super Saiyan figure's slot 10 was the base's change): `_powerup` (test_frames 14).
+- Great Saiyaman: from the Saiyan armour he came back in the school uniform (no `saiyaman_from_` row for it); now `saiyaman_from_armor`
+  (form 162, forms.json `rows_after`: new forms go after the shelved Great Ape's 159-161 so no saved form id moves), and build.py stops on
+  a Gohan outfit with no way back. His change into the costume was ten frames of his ki push (LoG2's default map): his arms up, then the
+  school uniform's white flash into Great Saiyaman. Super Saiyan pressed as Great Saiyaman changed him into form 255 and the game jumped
+  to garbage (the retail `SS_Can` only refuses when up equals down): `ss_can` now refuses a base form with no form above.
+- The charged ki ball (skill 8) and Gogeta's skill 5 show slot 19's frames 0-3 by number, then 2 and 3 in turn: slot 19 now keeps its
+  frames in place when stretched (`sprites.INDEXED`; Majin Buu's, Janemba's and Super 13's longer boss attacks stay spread, `even`).
+  Pikkon, Kid Buu, Android 13 and Full Power Broly held their stance; GT Goten a flying kick; Super Saiyan 4 Gogeta (the owner's sheet)
+  vanished; Blue Gogeta never reached his arm out: their ki blast's wind-up, then the arm out (`fighter_poses`). DBS Gogeta's sheet map
+  read slots 3, 7, 9 and 19 as charge, hurt, ki and idle: his ki blast showed the power-up and a hit the ki blast's arm out (`gogeta.py`).
+- Gogeta after the ending: `gogeta_keep` put him in the party as soon as his flag was set, a moment before the reward's join, which then
+  skipped his form, level and skills (test_zone26, by frame count); now only once he has his five skills.
+- Super 13 after 60%: Dabura's behaviour keeps reaching for the flying special, which `no_story_walk` turns back into fighting (0x71), and
+  there he stood where he was for the rest of the fight. `arena_chase` now also steps him at a fighter out of reach while fighting
+  (40 frames without moving). test_super13 keeps him above 8000 HP for its 150 steps (once he chased, its fighter beat him) and checks he
+  hits a fighter held at six spots round the field; a fighter held in the bottom-left corner after the long fight still takes no hits
+  (likely: a boss moved by hand never landed a hit to his left in s13diag; from a fresh fight he hits there).
+- Relocked as asked: the armour Vegetas, Broly Full Power; also Master Roshi (Krillin's frames under him had the same ki-blast and hit
+  mix-up) and Blue Vegeta's two looks (their Blue power-up was his slot 21's punches). Each is in the review sent to the owner.
+
+### Checking every move
+`python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
+and any form id that moved: run it after each sprite or build change and account for every line. `python3 ultimate/pose_strip.py` draws
+the poses an audit recorded as clean strips for the owner's previews.
+`python3 ultimate/audit_moves.py ROM OUTDIR [form ...]` (a `--debug` build, no `--enemy`) plays every wearable form in the field: walking
+four ways, running, the punch combo, each skill held and let go, its changes up and down; every pose the game shows is drawn from the ROM,
+one sheet per form (`NOPNG=1`: only the poses), and `report.txt` flags poses with no frame, another retail character's frames, being-hit
+frames in a move, a double-tap that didn't run and a change that didn't happen. It fills Super Saiyan's and Super Saiyan 3's pools
+(+0x1E, +0x20) before picking a form and before each change, or a Super Saiyan 3 or Blue form drops back on the Switch screen. Some flags
+are the design, not faults: a change that didn't happen where it is gated (Super Saiyan 3 only from 2, Super Saiyan 4 only in a GT look,
+Blue and God after the Battle of Gods), and likely scene-only retail forms (1, 9, 11, 12, 23, 24, 32, 33, 42, 43, 48, 51, 53: not on the Switch
+screen) with no ki-blast or run animation, as in the retail game. Look at every sheet after: a wrong pose (a wind-up where
+the arm should be out) isn't something it can see. `test_frames.py` 10-13 check the ROM directly: no template leftovers in any playable
+figure; Big Bang's code's two held frames one pose; run, ki blast and beams not the being-hit frames; changes and power-downs one view.
+
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The
 raid, the form, the Chou Makouhou, the twice-size drawing and the camera lift are out of the build; all of it, with its notes, is on the

@@ -230,6 +230,11 @@ h = open(d + '/h.bin', 'rb').read()[GOHAN + FORM]; i = open(d + '/i.bin', 'rb').
 check('saiyaman: no bad jumps', 'bad pc' not in o)
 check('saiyaman: costume on from the orange gi', h == forms['saiyaman_from_orange'])
 check('saiyaman: costume off returns to the orange gi', i == 13)
+# ... and to the Saiyan armour (Nov 10: armour Gohan came back in the school uniform; build.py now refuses a Gohan outfit with no way back)
+arm = '%08x' % (0x03001068 + GOHAN + FORM)
+o = run(rom, pick + ['tap A 150', 'run 100', 'poke8 %s %02x' % (arm, forms['gohan_armor']), 'run 30'] + use('j') + use('k'), d)
+j = open(d + '/j.bin', 'rb').read()[GOHAN + FORM]; k = open(d + '/k.bin', 'rb').read()[GOHAN + FORM]
+check('saiyaman: costume on from the Saiyan armour, off back to it', 'bad pc' not in o and j == forms['saiyaman_from_armor'] and k == forms['gohan_armor'])
 flag_byte = lambda f: '%08x' % (0x03001068 + 0x55 + f // 8)
 lock = [x for x in pick if x not in ('tap DOWN 30', 'shot outfit')]
 at = lock.index('tap RIGHT 40')

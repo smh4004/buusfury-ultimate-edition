@@ -544,10 +544,12 @@ void kk_track(void);
    below him) was drawn behind the rocks, half see-through, his shadow left below, and no hit reached him; his walk stayed pressed against
    the rocks (Nov 9, the owner: "can't even damage and he's stuck walking up", "couldn't even see it"; reproduced in the emulator: from
    (209, 96) no punch landed for 30 seconds). The open field is x 32-288, y 112-248 (floor mask), so foes stay in x ARENA_X0-ARENA_X1 and
-   below y ARENA_Y0; the change and the finish (scenes) are not in the list. */
-#define ARENA_X0 48
-#define ARENA_X1 272
-#define ARENA_Y0 120
+   below y ARENA_Y0; the change and the finish (scenes) are not in the list. The bounds are the open field's own (Nov 10, the owner: "He's
+   standing still punching the air not trying to walk to the player and attack"): with 16 px kept off each side a fighter at the field's
+   edge (x 32-48) was out of his reach, so he stood at the bound throwing punches. */
+#define ARENA_X0 32
+#define ARENA_X1 288
+#define ARENA_Y0 112
 /* The cause of both (same day): an enemy's stats row also picks its behaviour (row +8: its first state in the enemy state table
    0x0870F514), and Super 13 and Android 13 run Dabura's (row 18). Near 60% health Dabura's state 0x7B walks to the point (192, 80) of
    his own story room (a move-to action, vtable 0x08049A3C, made by sub_0802E104: +0x1C, +0x20 the target), waits 180 frames, then goes
@@ -590,6 +592,48 @@ static void no_story_walk(u8 *e) {
         if (IN_EWRAM(step) && step[0] == MOVE_TO_VT) { step[7] = *(u32 *)(e + 0x1A0); step[8] = *(u32 *)(e + 0x1A4); }
     }
 }
+/* Dabura's behaviour is for his own small room. On the open snowfield (measured Nov 10, a fighter standing still at spots round the field):
+   further than about 120 px away he waited with his arms crossed (state 0x6F) for as long as the fighter stayed there, and walking (0x72)
+   he took a line that ran him into the field's curved corner (248, 232), where he walked on the spot. So in the arena, a boss who has
+   walked without moving for 12 frames steps straight at the fighter (the field is open between them), and one who has waited 90 frames
+   with the fighter far off starts walking. Past 60% his behaviour keeps reaching for the flying special, which no_story_walk turns back
+   into fighting (0x71), and in 0x71 he stood where he was for the rest of the fight with the fighter out of reach (test_super13: frozen
+   at 36% for the last 50 steps, no hit on a fighter standing anywhere): fighting 40 frames without moving with the fighter out of
+   reach (past 24 px across or 16 up or down; he stopped 35-36 px off, where his punch barely reached) he steps at him too. (Sent back
+   to walking instead, he went into the special and stood for longer.) */
+#define DABURA_WAIT 0x6F
+#define DABURA_WALK 0x72
+struct arena_chase { u8 *e; short x, y; u16 still, idle; };
+#define AC (*(struct arena_chase *)0x0203F270)
+static void arena_chase(u8 *e) {
+    u8 *pl = *(u8 **)0x03001C34;
+    u32 st = *(u32 *)(e + 0x244);
+    int fx, fy, dx, dy;
+    if (!IN_EWRAM(pl) || *(int *)(e + 0x23C) != 1 || *(const u32 *)(*(const u8 **)(e + 0x224) + 8) != DABURA_AI) return;
+    fx = *(int *)(e + 0x1A0) >> 8; fy = *(int *)(e + 0x1A4) >> 8;
+    dx = (*(int *)(pl + 0x1A0) >> 8) - fx; dy = (*(int *)(pl + 0x1A4) >> 8) - fy;
+    if (AC.e != e) { AC.e = e; AC.still = AC.idle = 0; AC.x = fx; AC.y = fy; }
+    if (st == STATE_TABLE + 8 * DABURA_WALK && (dx > 36 || dx < -36 || dy > 20 || dy < -20)) {
+        if (fx == AC.x && fy == AC.y) { if (AC.still < 1000) AC.still++; } else AC.still = 0;
+        if (AC.still > 12) {
+            if (dx) *(int *)(e + 0x1A0) += dx > 0 ? 0x180 : -0x180;
+            if (dy > 8 || dy < -8) *(int *)(e + 0x1A4) += dy > 0 ? 0x100 : -0x100;
+        }
+    }
+    else if (st == STATE_TABLE + 8 * DABURA_FIGHT && (dx > 24 || dx < -24 || dy > 16 || dy < -16)) {
+        if (fx == AC.x && fy == AC.y) { if (AC.still < 1000) AC.still++; } else AC.still = 0;
+        if (AC.still > 40) {
+            if (dx) *(int *)(e + 0x1A0) += dx > 0 ? 0x180 : -0x180;
+            if (dy > 8 || dy < -8) *(int *)(e + 0x1A4) += dy > 0 ? 0x100 : -0x100;
+        }
+    }
+    else AC.still = 0;
+    if (st == STATE_TABLE + 8 * DABURA_WAIT && (dx > 110 || dx < -110 || dy > 70 || dy < -70)) {
+        if (++AC.idle > 90) { AC.idle = 0; STATE_GOTO(e, DABURA_WALK); }
+    }
+    else AC.idle = 0;
+    AC.x = *(int *)(e + 0x1A0) >> 8; AC.y = *(int *)(e + 0x1A4) >> 8;
+}
 static void arena_keep(void) {
     u16 at = *(volatile u16 *)0x0300197C;
     int i, n = *(volatile int *)0x03001BB0, arena = (at & 0xFF) == 26 && (at >> 8) < 32 && ((ARENA_ROOMS >> (at >> 8)) & 1);
@@ -599,6 +643,7 @@ static void arena_keep(void) {
         if (!IN_EWRAM(e) || e[0x1D0] == 1) continue;      /* team 1: the player's side */
         if (postgame_foe(e)) no_story_walk(e);
         if (!arena) continue;
+        arena_chase(e);
         x = (int *)(e + 0x1A0); y = (int *)(e + 0x1A4);
         if (*y < ARENA_Y0 << 8) *y = ARENA_Y0 << 8;
         if (*x < ARENA_X0 << 8) *x = ARENA_X0 << 8;
@@ -616,7 +661,10 @@ void *player_input(void) {
     /* Battle of Gods: Beerus fights Vegeta at the party, on Capsule Corporation's own grounds, which has no fighting (area record +8
        is 0; the area's load copies it here). While that fight is on, fighting is on there too. */
     if (!COMBAT_ON && *(volatile u16 *)0x0300197C == 0x1404 && more_flag(MORE_BOG_FIGHT)) COMBAT_ON = 1;
-    if ((FRAMES & 63) == 0) { skills_sync(*(u8 *)0x03001068); skills_sync((FRAMES >> 6) & 7); }      /* what play has earned (the skill book): the fighter in play, and the party in turn */
+    /* what play has earned (the skill book): the fighter in play, and 32 frames later the party in turn. Both in one frame ran over it and
+       a fight dropped a frame every 64 (Nov 10). */
+    if ((FRAMES & 63) == 0) skills_sync(*(u8 *)0x03001068);
+    else if ((FRAMES & 63) == 32) skills_sync((FRAMES >> 6) & 7);
     if (CL.active && CL.p_at + 2 < FRAMES) CL.active = 0;
     if (!CL.active && FRAMES >= CL.surge) return keys;
     CL.shadow[0] = keys[0]; CL.shadow[1] = keys[1] | 2; CL.shadow[2] = 0; CL.shadow[3] = keys[3]; CL.shadow[4] = keys[4]; CL.shadow[5] = keys[5];
@@ -737,8 +785,10 @@ static void no_shadows(void *obj) {
     }
 }
 
+void gogeta_keep(void);
 int picker_update(void *obj) {
     int first = LABEL_OWNER != ((u32)obj ^ SNAP_MAGIC), r;
+    gogeta_keep();                             /* before anyone can be picked: a pick of Gogeta with his story fusion's spent time unfused him */
     if (first) restore_borrowed(obj);
     if (first && OUT_FIGHTER) bench_settle(FORM_OF(8));    /* restore_borrowed may have put a different guest on */
     if (KEYS_NEW & KEY_UP) cycle(obj, -1);
@@ -918,6 +968,11 @@ int spirit_usable(u8 *rec)
 #define BOMB_PAL ((volatile u16 *)0x05000000)[BOMB_INDEX]
 #define BOMB_INDEX 255
 static u16 *const BOMB_OLD = (u16 *)0x0203FF78;
+/* The disc is drawn on BG0, priority 3, the fighters' own: they were drawn over it. bomb_fx(40) puts BG0 in front of them (priority 2; the HUD's
+   sprites are 1) for Super 13's finish (Nov 10, the owner: "make the spirit bomb overlay on top of Super 13 so it looks like its hitting him
+   rather than going behind him"); bomb_fx(0) puts it back. BG0_KEPT holds the old BG0CNT plus one bit to say it is raised. */
+#define BG0CNT (*(volatile u16 *)0x04000008)
+#define BG0_KEPT (*(volatile u32 *)0x0203FF7C)
 static void bomb_glow(int frame)
 {
     BOMB_PAL = 0x7F80;          /* a steady cyan */
@@ -1062,7 +1117,11 @@ void bomb_fx(int *sp)
         SB.frame++; bomb_glow(SB.frame);
         if (player) slot_pose(player, SLOT_ARMS_UP);
     }
-    else if (v == 0) { SB.phase = 0; BLDY = 0; bomb_hide(); }      /* the next room reloads the palette; restoring it here would turn the disc dull during the fade */
+    else if (v == 0) {
+        SB.phase = 0; BLDY = 0; bomb_hide();      /* the next room reloads the palette; restoring it here would turn the disc dull during the fade */
+        if (BG0_KEPT) { BG0CNT = (u16)BG0_KEPT; BG0_KEPT = 0; }
+    }
+    else if (v == 40) { if (!BG0_KEPT) BG0_KEPT = BG0CNT | 0x10000; BG0CNT = (BG0CNT & ~3) | 2; }
     else { impact(v - 2); }
     *sp = n - 1;
 }
@@ -1397,6 +1456,7 @@ void party_join(int *sp) {
     static const u8 lean[2][3] = {{110, 110, 110}, {120, 85, 110}};    /* strength, power, endurance: Gogeta, Broly */
     const u8 *l = lean[c == 8];
     *sp = n - 2;
+    if (c == 7) *(int *)(r + 8) = -1;       /* no fusion time limit (story_sync) */
     if (r[0] & 1) return;
     r[0] |= 1;
     FORM_OF(c) = form;
@@ -1455,6 +1515,7 @@ void disc_use(u8 *record, void *sprite) { ball_use(record, sprite, disc_vt); }
 void eraser_use(u8 *record, void *sprite) { ball_use(record, sprite, eraser_vt); }
 void bomber_use(u8 *record, void *sprite) { ball_use(record, sprite, bomber_vt); }
 
+static int beam_pose(void *sprite);
 /* Special Beam Cannon: the Kamehameha's code with its own frames, the same way. */
 #define MemCopy ((void (*)(void *, const void *, int))0x08049139)
 #define Kamehameha_Start ((void (*)(u32 *, void *))0x0801BDD5)
@@ -1475,7 +1536,7 @@ void beam_use(u8 *record, void *sprite) {
     int level = record[record[0x15] * 2 + 0x2E];
     u32 *b = Alloc(0x10);
     if (b) { b[0] = (u32)beam_vt; b[1] = 0; b[3] = level; }
-    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetFacing(sprite, beam_pose(sprite));
     Sprite_SetBehaviour(sprite, b);
 }
 
@@ -1497,7 +1558,7 @@ void black_kame_use(u8 *record, void *sprite) {
     int level = record[record[0x15] * 2 + 0x2E];
     u32 *b = Alloc(0x10);
     if (b) { b[0] = (u32)black_kame_vt; b[1] = 0; b[3] = level; }
-    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetFacing(sprite, beam_pose(sprite));
     Sprite_SetBehaviour(sprite, b);
 }
 
@@ -1518,7 +1579,9 @@ static void kv_begin(u32 *self, void *player, const u32 *params) {
     }
 }
 /* The Kamehameha's code shows frames 0-2 of the fighter's slot 18. Vegeta's figures hold his two-frame Big Bang there, so build.py gives them a pose
-   of their own in slot BEAM_POSE (beam_poses): his wind-up, then Final Flash's push with both hands. Any other figure uses slot 18 as the Kamehameha does. */
+   of their own in slot BEAM_POSE (beam_poses): his wind-up, then Final Flash's push with both hands; and the LoG2 figures, whose slot 18 holds
+   Big Bang's code's arm out (held_poses), get their fist in, then the arm out. Every Kamehameha-code move and the Electric Kamehameha's
+   (beam_use, black_kame_use, kv_use, kame_use, wave_use) shows it where the figure has one; any other figure uses slot 18 as before. */
 #define BEAM_POSE 31
 static int beam_pose(void *sprite) {
     const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
@@ -1558,9 +1621,9 @@ void kame_update(u32 *self, u8 *player) {
 void kame_use(u8 *record, void *sprite) {
     if (record == RECORDS && derived_level(0, 15) == 2 && MASTERY_BYTES[21] < 255) { bench_mine(1); MASTERY_BYTES[21]++; }
     ((void (*)(u8 *, void *))0x0801A35B)(record, sprite);
+    if (beam_pose(sprite) == BEAM_POSE) Sprite_SetFacing(sprite, BEAM_POSE);     /* a figure with a pose of its own (build.py beam_poses, held_poses) */
     if (record[0x14] == FORM_ROSHI || record[0x14] == FORM_ROSHI_MAX) {
         u32 *state = *(u32 **)((u8 *)sprite + 0x14);
-        if (beam_pose(sprite) == BEAM_POSE) Sprite_SetFacing(sprite, BEAM_POSE);
         if (state && state[0] == 0x0804D9F8) state[0] = (u32)kame_vt;
     }
 }
@@ -1668,7 +1731,7 @@ void wave_use(u8 *record, void *sprite) {
     int level = record[record[0x15] * 2 + 0x2E];
     u32 *b = Alloc(0x10);
     if (b) { b[0] = (u32)wave_vt; b[1] = 0; b[3] = level; }
-    Sprite_SetFacing(sprite, 0x12);
+    Sprite_SetFacing(sprite, beam_pose(sprite));
     Sprite_SetBehaviour(sprite, b);
 }
 
@@ -1764,10 +1827,25 @@ static int ss_to_ss2(u8 *record) {
     int form = record[0x14], f = flags_of(form);
     return (f & 1) && !(f & 2) && !is_kaioken(form) && up_of(form) != 255 && is_ss2(up_of(form)) && ss2_open(record, form_table[form * 24 + 0x0C]) && can_step(record);
 }
-int ss_can(u8 *record) { return is_kaioken(record[0x14]) || is_ssg(record[0x14]) || is_fp(record[0x14]) ? 0 : ss_to_ss2(record) || SS_Can(record); }
+/* A form that isn't transformed and has no form above (Great Saiyaman: up 255, down his outfit) can't use Super Saiyan: the game's SS_Can only
+   refuses when up equals down, so it changed him into form 255 and the next form lookup jumped to garbage (Nov 10, audit_moves). */
+int ss_can(u8 *record) {
+    int form = record[0x14];
+    if (!(flags_of(form) & 3) && up_of(form) == 255) return 0;
+    return is_kaioken(form) || is_ssg(form) || is_fp(form) ? 0 : ss_to_ss2(record) || SS_Can(record);
+}
+/* Going up to Super Saiyan 2 plays slot 10 on the Super Saiyan figure, and Goku's is BF's change into Super Saiyan 3 (his hair grows long):
+   his Super Saiyan figures carry a change of their own for 2 in slot SS2_POSE (build.py held_poses: his power-up's crouch, then arms up,
+   then his stance, front in every view), played instead. Same length as slot 10's, so the power-up ends as before. */
+#define SS2_POSE 30
+static void to_ss2(u8 *record, void *sprite) {
+    const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
+    SS3_Use(record, sprite);
+    if (actor && actor[0] > SS2_POSE && *(const u32 *)(actor + 0x54 + 4 * SS2_POSE)) Sprite_SetFacing(sprite, SS2_POSE);
+}
 void ss_use(u8 *record, void *sprite) {
     XFORM = 0;
-    if (ss_to_ss2(record)) SS3_Use(record, sprite);       /* the form's up: Super Saiyan 2, as its own skill goes (ss2_use) */
+    if (ss_to_ss2(record)) to_ss2(record, sprite);        /* the form's up: Super Saiyan 2, as its own skill goes (ss2_use) */
     else SS_Use(record, sprite);
 }
 int ss2_can(u8 *record) {
@@ -1777,7 +1855,16 @@ int ss2_can(u8 *record) {
 }
 void ss2_use(u8 *record, void *sprite) {
     XFORM = 0;
-    if (is_ss2(record[0x14])) power_down(record, sprite); else SS3_Use(record, sprite);
+    if (is_ss2(record[0x14])) power_down(record, sprite); else to_ss2(record, sprite);
+}
+/* The HUD's skill icon (sub_0800B99C asks sub_080135A2 for the held skill's row: icon +4 when it can be used, +8 when not). In Super
+   Saiyan 2 reached through Super Saiyan's skill, that skill shows Super Saiyan 2's icon (Nov 10, the owner: "when Goku transforms to SSJ2 the
+   icon doesn't reflect SSJ2"). Only the HUD comes here: using the skill still goes through Super Saiyan's row (ss_use). */
+#define SkillRow ((const u8 *(*)(u8 *, int))0x080135A3)
+const u8 *hud_skill_row(u8 *record, int i) {
+    const u8 *row = SkillRow(record, i);
+    if (record[0x0C] && record[0x0D + i] == 20 && is_ss2(record[0x14])) row += (SS2_SKILL - 20) * 24;
+    return row;
 }
 static int slot_of(const u8 *rec, int skill);
 /* From a Super Saiyan whose next form is Super Saiyan 2: once Super Saiyan 2 is open, the way up is through it (the Super Saiyan skill
@@ -1974,6 +2061,16 @@ static void learn(int c, int skill, int ok) {
    (outfits.json "unlocks", build.py) before the mod could set its flags there. Once the ending is seen they are all past; a few scenes also
    set a story flag of their own (STORY_MARKS: the unlock's flag, the scene's), which tells it earlier. */
 static const u16 story_unlocks[] = STORY_UNLOCKS, story_marks[][2] = STORY_MARKS;
+/* Gogeta after the ending: no fusion time limit, and back in the party if a pick unfused him (Nov 10). Only once party_join has given him his
+   five skills (a new game's record has three): the reward sets his flag a moment before it joins him, and putting him in between made
+   party_join see him joined and skip his form, level and skills (test_zone26, depending on the frame count). */
+void gogeta_keep(void) {
+    if (GetFlag(G_FLAGS, 149) && GetFlag(G_FLAGS, GOGETA_FLAG)) {
+        u8 *g = REC(7);
+        *(int *)(g + 8) = -1;
+        if (g[0x0C] >= 5) g[0] |= 1;
+    }
+}
 static void story_sync(int post) {
     int i;
     for (i = 0; i < (int)(sizeof story_unlocks / sizeof *story_unlocks); i++)
@@ -1993,6 +2090,12 @@ static void story_sync(int post) {
                 break;
             }
     }
+    /* Post-game Gogeta stays fused (Nov 10, the owner: "Selected Gogeta in character select and he fucking unfused and got deleted from
+       character select"). A fusion's time left is record +8 (frames; -1 = no limit; script native 0xA8 sets it), and the fighter HUD counts
+       it down while a fusion form (flags bit 3, Gogeta's form 41) plays, unfusing at 0. The story's fusion ends at 0, and that 0 stayed
+       in his record when the post-game joined him, so he unfused the moment he was picked. Joined after the ending: no limit. A save he
+       already left gets him back. */
+    gogeta_keep();
 }
 /* The Great Ape is shelved (Nov 10, the owner: "remove the whole great ape thing from the game and shelf it for now ... needs a redo for
    sprites"; its code is on the branch shelf/great-ape). A save from the Nov 9 build can hold one of its forms (now copies of the look it
@@ -2151,7 +2254,15 @@ int ss_tick(u8 *rec) {
     }
     if ((is_ssg(rec[0x14]) || is_fp(rec[0x14])) && (SSG_TICK ^= 1)) return 1;      /* Super Saiyan God and Full Power drain at half the rate */
     if (potara_skip(rec)) return 1;
-    return mastery_skip(rec);
+    if (mastery_skip(rec)) return 1;
+    /* Super Saiyan 2 drains 4x as fast as Super Saiyan (Nov 10, the owner: "the SSJ2 ki drain seems to be nonexistent"; measured: it drained
+       Super Saiyan's pool at Super Saiyan's rate, 1023 units at about 2.7 a second, over six minutes; Super Saiyan 3's pool lasts about 35
+       seconds). Three more units with each one the game takes: about a minute and a half, less what mastery saves (the units it skips). */
+    if (is_ss2(rec[0x14])) {
+        u16 *pool = (u16 *)(rec + 0x1E);
+        *pool = *pool > 4 ? *pool - 3 : 1;
+    }
+    return 0;
 }
 void ss_drain_hook(void);
 __asm__(".syntax unified\n.thumb\n.thumb_func\n.global ss_drain_hook\nss_drain_hook:\n"
