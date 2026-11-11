@@ -7,7 +7,9 @@
 4. The HUD's skill icon shows Super Saiyan 2's icon when Super Saiyan's skill took him there.
 5. The Skills tab scrolls to the fifth and sixth skills, and SELECT swaps the sixth.
 6. Gogeta stays fused after the ending when picked on Switch Character, his story fusion's time spent (record +8 = 0); one already unfused
-   comes back; one not joined yet is left for the reward's join."""
+   comes back; one not joined yet is left for the reward's join.
+7. A Super Saiyan pool above the EP maximum (the HUD's bar loops have no bound: bar pixels landed on the sprite palette, "ssj4 Gogeta has a
+   weird green outline" in a capture that had filled the pools first) is drawn within the bar's 41 columns."""
 import os, sys, re, struct, subprocess, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
@@ -87,6 +89,16 @@ cur, rec = gogeta(2, 0, 5, False)
 check('a Gogeta a pick had unfused is back in the party', rec & 1)
 cur, rec = gogeta(2, -1, 3, False)
 check('a Gogeta the reward has not joined yet is left for its join', not rec & 1)
+
+# 7. pools at 1023 with an EP maximum of 64: where the HUD starts drawing the bars (0x0800BB8A), the two pool lengths (sp + 0x502, + 0x503) are
+# within the 41 columns (they were 0x8F each: 102 columns past the table, three stray bytes a column)
+over = ['poke8 %08X 40' % (R + 0x1C), 'poke8 %08X 00' % (R + 0x1D), 'poke8 %08X 40' % (R + 0x1A), 'poke8 %08X 00' % (R + 0x1B)] + \
+       ['poke8 %08X FF' % (R + 0x1E), 'poke8 %08X 03' % (R + 0x1F), 'poke8 %08X FF' % (R + 0x20), 'poke8 %08X 03' % (R + 0x21)]
+o = T.run(T.setup([7, 15], None, (0,)) + ['run 100'] + over + ['bp 0800BB8A 120', 'mem r13+0x500 1'], 'bars')
+bars = [l for l in o.splitlines() if l.startswith('mem 0300')]
+lengths = list(int(bars[-1].split(':')[1].split()[0], 16).to_bytes(4, 'little')) if 'bp 0800bb8a hit' in o and bars else []
+print('   bar lengths (health, EP, Super Saiyan pool, Super Saiyan 3 pool): %s' % lengths)
+check('a Super Saiyan pool above the EP maximum is drawn within the bar\'s 41 columns', len(lengths) == 4 and max(lengths[2:]) <= 41)
 
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

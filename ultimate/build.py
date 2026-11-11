@@ -1332,10 +1332,10 @@ def add_actors(rom, clean):
                          'compress': True, 'high': True, 'grow': lengths}
     for name in ('piccolo', 'android17', 'android18', 'krillin', 'future_trunks', 'future_trunks_ss', 'videl_player', 'kid_buu_player', 'majin_buu_player', 'super_janemba_player', 'tien_player', 'yamcha_player', 'pikkon_player', 'hercule_player'):
         cfg[name]['grow'] = lengths
-    # Slot 19 frames stay in place (sprites.INDEXED, Nov 10: the charged ball holds frames 2 and 3), but Majin Buu's, Janemba's and Super 13's
-    # are their boss records' longer attacks: spread out, the hold stays on the ball overhead, the sword raised, the crouch (as approved).
-    for name in ('majin_buu_player', 'super_janemba_player'):
-        cfg[name]['even'] = [19]
+    # Slot 19 frames stay in place (sprites.INDEXED, Nov 10: the charged ball holds frames 2 and 3), but Janemba's and Super 13's are their
+    # boss records' longer attacks: spread out, the hold stays on the sword raised, the crouch (as approved). (Majin Buu's was too, held on
+    # his boss attack's lightning round his head: now a punch of his own, fighter_poses.)
+    cfg['super_janemba_player']['even'] = [19]
     # The LoG2 figures' slots that depend on what their record has (Nov 10, the owner on armour Gohan, Trunks and Vegeta, Future Trunks,
     # Android 17 and 18: run, ki blast, Big Bang, Final Flash and transformation frames "fucked"). Read off the frames: LoG2's 2 is being hurt
     # (it was the run), 13 the dash (the run; NPC records have none: their walk), 11 the power-up (fists in, then arms up), 12 flying, 9 the
@@ -1496,7 +1496,9 @@ def fighter_poses(rom, ids, at):
     # Energy Punch (skill 8) shows slot 19's frames 0-3 by number, then 2 and 3 in turn while held. Pikkon, Kid Buu and Android 13 had
     # their stance there (filled from slot 0), Full Power Broly his sheet's idle: their ki blast's wind-up, then its arm out held (ten frames,
     # a retail player's slot 19: the Ghost Attack once read past a shorter one). test_frames.
-    for name in ('pikkon_player', 'kid_buu_player', 'android13_player', 'broly_fp', 'broly_player'):     # (Broly's was his boss barrier: a golden shell)
+    # Majin Buu's was his boss record's attack (lightning round his head, then his antenna's beam), so the hold showed the lightning and no
+    # punch (Nov 10, the owner: "fat Majin Buu energy punch looks bugged"): the same as the others.
+    for name in ('pikkon_player', 'kid_buu_player', 'majin_buu_player', 'android13_player', 'broly_fp', 'broly_player'):     # (Broly's was his boss barrier: a golden shell)
         set_slot(name, 19, [need(name, 3, 0)] * 2 + [need(name, 3, 1)] * 8)
     # GT Trunks's slot 18 (from his BSO figure, where 18 is getting up) lay on the ground: his Flame Kamehameha fired lying down (seen in
     # the Nov 10 move GIFs). His ki blast's wind-up, then its arm out held.
@@ -1504,7 +1506,11 @@ def fighter_poses(rom, ids, at):
         set_slot(name, 18, [need(name, 3, 0)] + [need(name, 3, 1)] * 5)
     # GT Goten's (from his BSO figure) is a flying kick and a spin, and Super Saiyan 4 Gogeta's (the owner's sheet) a vanish, so the hold
     # showed a kick or nothing: the stance, their ki blast's wind-up, then its arm out held.
-    for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'gogeta_ssj4'):
+    # Super Saiyan 4 Goku's too (his BSO figure's slot 19 is base Goku's Instant Transmission: the stance, a fade, a line), and the Super
+    # Dragon Fist (outfit.c dragon4_use: the Dragon Fist's code, which shows slot 19 the same way and carries him along with the dragon) made
+    # him vanish (Nov 10, the owner: "SSJ4 Goku does instant transmission on dragon fist"). No form of his in that figure has Instant
+    # Transmission (kid Goku's moves: Energy Blast, the Kamehamehas, the Dragon Fist), so nothing else plays the slot.
+    for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'gogeta_ssj4', 'kid_goku_ssj4'):
         set_slot(name, 19, [need(name, 0, 0), need(name, 3, 0)] + [need(name, 3, 1)] * 8)
     # Full Power Broly's (approved Nov 10 as the strike's wind-up, then the hand out) flickered the same way: frame 0 is the wind-up. The hand out.
     set_slot('broly_fp', 18, [need('broly_fp', 18, 1)] * len(anim(rec_of('broly_fp'), 18)))
@@ -1972,7 +1978,12 @@ def beam_poses(rom, put, put_art):
 # then 3-4 firing) is his Galick Gun pose's frames (approved Nov 10): the charge, then both hands out; it was LoG2's one-armed ki frames.
 SS2_POSE = 30                    # outfit.c SS2_POSE: Goku's Super Saiyan figures' change into Super Saiyan 2
 BEAM_FORMS = ('android13', 'krillin', 'krillin_kaioken', 'tien', 'tien_kaioken', 'future_trunks', 'future_trunks_ss', 'android17', 'super17', 'android18',
-              'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2')
+              'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2',
+              'kid_buu', 'majin_buu')    # the Buus' Kamehameha (Nov 10): their slot 18 is a boss move (Kid Buu's rush, Majin Buu's antenna beam)
+# The rule for a figure with no beam frames of its own (Nov 10, 21:20, the owner: "Never use guards as an attack frame, use ki blast frames
+# but dont loop them just make it one smooth sustained transition on beams if none exist"): the ki blast's wind-up while it charges, then
+# its arm out, the same frame twice (the Kamehameha's code shows frames 1 and 2 in turn while the beam is out), so it is held, not looped.
+# (A try at Majin Buu's guard for the charge, his hands by the ball, went out with that.) test_frames checks both halves.
 
 
 def held_poses(rom, put_art):
@@ -2555,7 +2566,7 @@ def hud_icon_hook(rom, sym):
         sys.exit('the HUD skill icon call moved: %s' % rom[SITE - 4:SITE + 4].hex())
     v = VENEERS
     if rom[v:v + 8] != open('baserom.gba', 'rb').read()[v:v + 8]: sys.exit('veneer area in use')
-    rom[v:v + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['hud_skill_row'] | 1)
+    rom[v:v + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['hud_row_guard'] | 1)      # (caps the pool bars' lengths on its way to hud_skill_row)
     rom[SITE:SITE + 4] = thumb_bl(SITE, v)
 
 

@@ -402,7 +402,7 @@ check('every Gohan outfit changes into Great Saiyaman with a costume change, not
 # The guests' Energy Punch (skill 8) and Gogeta's Dragon Fist Explosion (skill 5) show slot 19's frames 0-3 by number, then 2 and 3 in turn while held: those two
 # are a move, not the stance or a step (Pikkon, Kid Buu and Android 13 stood; Blue Gogeta's four frames were spread over ten, DBS Gogeta's
 # slot 19 was his stance).
-S19 = ['goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'goten_gt_green_ssj', 'gogeta_ssj4', 'broly', 'broly_fp', 'android13', 'super13', 'android17', 'super17', 'pikkon', 'uub', 'majuub', 'roshi', 'roshi_max', 'kid_buu', 'majin_buu',
+S19 = ['goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'goten_gt_green_ssj', 'gogeta_ssj4', 'kid_goku_ssj4', 'broly', 'broly_fp', 'android13', 'super13', 'android17', 'super17', 'pikkon', 'uub', 'majuub', 'roshi', 'roshi_max', 'kid_buu', 'majin_buu',
        'super_janemba', 'pan', 'pan_ssj', 'pan_nobandana', 'pan_ssj_spiky', 'pan_bug', 'pan_gi_tan', 'pan_gi_red', 'pan_brapan', 'gogeta_dbs',
        'gogeta_dbs_ss', 'gogeta_ssb', 'gogeta_ssb_skin']
 still = []
@@ -414,10 +414,38 @@ for n in S19:
     rest = {look(fr[2]) for m in (0, 1) if m in sl for fr in all_views(a, m)}
     v19 = [look(fr[2]) for fr in all_views(a, 19)]; held = v19[2:4]
     vanish = any(fr[2] and sprites.frame_image(rom, fr[2]) is not None and (sprites.frame_image(rom, fr[2]) > 0).sum() < 60 for fr in all_views(a, 19)[:4])
-    spread = held[0] == v19[0] and n not in ('super13', 'majin_buu', 'super_janemba')   # frame 2 the same as 0: spread out (those three on purpose)
+    spread = held[0] == v19[0] and n not in ('super13', 'super_janemba')   # frame 2 the same as 0: spread out (those two on purpose)
     if len(held) < 2 or any(h in rest for h in held) or spread or vanish: still.append(n)
 
-check('Energy Punch and Gogeta\'s Dragon Fist Explosion hold a move, not the stance%s' % ((': %s' % still) if still else ''), not still)
+check('Energy Punch, the Dragon Fists and Gogeta\'s Dragon Fist Explosion hold a move, not the stance or a vanish%s' % ((': %s' % still) if still else ''), not still)
+# Majin Buu's hold is his ki blast's arm out, as the other guests' (it was his boss attack's lightning: "fat Majin Buu energy punch looks bugged")
+a = actor_of(forms['majin_buu'])
+check('Majin Buu\'s Energy Punch holds his ki blast\'s arm out', [fr[2] for fr in all_views(a, 19)[2:4]] == [all_views(a, 3)[1][2]] * 2)
+# The Buus' Kamehameha (Nov 10, the owner: "give all playable Buus forms kamehameha") has a pose of its own (slot 31: the wind-up, then the arm
+# out), since their slot 18 is a boss move: Kid Buu's rush, Majin Buu's antenna beam.
+nopose = []
+for n in ('kid_buu', 'majin_buu'):
+    a = actor_of(forms[n]); p31 = anim(a, 31); ki = all_views(a, 3)
+    if not p31 or len(all_views(a, 31)) != 3 or [fr[2] for fr in all_views(a, 31)] != [ki[0][2], ki[2][2], ki[2][2]]: nopose.append(n)
+check('Kid Buu and Majin Buu fire the Kamehameha from their ki blast\'s pose%s' % ((': %s' % nopose) if nopose else ''), not nopose)
+# The owner's rule (Nov 10, 21:20: "Never use guards as an attack frame, use ki blast frames but dont loop them just make it one smooth
+# sustained transition on beams if none exist"). a: no playable figure's ki blast, firing pose, slot 19 move or beam pose (3, 18, 19, 31)
+# shows a frame of its guard (slot 7), front, back and side alike (a guard that is itself another slot's frame, as the guests' filled
+# ones, doesn't count; nor does one view that came out the same: Goku Black's Instant Transmission starts on his guard's back view, two
+# of Goku's frames that his dark gi made alike). b: a beam pose built for a figure (slot 31) holds one frame while the beam is out
+# (frames 1 and 2 the same), so it doesn't loop.
+guards, loops = [], []
+for n, f in playable:
+    a = actor_of(f); sl = slots_of(a)
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    def looks(slot): return {tuple(look(v) for v in fr[:3]) for fr in all_views(a, slot)} if (slot in sl or (slot == 31 and anim(a, 31))) else set()
+    guard = looks(7) - looks(0) - looks(3) - looks(4)
+    if guard and any(looks(m) & guard for m in (3, 18, 19, 31)): guards.append(n)
+    if anim(a, 31):
+        p = all_views(a, 31)
+        if len(p) >= 3 and [look(v) for v in p[1][:3]] != [look(v) for v in p[2][:3]]: loops.append(n)
+check('no attack shows a guard frame%s' % ((': %s' % guards) if guards else ''), not guards)
+check('a beam pose made from the ki blast is held, not looped%s' % ((': %s' % loops) if loops else ''), not loops)
 # 14. Super Saiyan into 2 plays the Super Saiyan figure's slot 10 (Goku's: 30, outfit.c to_ss2): his power-up (slot 13's crouch, then arms
 # up), not a change from base again (GT Gohan's went back to black hair and glasses and turned Super Saiyan again; Goku's grew Super Saiyan
 # 3's hair). Armour Gohan's Super Saiyan has LoG2's own change into 2.

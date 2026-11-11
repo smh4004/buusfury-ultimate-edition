@@ -375,6 +375,27 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   (likely: a boss moved by hand never landed a hit to his left in s13diag; from a fresh fight he hits there).
 - Relocked as asked: the armour Vegetas, Broly Full Power; also Master Roshi (Krillin's frames under him had the same ki-blast and hit
   mix-up) and Blue Vegeta's two looks (their Blue power-up was his slot 21's punches). Each is in the review sent to the owner.
+- 21:00, the owner on the move GIFs: "SSJ4 Goku does instant transmission on dragon fist and ssj4 Gogeta has a weird green outline also
+  give all playable Buus forms kamehameha also fat Majin Buu energy punch looks bugged".
+  - Super Saiyan 4 Goku's slot 19 (his BSO figure's, from base Goku) is Instant Transmission: the stance, a fade, a line. The Super Dragon
+    Fist is the Dragon Fist's code, which shows slot 19 by frame number and carries him along with the dragon, so he vanished (the retail
+    Super Saiyan 3 does the same; left as the original). His slot 19 is now his stance, his ki blast's wind-up, then its arm out held. No
+    form in that figure has Instant Transmission, so nothing else plays it.
+  - The green on Super Saiyan 4 Gogeta was not in the game: the capture tool filled the Super Saiyan pools (+0x1E, +0x20) before it raised
+    the EP maximum. The HUD (0x0800B99C) draws each pool as pool * 41 / the EP maximum columns from a 41-column table, and its two pool
+    loops have no bound: past the table they wrote bar pixels wherever the next words pointed, here over sprite palette slots (127, his
+    fur's shade, turned green). The same stray writes went on in every capture and audit of the evening. The tools now set the EP maximum
+    first, `gif_cap.py` (the GIF previews' capture, with `gif_make.py`) checks the sprite palette is the game's own at the end of each
+    capture, and the game caps both lengths at 41 itself
+    (`outfit.c` `hud_row_guard`, on the way to `hud_skill_row`; test_nov10 7 reads the lengths at 0x0800BB8A: 0x8F each before, 41 now).
+  - Kid Buu and Majin Buu have the Kamehameha (`guest_sync` `buu`; Janemba keeps his three moves). Their slot 18 is a boss move (Kid Buu's
+    rush, Majin Buu's antenna beam), so the beam has a pose of its own (slot 31, `BEAM_FORMS`): the ki blast's wind-up while it charges,
+    then its arm out, held. Neither figure has a frame with both hands out. The rule for any figure with no beam frames (21:20, the
+    owner, on a try at Majin Buu's guard for the charge: "Never use guards as an attack frame, use ki blast frames but dont loop them
+    just make it one smooth sustained transition on beams if none exist"): test_frames checks no attack shows a guard frame and a built
+    beam pose holds one frame while the beam is out.
+  - Majin Buu's Energy Punch was his boss record's attack spread over the ten frames (lightning round his head while held, and no punch):
+    his ki blast's wind-up, then its arm out held, as the other guests'.
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
@@ -384,7 +405,8 @@ the poses an audit recorded as clean strips for the owner's previews.
 four ways, running, the punch combo, each skill held and let go, its changes up and down; every pose the game shows is drawn from the ROM,
 one sheet per form (`NOPNG=1`: only the poses), and `report.txt` flags poses with no frame, another retail character's frames, being-hit
 frames in a move, a double-tap that didn't run and a change that didn't happen. It fills Super Saiyan's and Super Saiyan 3's pools
-(+0x1E, +0x20) before picking a form and before each change, or a Super Saiyan 3 or Blue form drops back on the Switch screen. Some flags
+(+0x1E, +0x20) before picking a form and before each change, or a Super Saiyan 3 or Blue form drops back on the Switch screen; the EP
+maximum (+0x1C) goes up first, as a pool above it is outside what the game ever holds (see the green outline above). Some flags
 are the design, not faults: a change that didn't happen where it is gated (Super Saiyan 3 only from 2, Super Saiyan 4 only in a GT look,
 Blue and God after the Battle of Gods), and likely scene-only retail forms (1, 9, 11, 12, 23, 24, 32, 33, 42, 43, 48, 51, 53: not on the Switch
 screen) with no ki-blast or run animation, as in the retail game. Look at every sheet after: a wrong pose (a wind-up where

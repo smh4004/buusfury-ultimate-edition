@@ -32,7 +32,7 @@ GUEST = {'broly': [7, 8, ERASER], 'broly_fp': [7, 8, ERASER], 'android13': [7, 8
          'krillin': [7, 15, DISC, SOLAR, KK], 'videl': [7, KK], 'tien': [7, 15, BLITZ, SOLAR, KK], 'yamcha': [7, 15, KK], 'pikkon': [7, 8, WAVE],
          'hercule': [7, KK], 'goku_black': [7, 14, BKAME, ROSE], 'goku_rose': [7, 14, BKAME], 'future_trunks': [7, 20, 4, 11, GALICK],
          'future_trunks_ss': [7, 4, 11, GALICK, 20], 'uub': [7, 8, 15, MAJUUB], 'majuub': [7, 8, 15], 'roshi': [7, 8, 15, MAXP], 'roshi_max': [7, 8, 15],
-         'kid_buu': [7, 8], 'majin_buu': [7, 8], 'super_janemba': [7, 8]}
+         'kid_buu': [7, 8, 15], 'majin_buu': [7, 8, 15], 'super_janemba': [7, 8]}
 for p in ('pan', 'pan_ssj', 'pan_nobandana', 'pan_ssj_spiky'): GUEST[p] = [7, 8, 20]
 for p in ('pan_bug', 'pan_gi_tan', 'pan_gi_red', 'pan_brapan'): GUEST[p] = [7, 8]
 TRANSFORM = {20, 35, 22, 36, 44, 37, S13, S17, ROSE, MAJUUB, MAXP, 46, 47}
@@ -79,7 +79,10 @@ def play(name):
     if c == 7: send('poke8 %08X 03' % R)
     send('tap A 60', 'tap A 60', 'run 30'); mem(G)
     # Super Saiyan 3 and Blue forms drop back on the Switch screen when their pool (+0x1E Super Saiyan's, +0x20 Super Saiyan 3's) is empty
-    POOLS = ['poke8 %08X FF' % (R + 0x1E), 'poke8 %08X 03' % (R + 0x1F), 'poke8 %08X FF' % (R + 0x20), 'poke8 %08X 03' % (R + 0x21)]
+    # (the EP maximum first: the HUD draws each pool as pool * 41 / the EP maximum columns, and the retail loop has no bound, so a pool above
+    # the maximum wrote bar pixels over the sprite palette and whatever else the next table words pointed at. The game caps it now, outfit.c
+    # hud_row_guard; the audit still never asks for it)
+    POOLS = ['poke8 %08X FF' % (R + 0x1C), 'poke8 %08X 03' % (R + 0x1D)] + ['poke8 %08X FF' % (R + 0x1E), 'poke8 %08X 03' % (R + 0x1F), 'poke8 %08X FF' % (R + 0x20), 'poke8 %08X 03' % (R + 0x21)]
     send(*['tap RIGHT 40'] * POS[c]); send(*POOLS, 'poke8 %08X %02X' % (R + 0x14, f0), 'run 4', 'tap A 200', *POOLS, 'run 60')
     send('poke8 %08X %02X' % (R + 0x0C, len(skills)), *['poke8 %08X %02X' % (R + 0x0D + i, s) for i, s in enumerate(skills)], 'run 30')
     ok = (mem(R + 0x14)[0] & 255) == f0 and (mem(G)[0] & 255) == c

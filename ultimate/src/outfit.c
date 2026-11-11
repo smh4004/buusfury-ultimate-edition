@@ -40,7 +40,8 @@ static void guest_sync(void) {
         trunks[] = {5, 7, 20, 4, 11, GALICK_SKILL},     /* Future Trunks: the same moves as Trunks, and his father's Galick Gun (Nov 9) */
         pan[] = {3, 7, 8, 20}, pan_plain[] = {2, 7, 8},  /* Pan: ki blasts and her rush; Super Saiyan in the two looks that have it. Brapan (the Bulma-Pan fusion) fights as Pan */
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
-        roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL};    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
+        roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
+        buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
     const u8 *list;
@@ -61,7 +62,8 @@ static void guest_sync(void) {
     else if (form >= FORM_PAN + 4 && form <= FORM_PAN_LAST) list = pan_plain;
     else if (form == FORM_UUB || form == FORM_MAJUUB) list = uub;
     else if (form == FORM_ROSHI || form == FORM_ROSHI_MAX) list = roshi;
-    else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU || form == FORM_JANEMBA) list = fighter;
+    else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU) list = buu;
+    else if (form == FORM_JANEMBA) list = fighter;
     else return;
     r[0x0C] = list[0];
     for (i = 0; i < list[0]; i++) r[0x0D + i] = list[i + 1];
@@ -1866,6 +1868,17 @@ const u8 *hud_skill_row(u8 *record, int i) {
     if (record[0x0C] && record[0x0D + i] == 20 && is_ss2(record[0x14])) row += (SS2_SKILL - 20) * 24;
     return row;
 }
+/* The HUD's bars (sub_0800B99C) are drawn a column at a time from a 41-column table, and the loops for the two Super Saiyan pools (lengths at
+   sp + 0x502 and + 0x503: pool * 41 / the EP maximum) have no upper bound: a pool above the EP maximum walks off the table and writes bytes
+   of the bar's picture wherever the next words point, the sprite palette among them (Nov 10, the owner on a move GIF: "ssj4 Gogeta has a
+   weird green outline": the capture tool had filled the pools before raising the EP maximum, and the stray bytes turned palette slot 127,
+   his fur's shade, green). The skill icon's call comes after the lengths are worked out and before the loops, so it caps them here. */
+void hud_row_guard(void);
+__asm__(".syntax unified\n.thumb\n.thumb_func\n.global hud_row_guard\nhud_row_guard:\n"
+        "movs r3, #5\nlsls r3, r3, #8\nadd r3, sp\n"
+        "ldrb r2, [r3, #2]\ncmp r2, #41\nbls 1f\nmovs r2, #41\nstrb r2, [r3, #2]\n1:\n"
+        "ldrb r2, [r3, #3]\ncmp r2, #41\nbls 2f\nmovs r2, #41\nstrb r2, [r3, #3]\n2:\n"
+        "ldr r3, =hud_skill_row\nbx r3\n.ltorg\n");
 static int slot_of(const u8 *rec, int skill);
 /* From a Super Saiyan whose next form is Super Saiyan 2: once Super Saiyan 2 is open, the way up is through it (the Super Saiyan skill
    reaches it, held or not: ss_use); before the story opens it, Super Saiyan 3 goes straight on as in the retail game (its form: Super
