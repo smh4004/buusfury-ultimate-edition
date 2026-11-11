@@ -500,6 +500,43 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     Saiyan 4 Goku and Vegeta, and Teen Gohan for the Cell Games (LoG2 has his purple-gi base, record r50; his Super Saiyan and 2 only in
     the armor, r56 and r55, which Gohan's Saiyan armor already uses).
 
+- Nov 11, 13:26, the owner: "Did the super 13 fight with DBZ Gogeta, noticed it swapped back to Goku for the spirit bomb scene and then
+  when going back to the switch character menu after winning Gogeta is stuck permanently fused and Goku and Vegeta aren't selectable. I
+  guess add a rule to make the Super 13 fight specifically only startable and maybe only playable as Goku just to avoid bugs like this,
+  and revert any fusions if a player fuses mid fight for the spirit bomb scene just in case".
+  - What a fusion is in the party records (read from the game's code and scripts): record +0 bit 0 = in the party, bit 1 = selectable on
+    Switch Character. The Fusion Dance (skill 12, global script 13, script native 0xA8) clears bit 0 of both dancers, sets both bits of
+    the fused fighter, writes the dancers' slots into his +2 and his time into +8 (frames; -1 no limit). The fused fighter's own tick
+    (0x0800E15C) counts +8 down only while he is the one playing, and at 0 runs global script 14, which runs 503: the fused fighter
+    leaves, the dancers join and are made selectable (natives 0x98, 0x97, 0x99), and the dancer who started it plays (0x95).
+  - What broke: the Spirit Bomb finish makes Goku play (0x95(0)), which stops that clock for good with Goku and Vegeta still out; and
+    Gogeta's "no time limit" as a fighter of his own (`gogeta_keep` on Switch Character, `party_join` from the reward) then fell on the
+    danced Gogeta, so nothing could end the fusion. (The same after any scene that picks who plays: a Trial's set hero, the wish.)
+  - `outfit.c fusion_end` (after the ending only: the story has fusions of its own): a fused fighter who isn't the one playing leaves
+    and his dancers come back, selectable, as script 503 does; one who is playing with no time limit gets one frame, so the game ends
+    his fusion itself. It runs with `gogeta_keep` (every 32 frames in play, and on Switch Character), and for Gotenks too. `gogeta_keep`
+    and `party_join` give Gogeta "no time limit" only while Goku and Vegeta are both in the party (he is his own fighter then, not a
+    dance's). So a save stuck that way puts itself right, and a danced Gogeta keeps his clock and splits when it runs out; once split he
+    joins as himself again if a look of his is open (`story_sync`).
+  - Super 13's fight is Goku's: the doors into it (zone26.py, area 14's top door: to Android 13, or straight to Super 13 mid-fight) open
+    for Goku only (`more_get(252)`) until Super 13 is beaten; for anyone else a trigger on the same ground runs the quest list, which
+    says "Only Goku can win this fight. He steps in.", ends any fusion (`more_get(250)` = `fusion_end(1)`), makes Goku play and takes
+    him in (`build.py quest_npc_story`, its last two steps). The Fusion Dance can't be used in the fight's four rooms (`fusion_can` on
+    skill row 12). The finish calls `more_get(250)` too before it makes Goku play.
+  - `test_fusion.py` (debug zone build). The dance's button game can't be played by a script (five random moves; a wrong one gives the
+    fat or thin Gogeta, a scene of about five seconds that ends by itself, in the original game too), so a danced Gogeta is set up as
+    native 0xA8 leaves him and the next door builds his figure. Checks: his time counts down after the ending (the build before: -1);
+    at the door the message, then Goku in the fight's room with Goku and Vegeta back and selectable and Gogeta his own fighter; the
+    dance in the fight doesn't start, outside it is danced as ever; his time running out splits him the game's way; the stuck state
+    heals with Goku playing and with Gogeta playing.
+  - Found by that full run as well: `test_slots.py` pressed RIGHT five times for the guest slot, but a debug build's Gogeta now joins
+    by himself (his Dragon Ball Super looks are open there), so the guest is the seventh fighter; and its list of open guests follows
+    the moved flags (Future Trunks on 879, Krillin, Videl and Piccolo past 2000). The test's own navigation, not the game.
+  - And Super 13 "punching the air" again (`test_super13.py`: a fighter held at the field's left edge, (32, 200), took no hit in twelve
+    seconds; Super 13 stood at (56, 208), 24 px across and 8 down, inside the reach `arena_chase` let him stand at, punching). A punch
+    goes straight out the way he faces: fighting in place for a second and a half with no hit landing (the fighter's health hasn't
+    dropped), he now lines up with the fighter on the nearer axis, then closes to 16 px on the other.
+
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
 and any form id that moved: run it after each sprite or build change and account for every line. `python3 ultimate/pose_strip.py` draws

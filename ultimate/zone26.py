@@ -163,6 +163,7 @@ def links(cfg, masks):
 
 STATS = 0x711274
 PHASE1_ROW, BOSS_ROW = 113, 114      # placed nowhere else in the game
+S13_DOOR = (26, 14)                  # (world, area) whose top door is the way into the fight: only Goku fights it (apply, build.py quest_npc_story)
 STATS_COUNT, STATS_REFS = 150, (0xFCE4, 0xFD70, 0x1BA90, 0x24F28, 0x279DC, 0x2CD18, 0x2F5E4, 0x32D3C, 0x335B8, 0x39BD4, 0x39D90, 0x3A384, 0x3A698)
 RUSH = ((18, 73), (28, 43), (122, 154), (10, 38), (115, 49), (118, 51), (120, 52), (61, 47), (BOSS_ROW, 'super13'))
 # Dabura, Majin Buu, Super Janemba, Broly, Super Buu, Super Buu with Gotenks, Kid Buu, Super 13: enemy row and character from spawns.csv.
@@ -719,11 +720,18 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
             o = W.put(struct.pack('<2I4H2I', WARP[0], WARP[1], x0, y0, x1, y1, dest, ay << 16 | ax))
             param = 0
             if a == 14 and d['to'] == 15:                 # coming back mid-fight: straight to Super 13
-                param = condition(W, '    pushn 884\n    call not_flag\n    pushn 886\n    call flag\n    or\n    end\n')
+                # Only Goku starts or goes on with the fight (Nov 11, the owner: "make the Super 13 fight specifically only startable and maybe
+                # only playable as Goku": he fought it as a danced Gogeta, and its finish, Goku's Spirit Bomb, left Goku and Vegeta out of the
+                # party). The doors open for Goku (more_get(252)); for anyone else, until Super 13 is beaten (flag 886), a trigger on the same
+                # ground runs the quest list, which says so, makes Goku play and takes him in (build.py quest_npc_story's last two steps).
+                goku = '    pushn 252\n    call 0x%X\n' % MORE_GET
+                param = condition(W, '    pushn 884\n    call not_flag\n' + goku + '    and\n    pushn 886\n    call flag\n    or\n    end\n')
             exits.append((param, o))
             if a == 14 and d['to'] == 15:
                 o2 = W.put(struct.pack('<2I4H2I', WARP[0], WARP[1], x0, y0, x1, y1, d['key'] | 26 << 8 | 17 << 16 | 1 << 24, ay << 16 | ax))
-                exits.append((condition(W, '    pushn 884\n    call flag\n    pushn 886\n    call not_flag\n    and\n    end\n'), o2))
+                exits.append((condition(W, '    pushn 884\n    call flag\n    pushn 886\n    call not_flag\n    and\n' + goku + '    and\n    end\n'), o2))
+                o3 = W.put(struct.pack('<2I4HI', TRIGGER[0], TRIGGER[1], x0, y0, x1, y1, quest_list))
+                exits.append((condition(W, goku + '    push 0\n    eq\n    pushn 886\n    call not_flag\n    and\n    end\n'), o3))
         objs = []
         for e in ac.get('enemies', []):
             objs.append(W.put(struct.pack('<8I', 0x0800FD55, (condition(W, e['script']) if 'script' in e else e.get('condition', 0)), e['row'], e['y'] << 16 | e['x'],

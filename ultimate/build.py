@@ -345,11 +345,17 @@ def quest_npc(src):
 
 def quest_npc_story(src):
     """Post-game, this resident sends you to Zone 26, and rewards you once Super 13 is beaten (his death script runs this list).
+    The last two steps are the door of the fight for anyone but Goku (Nov 11, the owner: "make the Super 13 fight specifically only
+    startable and maybe only playable as Goku"; its finish is his Spirit Bomb): zone26.py's trigger at the door runs this list, step 1
+    sees the area, and Goku is made to play (any fusion ended first, more_get(250)) and taken in. The finish ends a fusion too, before
+    it makes Goku play: one danced mid-fight left Goku and Vegeta out of the party for good ("just in case": the Fusion Dance can't be
+    used in the fight now, outfit.c fusion_can).
     A step's `push N` jumps to the Nth step counting from 0, the same number the following step's position gets; past the last step ends the list."""
+    import zone26
     head, old = src.split('step 1 say', 1)
     ids = new_actor_ids(); super13 = ids['super13'] + 9; absorb = ids['android13_absorb'] + 9
-    return head + '''step 1 code
-    pushn 888
+    door = '    pushn 251\n    call 0x%X\n    pushn %d\n    eq\n    jz L9\n    push 25\n    end\nL9:\n' % (zone26.MORE_GET, zone26.S13_DOOR[1] << 8 | zone26.S13_DOOR[0])
+    return head + 'step 1 code\n' + door + '''    pushn 888
     call flag
     pushn 887
     call not_flag
@@ -391,7 +397,7 @@ L2:
     pushn 884
     call flag
     jz L7
-    push 25
+    push 27
     end
 L7:
     call flag(149)
@@ -401,7 +407,7 @@ L3:
     end
 step 2 say''' + old.rstrip() + '''
 step auto code
-    push 25
+    push 27
     end
 step auto say 0x85 "Something's wrong past the Z-Mart. Dr. Gero's old computer has woken up!"
 step auto say 0x85 "It built one last Android, up in the snow. Hurry!"
@@ -412,7 +418,7 @@ step auto code
     call 0x79(30)
     end
 step auto code
-    push 25
+    push 27
     end
 step auto say 0x85 "The signal stopped! You beat Super 13!"
 step auto say 0x85 "And you've made new allies out there! See the Switch Character menu."
@@ -432,11 +438,11 @@ step auto code
     call set_flag
     pushn 8, %d
     call 0x%X
-    push 25
+    push 27
     end
 step auto say 0x85 "Want a real fight? Hercule City has a Challenge Board now. Ask the tournament official!"
 step auto code
-    push 25
+    push 27
     end
 step auto code
     pushn %d, 120, 214
@@ -464,10 +470,14 @@ step auto code
     pushn %d, 20, 0
     call 0x51
     call wait(40)
-    push 25
+    push 27
     end
 step auto say 0x02 "He's still standing! I need everyone's energy!"
 step auto code
+    pushn 250
+    call 0x%X
+    jz L5
+L5:
     call 0x95(0)
     pushn %d, 120, 214
     call 0x35
@@ -559,17 +569,40 @@ L4:
     call 0x33(0)
     end
 step auto code
-    push 25
+    push 27
     end
 step auto say 0x85 "You beat all nine! Majin Buu, Super Janemba and Kid Buu join you. See Switch Character."
 step auto code
     pushn 887
     call set_flag
-    push 25
+    push 27
     end
 step auto code
     end
-''' % (form_row('android13'), JOIN_NATIVE, absorb, super13, super13, super13, super13, super13, super13)
+step auto say 0x00 "Only Goku can win this fight. He steps in."
+step auto code
+    pushn 250
+    call 0x%X
+    jz L1
+L1:
+    call 0x95(0)
+    call 0x78(20)
+    pushn 884
+    call flag
+    pushn 886
+    call not_flag
+    and
+    jz L2
+    pushn 26, 17, 1, 120, 276
+    jmp L3
+L2:
+    pushn 26, 15, 1, 120, 276
+L3:
+    call 0x77
+    call 0x79(20)
+    push 27
+    end
+''' % (form_row('android13'), JOIN_NATIVE, absorb, super13, super13, super13, zone26.MORE_GET, super13, super13, super13, zone26.MORE_GET)
 
 
 def tournament_npc(src):
@@ -2523,6 +2556,10 @@ def add_eraser(rom, clean, sym, at, art):
     if struct.unpack_from('<HH', rom, SKILL_ROWS + 24 * 5 + 12) != (1320, 1321) or struct.unpack_from('<II', rom, SKILL_ROWS + 24 * 5 + 16) != (0x08019E9F, 0x08019EB9):
         sys.exit('skill row 5 is not the original Dragon Fist Explosion')
     struct.pack_into('<II', rom, SKILL_ROWS + 24 * 5 + 16, sym['dragon_can'] | 1, sym['dragon_use'] | 1)
+    # The Fusion Dance (row 12) can't be used in Super 13's fight (outfit.c fusion_can); changed where it lies too.
+    if struct.unpack_from('<II', rom, SKILL_ROWS + 24 * 12 + 16) != (0x0801A169, 0x0801A19F):
+        sys.exit('skill row 12 is not the original Fusion Dance')
+    struct.pack_into('<I', rom, SKILL_ROWS + 24 * 12 + 16, sym['fusion_can'] | 1)
     if struct.unpack_from('<I', rom, 0x13618)[0] != ROM_BASE + SKILL_ROWS:
         sys.exit('skill table reference moved')
     struct.pack_into('<I', rom, 0x13618, put(bytes(rom[SKILL_ROWS:SKILL_ROWS + 24 * ERASER_SKILL]) + b''.join(rows[k] for k in sorted(rows))))

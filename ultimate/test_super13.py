@@ -98,10 +98,10 @@ for sx, sy in ((32, 200), (288, 200), (160, 112), (160, 240), (60, 130), (260, 1
     reach.append(((sx, sy), hp0 - low))
     send('poke8 %08X %02X' % (REC + 0x16, hp0 & 255), 'poke8 %08X %02X' % (REC + 0x17, hp0 >> 8), 'run 30')
 print('   damage he did at each spot:', reach)
-# Known gap (Nov 10, late): after the long fight above, a fighter held in the field's bottom-left corner (40, 240) takes no hits: Super 13
-# stands just right of him punching at head height. From a fresh fight he hits there (s13diag side2). The other six spots must all land.
-check('he reaches and hits a fighter standing still anywhere on the field but the bottom-left corner (a known gap: %s)' % reach[-1][1],
-      all(d > 0 for _, d in reach[:-1]))
+# All seven must land. (Nov 10 left a gap: after the long fight above, a fighter held in the bottom-left corner (40, 240) took no hits,
+# Super 13 standing beside him punching at head height. Nov 11 the full run had the same at the left edge, (32, 200): he stood at (56, 208),
+# inside the reach arena_chase let him stand at, and no punch landed in twelve seconds. He lines up with the fighter now when none land.)
+check('he reaches and hits a fighter standing still anywhere on the field, the edges and the bottom-left corner too', all(d > 0 for _, d in reach))
 check('no bad jumps', not bad[0])
 p.stdin.close(); p.wait(timeout=60)
 print('screens in', W)

@@ -227,10 +227,13 @@ static void more_flag_set(int f, int on) {
 #define MORE_POINTS 255
 int mastery_level(int c, int skill);
 /* Battle of Gods (ultimate/bog.py) asks more_get these too: 251 this area (area << 8 | world), 252 Goku playing, 253 the quest can start
-   (after the ending and the Garlic Jr. quest (garlic.py: it comes first, the owner's choice), Goku's Super Saiyan mastered, Goku playing) */
+   (after the ending and the Garlic Jr. quest (garlic.py: it comes first, the owner's choice), Goku's Super Saiyan mastered, Goku playing).
+   250 ends any fusion (fusion_end: Super 13's door and his Spirit Bomb finish ask it before they make Goku play) */
+int fusion_end(int now);
 void more_get(int *sp) {
     int n = *sp, f = sp[n], me = *(u8 *)0x03001068;
-    if (f == 251) sp[n] = *(volatile u16 *)0x0300197C;
+    if (f == 250) sp[n] = fusion_end(1);
+    else if (f == 251) sp[n] = *(volatile u16 *)0x0300197C;
     else if (f == 252) sp[n] = me == 0;
     else if (f == 253) sp[n] = GetFlag((void *)0x03001068, 149) && more_flag(MORE_GJ_DONE) && mastery_level(0, 20) == 2 && me == 0;
     else sp[n] = more_flag(f);
@@ -602,10 +605,15 @@ static void no_story_walk(u8 *e) {
    into fighting (0x71), and in 0x71 he stood where he was for the rest of the fight with the fighter out of reach (test_super13: frozen
    at 36% for the last 50 steps, no hit on a fighter standing anywhere): fighting 40 frames without moving with the fighter out of
    reach (past 24 px across or 16 up or down; he stopped 35-36 px off, where his punch barely reached) he steps at him too. (Sent back
-   to walking instead, he went into the special and stood for longer.) */
+   to walking instead, he went into the special and stood for longer.)
+   Within that reach his punches can still miss for good (Nov 11: a fighter at the field's left edge, (32, 200), with Super 13 at
+   (56, 208), 24 px across and 8 down: twelve seconds of punches, no hit; before, the same in the bottom-left corner after a long
+   fight). A punch goes straight out the way he faces, so he has to stand level with the fighter (or straight above or below him):
+   fighting in place for a second and a half with none of his hits landing (the fighter's health, record +0x16, hasn't dropped), he
+   lines up on the nearer axis, then closes to 16 px on the other. */
 #define DABURA_WAIT 0x6F
 #define DABURA_WALK 0x72
-struct arena_chase { u8 *e; short x, y; u16 still, idle; };
+struct arena_chase { u8 *e; short x, y; u16 still, idle; short hp; u16 miss; };
 #define AC (*(struct arena_chase *)0x0203F270)
 static void arena_chase(u8 *e) {
     u8 *pl = *(u8 **)0x03001C34;
@@ -614,7 +622,7 @@ static void arena_chase(u8 *e) {
     if (!IN_EWRAM(pl) || *(int *)(e + 0x23C) != 1 || *(const u32 *)(*(const u8 **)(e + 0x224) + 8) != DABURA_AI) return;
     fx = *(int *)(e + 0x1A0) >> 8; fy = *(int *)(e + 0x1A4) >> 8;
     dx = (*(int *)(pl + 0x1A0) >> 8) - fx; dy = (*(int *)(pl + 0x1A4) >> 8) - fy;
-    if (AC.e != e) { AC.e = e; AC.still = AC.idle = 0; AC.x = fx; AC.y = fy; }
+    if (AC.e != e) { AC.e = e; AC.still = AC.idle = AC.miss = 0; AC.x = fx; AC.y = fy; AC.hp = 0; }
     if (st == STATE_TABLE + 8 * DABURA_WALK && (dx > 36 || dx < -36 || dy > 20 || dy < -20)) {
         if (fx == AC.x && fy == AC.y) { if (AC.still < 1000) AC.still++; } else AC.still = 0;
         if (AC.still > 12) {
@@ -628,8 +636,28 @@ static void arena_chase(u8 *e) {
             if (dx) *(int *)(e + 0x1A0) += dx > 0 ? 0x180 : -0x180;
             if (dy > 8 || dy < -8) *(int *)(e + 0x1A4) += dy > 0 ? 0x100 : -0x100;
         }
+        AC.miss = 0;
     }
-    else AC.still = 0;
+    else {
+        AC.still = 0;
+        if (st == STATE_TABLE + 8 * DABURA_FIGHT) {
+            int hp = *(short *)(RECORDS + *(u8 *)0x03001068 * RECORD_SIZE + 0x16);
+            int ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy;
+            if (hp < AC.hp || fx != AC.x || fy != AC.y) AC.miss = 0; else if (AC.miss < 1000) AC.miss++;
+            AC.hp = hp;
+            if (AC.miss > 90) {
+                if (ax >= ay) {
+                    if (ay > 2) *(int *)(e + 0x1A4) += dy > 0 ? 0x100 : -0x100;
+                    else if (ax > 16) *(int *)(e + 0x1A0) += dx > 0 ? 0x100 : -0x100;
+                }
+                else {
+                    if (ax > 2) *(int *)(e + 0x1A0) += dx > 0 ? 0x100 : -0x100;
+                    else if (ay > 16) *(int *)(e + 0x1A4) += dy > 0 ? 0x100 : -0x100;
+                }
+            }
+        }
+        else AC.miss = 0;
+    }
     if (st == STATE_TABLE + 8 * DABURA_WAIT && (dx > 110 || dx < -110 || dy > 70 || dy < -70)) {
         if (++AC.idle > 90) { AC.idle = 0; STATE_GOTO(e, DABURA_WALK); }
     }
@@ -1466,7 +1494,7 @@ void party_join(int *sp) {
     static const u8 lean[2][3] = {{110, 110, 110}, {120, 85, 110}};    /* strength, power, endurance: Gogeta, Broly */
     const u8 *l = lean[c == 8];
     *sp = n - 2;
-    if (c == 7) *(int *)(r + 8) = -1;       /* no fusion time limit (story_sync) */
+    if (c == 7 && (REC(0)[0] & 1) && (REC(4)[0] & 1)) *(int *)(r + 8) = -1;       /* no fusion time limit (story_sync); a Fusion Dance's Gogeta keeps his (gogeta_keep) */
     if (r[0] & 1) return;
     r[0] |= 1;
     FORM_OF(c) = form;
@@ -1718,6 +1746,14 @@ void dragon_use(u8 *record, void *sprite) {
     const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
     DragonFist_Use(record, sprite);
     if (actor && actor[0] > FIST_POSE && *(const u32 *)(actor + 0x54 + 4 * FIST_POSE)) Sprite_SetFacing(sprite, FIST_POSE);
+}
+/* The Fusion Dance (skill 12) can't be used in Super 13's fight (Nov 11, the owner: "make the Super 13 fight specifically only startable
+   and maybe only playable as Goku"): its finish is Goku's Spirit Bomb. Zone 26's areas 15 to 18: Android 13, his change, Super 13, the finish. */
+#define FusionCan ((int (*)(u8 *))0x0801A169)
+int fusion_can(u8 *record) {
+    u16 at = *(volatile u16 *)0x0300197C;
+    if ((at & 0xFF) == 26 && (at >> 8) >= 15 && (at >> 8) <= 18) return 0;
+    return FusionCan(record);
 }
 #define KameCan ((int (*)(u8 *))0x0801A335)
 static int is_ssj4(int form);
@@ -2110,8 +2146,38 @@ static int gogeta_open(void) {                 /* is any of Gogeta's looks unloc
     for (i = 0; i < n; i++) if (outfit_open(&outfit_table[first + i])) return first + i;
     return -1;
 }
+/* A fusion that has gone wrong, after the ending (Nov 11, the owner: "Did the super 13 fight with DBZ Gogeta, noticed it swapped back to
+   Goku for the spirit bomb scene and then ... Gogeta is stuck permanently fused and Goku and Vegeta aren't selectable"). A Fusion Dance
+   (script native 0xA8) takes both dancers out of the party (record +0 bit 0), puts the fused fighter in, selectable (bits 0 and 1), and
+   gives him a time (+8, frames) that the HUD counts down only while he is the one playing; at 0 the game's own script (global script
+   503) takes him out again and puts the dancers back, selectable. Two things broke that: a scene that makes someone else play (native
+   0x95: the Spirit Bomb finish, a Trial's set hero, a pick on Switch Character) stops the clock for good, and Gogeta's "no time limit"
+   as a fighter of his own (gogeta_keep, party_join) fell on a danced Gogeta too, so the dancers never came back.
+   fusion_end puts that right the way the game's script does: a fused fighter who isn't the one playing leaves and his dancers come
+   back; one who is playing with no time limit gets one frame, so the game ends his fusion itself. `now` (Super 13's door and finish):
+   the one playing ends too. -> 1 if a fusion was ended. Only after the ending: the story has fusions of its own, with no limit. */
+static const u8 fusions[][3] = {{7, 0, 4}, {5, 2, 3}};       /* the fused fighter, his two dancers */
+int fusion_end(int now) {
+    int k, did = 0, me = *(u8 *)0x03001068;
+    if (!GetFlag(G_FLAGS, 149)) return 0;
+    for (k = 0; k < (int)(sizeof fusions / sizeof *fusions); k++) {
+        u8 *f = REC(fusions[k][0]), *a = REC(fusions[k][1]), *b = REC(fusions[k][2]);
+        if (!(f[0] & 1) || ((a[0] & 1) && (b[0] & 1))) continue;       /* not fused: he isn't in the party, or both dancers are */
+        if (me == fusions[k][0] && !now) {
+            if (*(int *)(f + 8) < 0) *(int *)(f + 8) = 1;
+            continue;
+        }
+        a[0] |= 3; b[0] |= 3;
+        f[0] &= ~1; *(int *)(f + 8) = 0;
+        did = 1;
+    }
+    return did;
+}
+/* Gogeta as a fighter of his own (a look of his unlocked, after the ending): in the party with no time limit. Not while a Fusion Dance's
+   Gogeta is out (his dancers aren't in the party): that one keeps his clock, and joins as himself once it has run out (story_sync). */
 void gogeta_keep(void) {
-    if (GetFlag(G_FLAGS, 149) && gogeta_open() >= 0) {
+    fusion_end(0);
+    if (GetFlag(G_FLAGS, 149) && gogeta_open() >= 0 && (REC(0)[0] & 1) && (REC(4)[0] & 1)) {
         u8 *g = REC(7);
         *(int *)(g + 8) = -1;
         if (g[0x0C] >= 5) g[0] |= 1;
