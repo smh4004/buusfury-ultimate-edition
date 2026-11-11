@@ -377,6 +377,18 @@ for n in sorted(BB | {'pikkon', 'piccolo', 'yamcha', 'goku_black', 'goku_rose', 
     a = actor_of(forms[n]); sl = slots_of(a)
     if 18 in sl and 9 in sl and {fr[2] for fr in all_views(a, 18)} & {fr[2] for fr in all_views(a, 9)}: held18.append(n)
 check('no beam or ball is fired with being-hit frames%s' % ((': %s' % held18) if held18 else ''), not held18)
+# ... nor lying down: slot 18 shares no frame (by its pixels) with the knockdown slots 15-17 on any playable figure (GT Trunks's slot 18 was
+# his BSO figure's getting up, so his Flame Kamehameha fired from the ground)
+down18 = []
+for n, f in playable:
+    a = actor_of(f); sl = slots_of(a)
+    if 18 not in sl: continue
+    def pix(fp):
+        try: im = image(fp)
+        except ValueError: im = None           # a frame of odd pieces: by its pointer
+        return im.tobytes() if im is not None else fp
+    if {pix(fr[2]) for fr in all_views(a, 18)} & {pix(fr[2]) for m in (15, 16, 17) if m in sl for fr in all_views(a, m)}: down18.append(n)
+check('no beam or ball is fired lying down%s' % ((': %s' % down18) if down18 else ''), not down18)
 # Great Saiyaman's change (slot 19) on every Gohan outfit is a costume change, not a move: none of the outfit's ki, beam or punch frames
 # (armour Gohan's was ten frames of his ki push), and it ends on Great Saiyaman (the frames after it are the costume's own).
 outfits1 = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'outfits.json')))['characters']['1']
@@ -387,7 +399,7 @@ for o in outfits1:
     moves = {look(fr[2]) for m in (3, 4, 5, 18, 31) if m in sl for fr in all_views(a, m)}
     if 19 not in sl or {look(fr[2]) for fr in all_views(a, 19)} & moves: costume.append(o['form'])
 check('every Gohan outfit changes into Great Saiyaman with a costume change, not a move%s' % ((': %s' % costume) if costume else ''), not costume)
-# The guests' charged ki ball (skill 8) and Gogeta's skill 5 show slot 19's frames 0-3 by number, then 2 and 3 in turn while held: those two
+# The guests' Energy Punch (skill 8) and Gogeta's Dragon Fist Explosion (skill 5) show slot 19's frames 0-3 by number, then 2 and 3 in turn while held: those two
 # are a move, not the stance or a step (Pikkon, Kid Buu and Android 13 stood; Blue Gogeta's four frames were spread over ten, DBS Gogeta's
 # slot 19 was his stance).
 S19 = ['goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'goten_gt_green_ssj', 'gogeta_ssj4', 'broly', 'broly_fp', 'android13', 'super13', 'android17', 'super17', 'pikkon', 'uub', 'majuub', 'roshi', 'roshi_max', 'kid_buu', 'majin_buu',
@@ -405,7 +417,7 @@ for n in S19:
     spread = held[0] == v19[0] and n not in ('super13', 'majin_buu', 'super_janemba')   # frame 2 the same as 0: spread out (those three on purpose)
     if len(held) < 2 or any(h in rest for h in held) or spread or vanish: still.append(n)
 
-check('the charged ki ball and Gogeta\'s skill 5 hold a move, not the stance%s' % ((': %s' % still) if still else ''), not still)
+check('Energy Punch and Gogeta\'s Dragon Fist Explosion hold a move, not the stance%s' % ((': %s' % still) if still else ''), not still)
 # 14. Super Saiyan into 2 plays the Super Saiyan figure's slot 10 (Goku's: 30, outfit.c to_ss2): his power-up (slot 13's crouch, then arms
 # up), not a change from base again (GT Gohan's went back to black hair and glasses and turned Super Saiyan again; Goku's grew Super Saiyan
 # 3's hair). Armour Gohan's Super Saiyan has LoG2's own change into 2.

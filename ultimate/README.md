@@ -355,11 +355,17 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   a Gohan outfit with no way back. His change into the costume was ten frames of his ki push (LoG2's default map): his arms up, then the
   school uniform's white flash into Great Saiyaman. Super Saiyan pressed as Great Saiyaman changed him into form 255 and the game jumped
   to garbage (the retail `SS_Can` only refuses when up equals down): `ss_can` now refuses a base form with no form above.
-- The charged ki ball (skill 8) and Gogeta's skill 5 show slot 19's frames 0-3 by number, then 2 and 3 in turn: slot 19 now keeps its
+- Energy Punch (skill 8) and Gogeta's Dragon Fist Explosion (skill 5) show slot 19's frames 0-3 by number, then 2 and 3 in turn: slot 19 now keeps its
   frames in place when stretched (`sprites.INDEXED`; Majin Buu's, Janemba's and Super 13's longer boss attacks stay spread, `even`).
-  Pikkon, Kid Buu, Android 13 and Full Power Broly held their stance; GT Goten a flying kick; Super Saiyan 4 Gogeta (the owner's sheet)
+  Pikkon, Kid Buu, Android 13 and Full Power Broly held their stance (Broly his boss barrier); GT Goten a flying kick; Super Saiyan 4 Gogeta (the owner's sheet)
   vanished; Blue Gogeta never reached his arm out: their ki blast's wind-up, then the arm out (`fighter_poses`). DBS Gogeta's sheet map
   read slots 3, 7, 9 and 19 as charge, hurt, ki and idle: his ki blast showed the power-up and a hit the ki blast's arm out (`gogeta.py`).
+- GT Trunks fired his Flame Kamehameha lying on the ground (slot 18 from his BSO figure, where 18 is getting up): found in the in-game
+  move GIFs made for the owner (20:35, "Preview every fix as an animated gif too for everyones beam/ki blast frames at least");
+  test_frames now checks no figure fires with its knockdown frames.
+  The same footage showed Great Saiyaman over any other outfit flash the school uniform on the way back (BF's figure ends its change
+  there): the `saiyaman_from_` forms now wear a copy, `saiyaman_outfit`, that ends on the white figure. And Broly's Energy Punch was his
+  boss barrier (a golden shell): his ki blast's wind-up and arm out, as the other guests'.
 - Gogeta after the ending: `gogeta_keep` put him in the party as soon as his flag was set, a moment before the reward's join, which then
   skipped his form, level and skills (test_zone26, by frame count); now only once he has his five skills.
 - Super 13 after 60%: Dabura's behaviour keeps reaching for the flying special, which `no_story_walk` turns back into fighting (0x71), and

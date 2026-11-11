@@ -1419,6 +1419,10 @@ def add_actors(rom, clean):
                       'gohan_gt_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
                                           # was the base's change, so into 2 he went back to black hair and glasses first (test_frames 14)
     cfg['broly_player'] = {'template': 29}       # the playable Broly's own copy of the story's figure: his slot 18 is the Eraser Cannon's pose (fighter_poses), the boss keeps his. Last: scripts name the ids before it
+    # Great Saiyaman worn over another outfit (the saiyaman_from_ forms): BF's figure (actor 102) ends its change back (slots 11 and 19)
+    # on the school uniform, grey then full, so every other outfit flashed the school uniform before its own (seen in the Nov 10 GIFs).
+    # A copy that ends on the white figure instead; the school uniform's own Great Saiyaman (form 14) keeps BF's. After broly_player.
+    cfg['saiyaman_outfit'] = {'template': 102, 'reframe': {'11': [0, 1, 2, 3, 4, 5, 5, 5, 5], '19': [0, 1, 2, 3, 4, 5, 5, 5, 5]}}
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
 
@@ -1489,11 +1493,15 @@ def fighter_poses(rom, ids, at):
     flash = anim(u(ACTORS_AT + 4 * 98) - ROM_BASE, 19)
     if not flash or len(flash) != 10: sys.exit('retail Gohan (actor 98): no ten-frame Great Saiyaman change')
     set_slot('gohan_armor', 19, [need('gohan_armor', 13, 0)] + [need('gohan_armor', 13, 1)] * 3 + flash[4:])
-    # The charged ki ball (skill 8) shows slot 19's frames 0-3 by number, then 2 and 3 in turn while held. Pikkon, Kid Buu and Android 13 had
+    # Energy Punch (skill 8) shows slot 19's frames 0-3 by number, then 2 and 3 in turn while held. Pikkon, Kid Buu and Android 13 had
     # their stance there (filled from slot 0), Full Power Broly his sheet's idle: their ki blast's wind-up, then its arm out held (ten frames,
     # a retail player's slot 19: the Ghost Attack once read past a shorter one). test_frames.
-    for name in ('pikkon_player', 'kid_buu_player', 'android13_player', 'broly_fp'):
+    for name in ('pikkon_player', 'kid_buu_player', 'android13_player', 'broly_fp', 'broly_player'):     # (Broly's was his boss barrier: a golden shell)
         set_slot(name, 19, [need(name, 3, 0)] * 2 + [need(name, 3, 1)] * 8)
+    # GT Trunks's slot 18 (from his BSO figure, where 18 is getting up) lay on the ground: his Flame Kamehameha fired lying down (seen in
+    # the Nov 10 move GIFs). His ki blast's wind-up, then its arm out held.
+    for name in ('trunks_gt', 'trunks_gt_ssj'):
+        set_slot(name, 18, [need(name, 3, 0)] + [need(name, 3, 1)] * 5)
     # GT Goten's (from his BSO figure) is a flying kick and a spin, and Super Saiyan 4 Gogeta's (the owner's sheet) a vanish, so the hold
     # showed a kick or nothing: the stance, their ki blast's wind-up, then its arm out held.
     for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'gogeta_ssj4'):

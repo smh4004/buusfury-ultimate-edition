@@ -50,7 +50,7 @@
   {
    "id": "saiyaman_from_green",
    "copy": 14,
-   "character": 111,
+   "actor": "saiyaman_outfit",
    "owner": 1,
    "name": 1186,
    "up": 255,
@@ -59,7 +59,7 @@
   {
    "id": "saiyaman_from_orange",
    "copy": 14,
-   "character": 111,
+   "actor": "saiyaman_outfit",
    "owner": 1,
    "name": 1186,
    "up": 255,
@@ -469,7 +469,7 @@
   {
    "id": "saiyaman_from_gt",
    "copy": 14,
-   "character": 111,
+   "actor": "saiyaman_outfit",
    "owner": 1,
    "name": 1186,
    "up": 255,
@@ -478,7 +478,7 @@
   {
    "id": "saiyaman_from_gt_ng",
    "copy": 14,
-   "character": 111,
+   "actor": "saiyaman_outfit",
    "owner": 1,
    "name": 1186,
    "up": 255,
@@ -757,7 +757,7 @@
   {
    "id": "saiyaman_from_armor",
    "copy": 14,
-   "character": 111,
+   "actor": "saiyaman_outfit",
    "owner": 1,
    "name": 1186,
    "up": 255,
