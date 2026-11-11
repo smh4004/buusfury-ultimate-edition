@@ -8,7 +8,22 @@ behaviour plays every animation it expects. Each frame gets:
     with its chin on Kid Buu's chin, facing the way Kid Buu's head faced;
   - his collar (white, gold and blue, from the owner's sprite) on the four rows under the chin while he stands;
   - his colours: purple skin, gold wristbands, dark blue trousers with a navy waist and an orange gem, a gold hem, brown shoes.
-Effects (white trails, steam, sparks) keep BF's colours. A frame whose head isn't found is counted and printed by the build."""
+Effects (white trails, steam, sparks) keep BF's colours. A frame whose head isn't found is counted and printed by the build.
+
+Nov 11, the owner on the side view ("the side view sucks"; "base it off a buus fury shape or the existing sprite"; "Maybe super janemba";
+"Use janemba but fix the eyes and ears and maintain visual clarity and attention to detail"; "make the sprite a bit taller potentially
+but not janemba full height"): HEAD_SIDE_NEW and frame(), both off until he approves his preview (ultimate/beerus_preview.py draws it):
+  - HEAD_SIDE_NEW: Super Janemba's side head (actor 145) gives the shape: a skull as deep as the front head is wide, the brow over the
+    eye, both ears showing as both his horns show. On it the owner's own pixels: his front sprite's ear twice (the near one with its
+    light inside and his earring, the far one before it, a gap between their tips), and his eye's gold with a black pupil, two by two
+    under a dark brow so it reads at the game's size.
+  - frame(): the frame `tall` = (torso, legs) pixels longer. Kid Buu's body makes Beerus 30 rows standing (Goku 31, Super Janemba 59).
+    A seam is one pixel in every column, joined from the frame's left edge to its right, laid through the cheapest pixels of Kid Buu's
+    frame: its pixel and all above stay, it and all below go down one, so that part of him is a pixel longer. A leg seam runs through
+    the trousers, a torso seam through bare skin under the chin (the collar is drawn over the first three rows after, so the new row
+    shows as belly); belts, wristbands, shoes and the head are never repeated, and a seam that could only be made by cutting one is
+    not made (the other kind is tried). The frame is turned first so the body hangs below the head (lying frames grow along the
+    body; a body drawn behind the head, foreshortened, is left). It is lengthened BEFORE it is dressed, so the head is found as ever."""
 import hashlib
 import numpy as np
 
@@ -32,6 +47,8 @@ HEAD_BACK = ('...B.......B...', '...B.......B...', '..BCB.....BCB..', '..BCB....
 # does in his side view; eye and brow at the front, a short muzzle, the chin under it
 HEAD_SIDE = ('.......B..', '.......B..', '......BCB.', '......BCB.', '.....BCCDE', '.....BCCCB', '...BBBCCCB',
              '..BCCCCCCB', '.BCCCCCCCB', '.BFFFCCCCB', 'BFBBBFCCCB', 'BFGBFCCCB.', 'BFHEFCCCB.', '.BFFCCCB..', '..BBBBB...')
+HEAD_SIDE_NEW = ('....B...B...', '....B...B...', '...BCB.BFB..', '...BCB.BFB..', '...BCBBCFDE.', '...BCBBCFCB.', '...BBBBCCCBB',
+                 '..BCCCCCCCCB', '.BCCCCCCCCCB', '.BFFCCCCCCCB', '.BBBBFCCCCCB', 'BFEEBFCCCCB.', 'BFHEFFCCCB..', '.BFFFCCBB...', '..BBBBB.....')
 COLLAR_FRONT = (REF[15], REF[16], '.BEIIIMNMIIIEB.')     # three of the sprite's four collar rows, the gem on the last: Kid Buu's chest is shorter
 COLLAR_BACK = ('..JIIIIIIIIIJ..', '.DEIIIIIIIIIED.', '..BEEEEEEEEEB..')
 COLLAR_SIDE = ('..IJIII..', '.DIIKJID.', '..BEEEB..')
@@ -43,6 +60,8 @@ FACE = (1, 3, 31, 32, 33)                         # Kid Buu's eyes and mouth
 PANTS = (111, 112, 113, 114, 115, 116, 117, 118, 119, 120)
 ACCENT = (1, 62, 63, 64, 65, 79, 109, 111, 16, 77, 78, 81, 211, 248)       # belt, wristbands, shoes
 MIN_MATCH = 0.5
+LEG = tuple(range(113, 121))                      # his trousers without 111 and 112, which the belt and wristbands use too
+SEAM_DEAR = 80                                    # a seam dearer than this would repeat something it shouldn't: it isn't made
 # Frames whose head the matcher can't find (a scream, the dash's blur): Kid Buu's frame (sha1 of its pixels, 12 hex) -> the box cleared
 # (rows y0..y1, columns x0..x1: his skin, face and blur colours only), the head drawn (0 front, 2 side), its chin row and centre column,
 # and whether the collar goes on. Read off grids of each frame (tools: a zoomed sheet with coordinates).
@@ -86,16 +105,66 @@ def _crop(img):
     return img[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 
 
+def seam(img, cost, lo, hi):
+    """The cheapest path from the left edge to the right with one row in every column, in rows lo..hi: neighbours at most a row apart,
+    but free between two empty pixels. -> ([row per column], cost)"""
+    H, W = img.shape; empty = img == 0; BIG = 10 ** 6
+    c = np.full((H, W), BIG, np.int64); c[lo:hi + 1] = cost[lo:hi + 1]
+    tot = np.full((H, W), BIG * 100, np.int64); back = np.zeros((H, W), np.int32)
+    tot[:, 0] = c[:, 0]
+    for x in range(1, W):
+        prev = tot[:, x - 1]
+        e_rows = np.nonzero(empty[:, x - 1])[0]
+        e_best = e_rows[prev[e_rows].argmin()] if len(e_rows) else None
+        for r in range(lo, hi + 1):
+            best, arg = BIG * 100, r
+            for q in (r, r - 1, r + 1):
+                if lo <= q <= hi and prev[q] < best: best, arg = prev[q], q
+            if empty[r, x] and e_best is not None and prev[e_best] < best: best, arg = prev[e_best], e_best
+            tot[r, x] = c[r, x] + best; back[r, x] = arg
+    r = int(tot[lo:hi + 1, W - 1].argmin()) + lo; total = int(tot[r, W - 1]); path = [r]
+    for x in range(W - 1, 0, -1):
+        r = int(back[r, x]); path.append(r)
+    return path[::-1], total
+
+
+def seam_costs(img, cheap, dear=60, other=25):
+    """What repeating each pixel costs: 1 in the class to lengthen, more where the pixel differs from the ones above and below it or
+    lies in a run of outline (a line across the limb would get thicker), `other` in the rest of the body, `dear` in belts and
+    wristbands and three times that in a sole, 0 in the empty."""
+    H, W = img.shape
+    c = np.full((H, W), other, np.int64)
+    c[np.isin(img, cheap)] = 1
+    c[np.isin(img, ACCENT) & ~np.isin(img, cheap)] = dear
+    c[np.isin(img, (77, 78))] = dear * 3
+    up = np.zeros((H, W), bool); dn = np.zeros((H, W), bool)
+    up[1:] = img[1:] != img[:-1]; dn[:-1] = img[:-1] != img[1:]
+    dark = np.isin(img, (38, 39, 40, 1, 111, 114))
+    c += 3 * (up & dn) + 4 * (dark & np.roll(dark, 1, 1) & np.roll(dark, -1, 1))
+    c[img == 0] = 0
+    return c
+
+
+def seam_insert(img, path):
+    """One row more: in every column the seam's pixel and all above it stay, and it and all below it go down one."""
+    H, W = img.shape; out = np.zeros((H + 1, W), img.dtype)
+    for x, r in enumerate(path):
+        out[:r + 1, x] = img[:r + 1, x]; out[r + 1:, x] = img[r:, x]
+    return out
+
+
 class Beerus:
-    def __init__(self, kid_stand, one, chins=(15, 15, 16)):
-        """kid_stand: {view: Kid Buu's standing frame (BF colour indices)}; one: RGB -> palette index; chins: the row each standing head ends."""
+    def __init__(self, kid_stand, one, chins=(15, 15, 16), side=None, tall=(0, 0)):
+        """kid_stand: {view: Kid Buu's standing frame (BF colour indices)}; one: RGB -> palette index; chins: the row each standing head ends;
+        side: the side head's rows (HEAD_SIDE if none); tall: (torso, legs) pixels frame() adds."""
         def idx(rows):
             out = np.zeros((len(rows), len(rows[0])), np.uint8)
             for y, r in enumerate(rows):
                 for x, c in enumerate(r):
                     if c != '.': out[y, x] = SKIN_OF.get(c) or one(np.array(RGB[c]))
             return out
-        self.head = {0: idx(HEAD_FRONT), 1: idx(HEAD_BACK), 2: idx(HEAD_SIDE)}
+        self.head = {0: idx(HEAD_FRONT), 1: idx(HEAD_BACK), 2: idx(side or HEAD_SIDE)}
+        self.tall = tuple(tall); self.seams = {'leg': 0, 'torso': 0, 'not made': 0}
         self.collar = {0: idx(COLLAR_FRONT), 1: idx(COLLAR_BACK), 2: idx(COLLAR_SIDE)}
         self.gold = {k: one(np.array(v)) for k, v in (('dark', (152, 152, 0)), ('mid', (200, 196, 62)), ('light', (228, 223, 97)))}
         self.navy, self.navy2 = one(np.array((0, 33, 66))), one(np.array((1, 45, 92)))
@@ -135,11 +204,60 @@ class Beerus:
             if score > best[0]: best = (score, i, j[1] - tw, j[0] - th)
         return best
 
-    def apply(self, img, view=None):
+    def head_box(self, img):
+        """(y0, y1, x0, x1) of Kid Buu's head in a frame (MANUAL's box where the matcher can't find it), or None."""
+        hand = MANUAL.get(hashlib.sha1(img.tobytes()).hexdigest()[:12])
+        if hand: return hand[:4]
+        score, i, x0, y0 = self.find(img)
+        if i is None or score < MIN_MATCH: return None
+        t = self.tpl[i][0]; return max(y0, 0), y0 + t.shape[0] - 1, max(x0, 0), x0 + t.shape[1] - 1
+
+    @staticmethod
+    def body_way(img, box):
+        """Which way his body runs from his head, by where his legs are (trousers and soles; the whole body where a frame shows no
+        legs): 'down' standing, crouching or in the air; 'right' or 'left' lying or flying; 'up' when the body is drawn behind the head
+        (he lies towards the viewer, foreshortened): nothing to lengthen there. None with no body."""
+        y0, y1, x0, x1 = box
+        m = np.isin(img, LEG + (77, 78))
+        if m.sum() < 6: m = np.isin(img, KID_SKIN + PANTS + ACCENT); m[y0:y1 + 1, x0:x1 + 1] = False
+        ys, xs = np.nonzero(m)
+        if not len(ys): return None
+        dy, dx = ys.mean() - y1, xs.mean() - (x0 + x1) / 2
+        return 'down' if dy >= abs(dx) else 'up' if dy < 0 and -dy >= abs(dx) else 'right' if dx > 0 else 'left'
+
+    def frame(self, img, view=None):
+        """apply() with him self.tall pixels longer. -> (image, (dx, dy)): where the image's corner goes from the frame's own, so that
+        his feet stay where they were when he stands (the image grows upward) and his head when he lies (it grows past his feet)."""
+        torso, legs = self.tall
+        box = self.head_box(img) if (torso or legs) and img.any() else None
+        way = self.body_way(img, box) if box else None
+        if way in (None, 'up'): return self.apply(img, view), (0, 0)
+        k = {'down': 0, 'right': -1, 'left': 1}[way]; H, W = img.shape       # np.rot90 turns that bring the body below the head
+        mark = np.zeros((H, W), bool); mark[box[0]:box[1] + 1, box[2]:box[3] + 1] = True
+        r = np.rot90(img, k).copy(); chin = np.nonzero(np.rot90(mark, k).any(1))[0].max()
+        kinds = {'leg': (LEG + (2,), chin + 2), 'torso': (KID_SKIN, chin + 1)}
+        for kind in ['leg'] * legs + ['torso'] * torso:
+            best = None
+            for kd in (kind, 'torso' if kind == 'leg' else 'leg'):
+                cheap, lo = kinds[kd]; ys = np.nonzero((r != 0).any(1))[0]
+                if ys.max() - 1 < lo: continue
+                path, total = seam(r, seam_costs(r, cheap), lo, ys.max() - 1)
+                if 0 < total <= SEAM_DEAR: best = (kd, path); break       # (0: a path through empty pixels only lengthens nothing)
+            self.seams[best[0] if best else 'not made'] += 1
+            if best: r = seam_insert(r, best[1])
+        s = np.rot90(r, -k).copy(); gy, gx = s.shape[0] - H, s.shape[1] - W
+        hand = MANUAL.get(hashlib.sha1(img.tobytes()).hexdigest()[:12])     # the frame's own entry, by its pixels as they were
+        sx = gx if way == 'left' else 0                                      # (only growing leftward moves the head in the image)
+        if hand: hand = (hand[0], hand[1], hand[2] + sx, hand[3] + sx) + hand[4:6] + (hand[6] + sx,) + hand[7:]
+        elif self.head_box(s) != (box[0], box[1], box[2] + sx, box[3] + sx):
+            raise SystemExit('beerus: Kid Buu\'s head is found elsewhere once the frame is lengthened (%s -> %s)' % (box, self.head_box(s)))
+        return self.apply(s, view, hand), {'down': (0, -gy), 'right': (0, 0), 'left': (-gx, 0)}[way]
+
+    def apply(self, img, view=None, hand=None):
         img = img.copy()
         if not img.any(): return img
         H, W = img.shape
-        hand = MANUAL.get(hashlib.sha1(img.tobytes()).hexdigest()[:12])
+        if hand is None: hand = MANUAL.get(hashlib.sha1(img.tobytes()).hexdigest()[:12])
         if hand:
             self.manual += 1
             y0, y1, x0, x1, kind, chin, cx, collar = hand

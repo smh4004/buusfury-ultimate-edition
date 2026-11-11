@@ -32,6 +32,7 @@ CODE_END = 0x54FBC
 HEAP_WORDS = 0xFDFE - 0x400      # the top 4 KB of work RAM belongs to outfit.c
 SPACE = 0x800000                 # new data starts at the old 8 MB end: forms, then code
 ACTORS_AT = 0x840000             # moved actor table and imported sprites
+BEERUS_LOOK = 'old,0,0'          # Beerus's side head, pixels of torso, pixels of legs added (see cfg['beerus']): as approved
 ROM32 = '--rom16' not in sys.argv  # 32 MB: the GT actors live above 16 MB and the save chip moves to 0x0DFFFF00 (lib/rom32.py). --rom16: the old 16 MB layout
 COMBO_SHA1 = 'f02d179accbeb9b68bcaef8720eb0ae426dde6ee'
 PROTO = os.environ.get('BFU_PROTO', 'protoD.gba')   # Prototype D cart: Super 13 and Zone 26
@@ -1431,7 +1432,11 @@ def add_actors(rom, clean):
     cfg['roshi_player'] = {'roshi_of': 'krillin', 'head_of': 177, 'chin': [12, 11], 'high': True}     # Master Roshi: Krillin's frames, Roshi's head and clothes (lib/roshi.py)
     # Beerus (Battle of Gods, post-game): every frame of Kid Buu (actor 38, the boss's own 19 slots) with Beerus's head, collar and clothes
     # (lib/beerus.py). Slot 17 is Kid Buu's death by dissolving (likely only the ending plays it): Beerus's is a hit, then the knockdown.
-    cfg['beerus'] = {'beerus_of': 38, 'one': one, 'high': True, 'remap': {'17': [(9, 0), (9, 1), (9, 2)] + [(15, k) for k in range(4)] + [(15, 3)] * 4}}
+    # BEERUS_LOOK: his side head ('old', or 'new': lib/beerus.py HEAD_SIDE_NEW) and how many pixels longer his torso and legs are. Both wait
+    # for the owner's word on his preview (ultimate/beerus_preview.py); BFU_BEERUS=new,2,2 tries a look without changing this line.
+    look = os.environ.get('BFU_BEERUS', BEERUS_LOOK).split(',')
+    cfg['beerus'] = {'beerus_of': 38, 'one': one, 'high': True, 'side': look[0], 'tall': (int(look[1]), int(look[2])),
+                     'remap': {'17': [(9, 0), (9, 1), (9, 2)] + [(15, k) for k in range(4)] + [(15, 3)] * 4}}
     import whis                                            # Whis: Kibito's frames in his colours (lib/whis.py)
     cfg['whis'] = {'tint_of': 149, 'tint': whis.recolour(one), 'high': True}
     # Orange-gi Gohan's Super Saiyan and 2 (Nov 9): the game has no such figure, so form 58 used the school uniform's (actor 104) and he

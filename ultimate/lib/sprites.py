@@ -281,10 +281,12 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             src = table[a['beerus_of']]; srec = src - BASE
             stand = struct.unpack_from('<I', rom, srec + 0x54)[0]
             kst = {v: frame_image(rom, struct.unpack_from('<I', rom, stand - BASE + 4 + 4 * v)[0]) for v in (0, 1, 2)}
-            conv = beerus.Beerus(kst, a['one'])
-            rec = composed_actor(ins, rom, srec, conv.apply, {int(k): v for k, v in a.get('remap', {}).items()})
+            tall = tuple(a.get('tall', (0, 0)))
+            conv = beerus.Beerus(kst, a['one'], side=beerus.HEAD_SIDE_NEW if a.get('side') == 'new' else None, tall=tall)
+            rec = composed_actor(ins, rom, srec, conv.frame if any(tall) else conv.apply, {int(k): v for k, v in a.get('remap', {}).items()})
             ids[name] = len(table); table.append(ins.put(bytes(rec)))
-            print('%s: heads placed %d (%d by hand), missed %d' % (name, conv.hits, conv.manual, conv.misses))
+            print('%s: heads placed %d (%d by hand), missed %d%s' % (name, conv.hits, conv.manual, conv.misses,
+                  '; %d leg and %d torso seams, %d not made; %d bytes of sprite memory a frame' % (conv.seams['leg'], conv.seams['torso'], conv.seams['not made'], struct.unpack_from('<H', rec, 2)[0]) if any(tall) else ''))
             if conv.misses: sys.exit('%s: Kid Buu\'s head not found in %d frames (add them to beerus.MANUAL)' % (name, conv.misses))
             continue
         if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
@@ -618,7 +620,10 @@ def composed_actor(ins, rom, rec_at, fn, remap=None):
     """A copy of an actor with every frame through fn(image, view) as a whole: a frame's pieces (a boss's can have two, e.g. Kid Buu's 32x32
     over 32x16) are put together on the frame's box, changed, and cut back into the same pieces, so the layout, OAM attributes and OBJ
     memory stay the actor's own. Frame = u32 count, box (s8 x, s8 y, u8 w, u8 h), then count x (box, OAM attr, tile container) of 12 bytes.
-    remap: {slot: [(slot, frame), ...]} builds that slot from other slots' frames (Beerus: no death by dissolving). Tiles are stored raw."""
+    remap: {slot: [(slot, frame), ...]} builds that slot from other slots' frames (Beerus: no death by dissolving). Tiles are stored raw.
+    fn may also return (image, (dx, dy)): a larger image whose corner goes (dx, dy) from the frame's own (a taller Beerus). The frame's
+    pieces stay where they are and what the image has beyond them goes into strips of 8 pixels above, left or right of the box (new
+    pieces, only where they hold a pixel); the record's sprite memory a frame (its word at +2) is raised to the largest frame's."""
     from wfz import decompress_stream
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
     n = u(rec_at) & 0xFF; rec = bytearray(rom[rec_at:rec_at + 0x54 + 4 * n])
@@ -635,14 +640,54 @@ def composed_actor(ins, rom, rec_at, fn, remap=None):
         for j in range(c):
             x, y, w, h = struct.unpack_from('<bbBB', rom, o + 8 + 12 * j)
             img[y - by:y - by + h, x - bx:x - bx + w] = piece(u(o + 16 + 12 * j), w, h); boxes.append((x, y, w, h))
-        out = np.asarray(fn(img, view), np.uint8)
-        body = bytearray(rom[o:o + 8 + 12 * c])
-        for j, (x, y, w, h) in enumerate(boxes):
-            data = out[y - by:y - by + h, x - bx:x - bx + w].reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+        out = fn(img, view); off = (0, 0)
+        if isinstance(out, tuple): out, off = out
+        out = np.asarray(out, np.uint8)
+        body = bytearray(rom[o:o + 8 + 12 * c]); cut = [(x - bx, y - by, w, h) for x, y, w, h in boxes]
+        if out.shape != img.shape or off != (0, 0):
+            out, cut, body = grown(o, out, off, (bx, by, bw, bh), boxes, body)
+        used[0] = max(used[0], sum(w * h for _, _, w, h in cut))
+        for j, (x, y, w, h) in enumerate(cut):
+            data = out[y:y + h, x:x + w].reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
             if data not in tiles: tiles[data] = ins.put(struct.pack('<II', 0, len(data)) + data)
             struct.pack_into('<I', body, 16 + 12 * j, tiles[data])
         frames[fp, view] = ins.put(bytes(body))
         return frames[fp, view]
+    used = [0]
+    SHAPES = {(8, 8): (0, 0), (16, 8): (1, 0), (32, 8): (1, 1), (8, 16): (2, 0), (8, 32): (2, 1)}      # (w, h) -> OAM shape, size
+    def grown(o, out, off, box, boxes, body):
+        """A frame whose image outgrew its box: -> (the image on the grown box, [(x, y, w, h) of every piece on it], the frame's
+        bytes with the new pieces and box). The pieces it had keep their place on the screen. A mirrored frame's pieces are stored
+        where they are shown (x = 16 - w - x of the frame as drawn), so its side strips change sides."""
+        bx, by, bw, bh = box; dx, dy = off; H, W = out.shape
+        a0, a1 = struct.unpack_from('<HH', rom, o + 12); flip = a1 & 0x1000
+        top, left, right = -dy, -dx, W + dx - bw
+        if dy > 0 or dx > 0 or H + dy != bh or max(top, left, right) > 8 or min(top, left, right) < 0 or bw % 8 or bh % 8:
+            sys.exit('composed_actor: a frame grew in a way that is not handled (box %s, image %dx%d at %s)' % (box, W, H, off))
+        if flip and any((x, w) != (bx, bw) for x, y, w, h in boxes) and (left or right):
+            sys.exit('composed_actor: a mirrored frame of several narrow pieces cannot grow sideways')
+        pt, pl, pr = 8 * (top > 0), 8 * (left > 0), 8 * (right > 0)          # the grown box: 8 more on each side that grew
+        P = np.zeros((bh + pt, bw + pl + pr), np.uint8)
+        P[pt + dy:pt + dy + H, pl + dx:pl + dx + W] = out
+        cut = [(x - bx + pl, y - by + pt, w, h) for x, y, w, h in boxes]; new = []
+        def strips(x0, y0, w, h, tall):                        # cover w x h at (x0, y0) of P with pieces 8 thick that hold a pixel
+            sizes = (32, 16, 8); at = 0; length = h if tall else w
+            while at < length:
+                n = next(k for k in sizes if k <= length - at)
+                r = (x0, y0 + at, 8, n) if tall else (x0 + at, y0, n, 8)
+                if P[r[1]:r[1] + r[3], r[0]:r[0] + r[2]].any(): new.append(r)
+                at += n
+        if pt: strips(0, 0, bw + pl + pr, 8, False)
+        if pl: strips(0, pt, 8, bh, True)
+        if pr: strips(bw + pl, pt, 8, bh, True)
+        nbx = bx - (pr if flip else pl); nby = by - pt
+        for (x, y, w, h) in new:
+            shape, size = SHAPES[w, h]
+            sx = (bw + pl + pr - w - x) if flip else x          # where it is shown on a mirrored frame
+            body += struct.pack('<bbBBHHI', nbx + sx, nby + y, w, h, (a0 & 0x3FFF) | shape << 14, (a1 & 0x3FFF) | size << 14, 0)
+        struct.pack_into('<I', body, 0, len(boxes) + len(new))
+        struct.pack_into('<bbBB', body, 4, nbx, nby, bw + pl + pr, bh + pt)
+        return P, cut + new, body
     for s in range(n):
         ap = u(rec_at + 0x54 + 4 * s)
         if not ap or s in (remap or {}): continue             # a remapped slot's own frames aren't needed
@@ -657,6 +702,8 @@ def composed_actor(ins, rom, rec_at, fn, remap=None):
             k, p, _ = anims[u(rec_at + 0x54 + 4 * src)]
             ptrs += p[4 * f:4 * f + 4]
         struct.pack_into('<I', rec, 0x54 + 4 * int(s), ins.put(struct.pack('<I', len(seq)) + struct.pack('<%dI' % len(ptrs), *ptrs)))
+    need = (used[0] + 63) & ~63                                # the allocator's unit is 64 bytes
+    if need > struct.unpack_from('<H', rec, 2)[0]: struct.pack_into('<H', rec, 2, need)
     return rec
 
 

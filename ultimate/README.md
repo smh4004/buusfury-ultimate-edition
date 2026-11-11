@@ -584,11 +584,16 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     already and fill it in better"; 16:59 "Maybe super janemba tbh"; 17:02 "Use janemba but fix the eyes and ears and maintain
     visual clarity and attention to detail"; 17:03 "make the sprite a bit taller potentially but not janemba full height").
     `ultimate/beerus_preview.py OUTDIR` makes the pictures he was sent: a new side head on Super Janemba's shape with the owner's
-    own ear, eye and earring pixels (`HEAD_SIDE_NEW`), and Beerus 2 or 4 rows taller by seams through Kid Buu's bare chest and
-    trousers (never his belt, wristbands, shoes or head), in every frame of all three views. Standing he is 30 rows today (Goku
-    31, Super Janemba 59). Once approved: the head and the lengthening go into `lib/beerus.py`, and `sprites.composed_actor` must
-    let a frame's box grow (a piece more; Kid Buu's record reserves 2 KB of sprite memory a frame, and his largest frames, 32x64,
-    already fill it); then his fights are tested. He has no portrait: `bog.say` shows his lines in the narrator's box.
+    own ear, eye and earring pixels (`lib/beerus.py HEAD_SIDE_NEW`), and Beerus 2 or 4 rows taller by seams through Kid Buu's bare
+    chest and trousers (never his belt, wristbands, shoes or head; `Beerus.frame`), in every frame of all three views. Standing he is
+    30 rows today (Goku 31, Super Janemba 59). Both are in the builder, switched by `build.py BEERUS_LOOK`, which says `'old,0,0'`
+    until he approves: with it so the release ROM is byte for byte the one delivered (sha1 b9c57edd...). A frame that outgrows its
+    box keeps its pieces where they are and gets strips of 8 pixels for the rest (`sprites.composed_actor`: one 16x8 or 32x8 piece
+    above a standing frame, 8x32 past the feet of a lying one); his largest frames then take 1,792 bytes of the 2 KB his record
+    reserves. Tried as `BFU_BEERUS=new,2,2` (a build of its own, not delivered): each of the 188 frames in the ROM is the
+    preview's picture of it, pixel for pixel, mirrored frames too; `test_bog` passes on it, and its screenshots show him whole at
+    Goku's height in his scenes and fights. Still to do when he answers: set the line, rebuild, the suite, GIFs from the game.
+    He has no portrait: `bog.say` shows his lines in the narrator's box.
   - Teen Gohan in the purple gi, base, Super Saiyan and Super Saiyan 2 (12:01 to 13:12): `ultimate/teen.py` with `lib/headfit.py`
     composes all 212 frames from LoG2's records and checks every one (a frame that can't be placed or fails a check stops it).
     Not wired into the build; his preview PDF and GIFs are with the owner.
