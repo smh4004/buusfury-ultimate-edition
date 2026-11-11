@@ -378,8 +378,8 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
 - 21:00, the owner on the move GIFs: "SSJ4 Goku does instant transmission on dragon fist and ssj4 Gogeta has a weird green outline also
   give all playable Buus forms kamehameha also fat Majin Buu energy punch looks bugged".
   - Super Saiyan 4 Goku's slot 19 (his BSO figure's, from base Goku) is Instant Transmission: the stance, a fade, a line. The Super Dragon
-    Fist is the Dragon Fist's code, which shows slot 19 by frame number and carries him along with the dragon, so he vanished (the retail
-    Super Saiyan 3 does the same; left as the original). His slot 19 is now his stance, his ki blast's wind-up, then its arm out held. No
+    Fist is the Dragon Fist's code, which shows slot 19 by frame number and carries him along with the dragon, so he vanished (Goku's
+    Super Saiyan 3 has no Dragon Fist to do it with: see Nov 11 below). His slot 19 is now his stance, his ki blast's wind-up, then its arm out held. No
     form in that figure has Instant Transmission, so nothing else plays it.
   - The green on Super Saiyan 4 Gogeta was not in the game: the capture tool filled the Super Saiyan pools (+0x1E, +0x20) before it raised
     the EP maximum. The HUD (0x0800B99C) draws each pool as pool * 41 / the EP maximum columns from a 41-column table, and its two pool
@@ -409,6 +409,18 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     palette entry cyan; the Nov 9 build did the same. The skill now draws the sprite only: the orb swells to its largest picture for
     the blast and shrinks away (`spirit_draw`, `SKILL_SPRITE_ONLY`). The story's finish against Super 13 keeps the disc (the snow
     arena's map suits it). The white, black, white impact flash is as designed (`impact`).
+- Nov 11, 00:15, the owner: "Fix those three things you mentioned SSJ3 goku too" (the three listed to him with the trailer: the Spirit
+  Bomb skill's sprite-only blast, the tournament's Spopovich, and "the original game's Super Saiyan 3 Goku also vanishes during Dragon
+  Fist Explosion"). The first two are the fixes above, now approved. The third was a wrong report, and nothing was changed for it:
+  - No Goku can use a Dragon Fist as a Super Saiyan 3. Dragon Fist Explosion (skill 5, the retail row: can `0x08019E9F`, use
+    `0x08019EB9`) is Gogeta's in the original game and here (`gogeta_skills`; the owner's 100% save: Goku holds 7, 15, 14, 20, 22, 12,
+    Gogeta 7, 3, 5), and the Super Dragon Fist (41) is refused outside Super Saiyan 4 (`ssj4_dragon_can`). Skill 5 isn't in Goku's book.
+  - The original Gogeta doesn't vanish either: his figure's slot 19 (actor 93, four frames) is the move's own wind-up and arm out, held
+    at the dragon's tail while it flies.
+  - The vanish was seen only with skill 5 poked into Super Saiyan 3 Goku's skills by a capture: his slot 19 (forms 5 and 6, actors 111
+    and 112) is Instant Transmission's three frames, so he fades, and the move's fourth frame isn't there (junk tiles). Not reachable
+    in play. If Super Saiyan 3 Goku is ever given the move, he needs a pose slot of his own for it (as `BEAM_POSE`), since Instant
+    Transmission plays slot 19 too.
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
