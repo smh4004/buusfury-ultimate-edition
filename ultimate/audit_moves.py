@@ -215,7 +215,7 @@ def flags(name, f0, steps, ok, bad):
         if label == 'run right' and not any(k[1] == 2 for k, _ in poses): out.append('%s: a double-tap right did not run (slot 2)' % name)
         if label.startswith('transform') and all(k[0] == f0 for k, _ in poses): out.append('%s: %s: the form did not change' % (name, label))
     return sorted(set(out), key=out.index)
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46, 5), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
               3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 SKILLS_OVERRIDE = None

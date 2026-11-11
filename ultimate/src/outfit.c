@@ -1699,6 +1699,26 @@ void dragon4_use(u8 *record, void *sprite) {
     Sprite_SetBehaviour(sprite, b);
 }
 int ssj4_dragon_can(u8 *record) { return is_ssj4(record[0x14]) && CanAfford(record, DRAGON4_COST); }
+/* Dragon Fist Explosion (skill 5, the original game's, Gogeta's) is Goku's too as a Super Saiyan 3 (Nov 11, the owner: "give ssj3 Goku
+   access to the dragon fist explosion ... not the same one ssj4 Goku has but the one from gogeta"). It comes with Super Saiyan 3
+   (skills_sync) and fires only in a Super Saiyan 3 form (ssj3_goku_rows, build.py: his two original looks' and Kid Goku's); Gogeta's is
+   as it was. The move's code shows the figure's slot 19 by frame number (0-3, then 2 and 3 in turn), and on Goku's Super Saiyan 3
+   figures slot 19 is Instant Transmission's three frames (he would fade away and draw a fourth frame that isn't there): they carry a
+   pose for it in slot FIST_POSE (build.py fist_poses: his stance, his ki blast's wind-up, then its arm out, held), shown instead. */
+extern const u8 ssj3_goku_rows[];
+#define FIST_POSE 29
+#define DragonFist_Use ((void (*)(u8 *, void *))0x08019EB9)
+static int is_ssj3_goku(int form) {
+    const u8 *p;
+    for (p = ssj3_goku_rows; *p != 255; p++) if (*p == form) return 1;
+    return 0;
+}
+int dragon_can(u8 *record) { return (record != RECORDS || is_ssj3_goku(record[0x14])) && DragonFist_Can(record); }
+void dragon_use(u8 *record, void *sprite) {
+    const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
+    DragonFist_Use(record, sprite);
+    if (actor && actor[0] > FIST_POSE && *(const u32 *)(actor + 0x54 + 4 * FIST_POSE)) Sprite_SetFacing(sprite, FIST_POSE);
+}
 #define KameCan ((int (*)(u8 *))0x0801A335)
 static int is_ssj4(int form);
 int ssj4_kame_can(u8 *record) { return is_ssj4(record[0x14]) && KameCan(record); }     /* 10x Kamehameha: Super Saiyan 4 only */
@@ -2159,6 +2179,11 @@ void skills_sync(int c) {
     if (c == 0) {
         learn(c, KAIOKEN_SKILL, 1);
         learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
+        {   /* Dragon Fist Explosion comes with Super Saiyan 3 (its book place was the shelved Great Ape's: a Nov 9 save's bit goes) */
+            int ss3 = knows(0, 22) || slot_of(rec, 22) >= 0;
+            if (!ss3 && slot_of(rec, 5) < 0) set_known(0, 5, 0);
+            learn(c, 5, ss3);
+        }
         learn(c, SSB_SKILL, post && mastery_level(0, 22) == 2);
         learn(c, SSG_SKILL, post && mastery_level(0, 20) == 2 && (more_flag(MORE_BOG_RITUAL) || more_flag(MORE_BOG_DONE)));     /* from the ritual on */
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);

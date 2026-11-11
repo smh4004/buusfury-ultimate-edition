@@ -9,7 +9,7 @@
    and boot soles left a green tuft and grey specks there). No dark purple specks (Goten's sleeve flicker) in either.
 3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr. 6. GT Vegeta's change and Final Flash frames. 7. Super Saiyan Blue's hair.
 8. Super Saiyan 4 Kid Goku's hands on the 10x Kamehameha. 9. Super Saiyan 4 Vegeta's Final Shine wind-up. (7 also: Blue Goku's and Blue
-Vegeta's faces stay Super Saiyan's.)"""
+Vegeta's faces stay Super Saiyan's.) 15. Super Saiyan 3 Goku's Dragon Fist Explosion pose."""
 import json, struct, sys, os
 import numpy as np
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')]
@@ -134,22 +134,41 @@ else:
     check('Super Garlic Jr. is in this build', False)
 
 
-# 6. GT Vegeta (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not transformation frames", "his final shine frames
-# are broken", then "Why doesn't SSJ4 vegeta have transformation frames", "why are vegetas arms disappearing on transforming"). His change
-# (slot 10) is a power-up's crouch (slot 13 frame 0) in his own figure for two frames, then in the form he changes into (gt.GT_NEXT; none: his
-# own) for eight, and its stance, as BF's own changes go (not the shout, slot 13 frame 1, whose arms the sheet's hair covers), every view the
-# front's (16:28: "they should all be the same anyways"); none of
-# the sheet's "special" (slot 21, the arms flung out). Final Flash's code (Final Shine's too) shows slot 19's frames by number, 0-1 charging,
-# 3-4 firing: frames 3 and 4 are the push, never frame 0, 1 or 2 again.
+# 6. GT Vegeta. Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not transformation frames", "why are vegetas arms
+# disappearing on transforming"; Nov 11: "Vegeta ssj4 transformation frames still off". The change (slot 10) of the four looks with a form
+# above them (gt.vegeta_changes) is the game's own change of form as his sheet draws it for the base looks: fists out, then the arms held out
+# to both sides, flickering, eleven frames, every view the front's (Nov 10, 16:28: "they should all be the same anyways"); his own head for
+# frames 0-1 and the next form's from frame 2, as BF's changes go; Super Saiyan 4's figure from frame 2 is the tank top's with fur, bare
+# chest and tail. Never the power-up's crouch (the gloves in front of the trousers: a lavender blob under the aura), and none of the
+# sheet's "special" (slot 21). The moustache and Super Saiyan 4 have no form above them: the crouch pattern stays (never played).
+# Final Flash's code (Final Shine's too) shows slot 19's frames by number, 0-1 charging, 3-4 firing: frames 3 and 4 are the push.
 GT_NEXT = {'vegeta_gt': 'vegeta_gt_ssj', 'vegeta_gt_tank': 'vegeta_gt_tank_ssj', 'vegeta_gt_ssj': 'vegeta_gt_ssj4', 'vegeta_gt_tank_ssj': 'vegeta_gt_tank_ssj4'}
+GLOVES = (169, 152, 151)
 for name in ('vegeta_gt', 'vegeta_gt_tank', 'vegeta_gt_mustache', 'vegeta_gt_ssj', 'vegeta_gt_tank_ssj', 'vegeta_gt_ssj4'):
     a = actor_of(forms[name]); ch, pw, sp, fl = anim(a, 10), anim(a, 13), anim(a, 21), anim(a, 19)
     nx = actor_of(forms[GT_NEXT.get(name, name)]); npw, nst = anim(nx, 13), anim(nx, 0)
     imgs = lambda fr: [[image(fp).tobytes() if image(fp) is not None else None for fp in f] for f in fr]
     C, P, SP, NP, NST = imgs(ch), imgs(pw), imgs(sp) if sp else [], imgs(npw), imgs(nst)
-    ok = len(C) == 11 and all(C[k][d] == P[0][0] for k in range(2) for d in range(3)) and all(C[k][d] == NP[0][0] for k in range(2, 10) for d in range(3)) \
-         and all(C[10][d] == NST[0][0] for d in range(3)) and not any(C[k][d] == x[d] for k in range(10) for x in SP for d in range(3))
-    check('%s changes on a power-up facing front (his crouch, then %s\'s crouch and stance), not the sheet\'s "special"' % (name, GT_NEXT.get(name, 'his own')), ok)
+    if name in GT_NEXT:
+        pic = [image(f[0]) for f in ch]; col = [set(np.unique(p).tolist()) - {0} for p in pic]
+        own = set(np.unique(image(anim(a, 0)[0][0])).tolist()); nxt = set(np.unique(image(nst[0][0])).tolist())
+        old, new = own - nxt, nxt - own                                  # what only his own figure has (his hair, his vest) and only the next
+        views = len(C) == 11 and all(C[k][d] == C[k][0] for k in range(11) for d in range(3))
+        heads = views and all(col[k] & old and not col[k] & new for k in range(2)) and all(col[k] & new and not col[k] & old for k in range(2, 11))
+        flick = views and len({C[k][0] for k in (2, 4, 6, 8)}) == 1 and len({C[k][0] for k in (3, 5, 7, 9)}) == 1 and C[2][0] != C[3][0] and C[10][0] not in (C[2][0], C[3][0])
+        wide = []
+        for k in range(1, 10):                                           # the arms held out: a glove well to each side of the figure's middle
+            xs = np.where(pic[k].any(0))[0]; mid = (xs[0] + xs[-1]) / 2; g = np.where(np.isin(pic[k], GLOVES).any(0))[0]
+            wide.append(len(g) > 0 and g[0] <= mid - 8 and g[-1] >= mid + 8)
+        crouch = {x[0] for x in P + NP} | {x[d] for x in SP for d in range(3)}
+        print('   %s: change frames %d, views alike %s, heads %s, flicker %s, arms out %s, only his %s, only the next %s' % (name, len(C), views, heads, flick, wide, sorted(old), sorted(new)))
+        check('%s changes form the way the game does (arms out to both sides, his own head two frames, then %s\'s), every view the front\'s' % (name, GT_NEXT[name]),
+              views and heads and flick and all(wide))
+        check('%s\'s change is never the power-up\'s crouch nor the sheet\'s "special"' % name, views and not any(C[k][0] in crouch for k in range(11)))
+    else:
+        ok = len(C) == 11 and all(C[k][d] == P[0][0] for k in range(2) for d in range(3)) and all(C[k][d] == NP[0][0] for k in range(2, 10) for d in range(3)) \
+             and all(C[10][d] == NST[0][0] for d in range(3)) and not any(C[k][d] == x[d] for k in range(10) for x in SP for d in range(3))
+        check('%s (no form above him) keeps a change facing front, not the sheet\'s "special"' % name, ok)
     F = imgs(fl)
     check('%s\'s Final Flash / Final Shine pushes the beam out: slot 19 frames 3 and 4 are none of 0, 1, 2' % name,
           len(F) >= 5 and all(F[k][d] not in (F[0][d], F[1][d], F[2][d]) for k in (3, 4) for d in range(3)))
@@ -438,9 +457,9 @@ guards, loops = [], []
 for n, f in playable:
     a = actor_of(f); sl = slots_of(a)
     look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
-    def looks(slot): return {tuple(look(v) for v in fr[:3]) for fr in all_views(a, slot)} if (slot in sl or (slot == 31 and anim(a, 31))) else set()
+    def looks(slot): return {tuple(look(v) for v in fr[:3]) for fr in all_views(a, slot)} if (slot in sl or (slot in (29, 31) and anim(a, slot))) else set()
     guard = looks(7) - looks(0) - looks(3) - looks(4)
-    if guard and any(looks(m) & guard for m in (3, 18, 19, 31)): guards.append(n)
+    if guard and any(looks(m) & guard for m in (3, 18, 19, 29, 31)): guards.append(n)
     if anim(a, 31):
         p = all_views(a, 31)
         if len(p) >= 3 and [look(v) for v in p[1][:3]] != [look(v) for v in p[2][:3]]: loops.append(n)
@@ -472,6 +491,28 @@ for n, f in playable:
         if not want or s not in slots_of(a): continue
         if any(len(set(fr)) != 1 for fr in all_views(a, s)): views.append('%s %d' % (n, s))
 check('every mod figure\'s change and power-down show one view%s' % ((': %s' % views[:12]) if views else ''), not views)
+# 15. Super Saiyan 3 Goku's Dragon Fist Explosion (Nov 11, the owner: "give ssj3 Goku access to the dragon fist explosion ... the one from
+# gogeta"). The move's code shows frames 0-3 of slot 19, which on Goku is Instant Transmission (he vanished); outfit.c's dragon_use points
+# the move at slot 29 (build.py fist_poses) on his Super Saiyan 3 figures: the stance, the ki blast's wind-up, then its arm held out (frames
+# 2 and 3 alike, shown in turn while the dragon is steered: no loop, no guard, no vanish). Every Goku form in the list has it and no other
+# Goku form does.
+fist = []
+ss3 = [5, 6, 7, 8] + ([forms['kid_goku_ssj3']] if 'kid_goku_ssj3' in forms else [])
+for f in range(0, 160):
+    row = rom[0x800000 + 24 * f:0x800000 + 24 * f + 24]
+    if f >= 9 and f not in forms.values(): continue
+    a = actor_of(f)
+    if not 0 <= a < FIRST_NEW + n_actors: continue
+    p29 = anim(a, 29)
+    if f in ss3:
+        ki, st = all_views(a, 3), all_views(a, 0); p = all_views(a, 29) if p29 else []
+        look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+        guard = {look(v) for fr in all_views(a, 7) for v in fr[:3]} - {look(v) for m in (0, 3, 4) for fr in all_views(a, m) for v in fr[:3]}
+        if len(p) != 4 or p[0] != st[0] or p[1] != ki[0] or p[2] != ki[2] or p[3] != ki[2]: fist.append('form %d: pose' % f)
+        elif any(look(v) in guard for fr in p for v in fr[:3]): fist.append('form %d: a guard frame' % f)
+        elif any(v and sprites.frame_image(rom, v) is not None and (sprites.frame_image(rom, v) > 0).sum() < 60 for fr in p for v in fr[:3]): fist.append('form %d: vanishes' % f)
+    elif p29 and row[0x0C] == 0: fist.append('form %d has the pose' % f)
+check('Super Saiyan 3 Goku\'s Dragon Fist Explosion has its own pose (stance, wind-up, the arm held out), no other Goku%s' % ((': %s' % fist) if fist else ''), not fist and len(ss3) >= 4)
 
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

@@ -164,7 +164,7 @@ writable statics (they'd link into ROM); the build stops if one appears.
   (slot 10) for him, and `gt.FILL`'s first choice is his slot 21, the sheet's "special", which starts with the arms flung out to one side
   and then the other. Every GT Vegeta look (base, tank top, moustache, Super Saiyan, Super Saiyan 4) now changes on his own power-up
   (slot 13): the crouch twice, the shout eight times, his stance, a retail change's 11 frames (`gt.actors`). (Third pass: the next form's
-  crouch and stance, without the shout.)
+  crouch and stance, without the shout.) (Nov 11: the game's own change pose instead, see "Nov 11, 09:07" below.)
 - Final Shine ("his final shine frames are broken"): Final Flash's code (Final Shine's too) shows slot 19's frames by number: 0 and 1 by
   turns while charging, 2, then 3 and 4 by turns while the beam is out (sub_0801B4EC). The sheet's five frames, grown to a retail
   player's ten by spreading, put the charge (sheet 1 and 2) at 3 and 4, so GT Vegeta never pushed his Final Flash or Final Shine out.
@@ -250,7 +250,8 @@ Third pass, from the owner's notes on cut 4 (15:16: "Why doesn't SSJ4 vegeta hav
 frames for shooting his eraser cannon. Why is vegeta fucking punching while shooting the galick gun and not holding his hands out normally
 like the kamehameha frames do. Why the fuck is super android 13s beam attack frames so glitched out", "PREVIEW BEFORE RESHOOT"), and 15:40
 ("Also replace the SSJ4 Gogeta with this one"):
-- GT Vegeta's changes show the new form: slot 10 is his power-up's crouch (slot 13 frame 0) for two frames, then the form he changes into
+- (Superseded on Nov 11 for the four looks with a form above them: see "Nov 11, 09:07" below.)
+  GT Vegeta's changes show the new form: slot 10 is his power-up's crouch (slot 13 frame 0) for two frames, then the form he changes into
   (`gt.GT_NEXT`: Super Saiyan, then Super Saiyan 4; the tank top's the same) in the same crouch for eight and its stance, as BF's own
   changes go (Goku 106: the old hair for two frames, the new form from the third). Before, all eleven were his own figure, so the hair
   changed only when the change ended. The moustache look and Super Saiyan 4 (no next form) keep their own. Not the shout (slot 13 frame
@@ -421,6 +422,34 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     and 112) is Instant Transmission's three frames, so he fades, and the move's fourth frame isn't there (junk tiles). Not reachable
     in play. If Super Saiyan 3 Goku is ever given the move, he needs a pose slot of his own for it (as `BEAM_POSE`), since Instant
     Transmission plays slot 19 too.
+- Nov 11, 09:07, the owner: "Vegeta ssj4 transformation frames still off and can you remove the ssj4 Goku dragon fist scene and also
+  give ssj3 Goku access to the dragon fist explosion or whatever not the same one ssj4 Goku has but the one from gogeta or whatever".
+  - GT Vegeta's change (`gt.vegeta_changes`; this replaces the crouch of Nov 10 for the four looks with a form above them). The crouch
+    was the wrong pose: his gloves are in front of his trousers in it, and under the change's aura that read as a lavender blob with
+    no arms. His sheet does draw the game's change of form (slot 10, eleven frames: fists out, then the arms held out to both sides
+    with a brighter flicker frame between, then the arms coming down), but only for the base looks. Now: base into Super Saiyan plays
+    the sheet's own frames with the Super Saiyan stance's head from frame 2 (`_swap_head`: BF's changes show the old hair for two
+    frames); Super Saiyan into Super Saiyan 4 plays the gold frames for two and then Super Saiyan 4's figure, made from the tank
+    top's frames by the rules his sheet follows between the two (`_ssj4_body`: arms and shoulders to fur `V_FUR`, a bare chest strip
+    under the neckline `V_CHEST`, the belt to trousers, the darker glove shade, the stance's head, and the tail from slot 19 frame 2
+    drawn only where nothing else is, one row below the sheet's anchor so the fist doesn't hide it: `V_TAIL_LOWER`). Checked pixel for
+    pixel against the pairs the sheet does draw (stance, crouch, Final Flash). Every view is the front's. The moustache look and
+    Super Saiyan 4 itself have no form above them and keep the old pattern (never played). `test_frames.py` 6. Relocked with
+    `BFU_RELOCK=vegeta_gt,vegeta_gt_tank,vegeta_gt_ssj,vegeta_gt_tank_ssj` (the owner asked for the change).
+  - Super Saiyan 3 Goku has the Dragon Fist Explosion (skill 5, Gogeta's move, not the Super Dragon Fist 41). It is the 16th and last
+    place in Goku's book (`SKILL_BOOK[0]`; the known bits are a u16, so his book is full) and comes with Super Saiyan 3
+    (`skills_sync`: known once Super Saiyan 3 is known or held, into a free slot as every learned skill; with six held, SELECT on the
+    Skills tab swaps it in; the place was the shelved Great Ape's, so a bit with no Super Saiyan 3 is cleared). Only a Super Saiyan 3
+    can use it (`dragon_can`: the form is in `ssj3_goku_rows`, forms 5-8 and Kid Goku's; Gogeta's record is let through as before);
+    it costs the retail 300, from the Super Saiyan 3 pool by his form's flags. The retail code shows slot 19's frames 0-3 by number,
+    and Goku's slot 19 is Instant Transmission, so `dragon_use` runs the retail use and then points the sprite at `FIST_POSE` (slot
+    29, `build.py fist_poses`, on actors 111, 112 and Kid Goku's Super Saiyan 3): his stance, his ki blast's wind-up, then its arm out
+    for frames 2 and 3 (the move shows those two in turn while the dragon is steered: one held picture, no loop, no guard frame; the
+    owner's rule of Nov 10). The update code shows frames by number without resetting the slot, so the pose stays. The row is patched
+    before the skill table is copied out (the game reads the copy at the pointer in `0x13618`). Its text (UI string 1321) says who
+    can use it. `test_nov11.py` (in game: the pose on every Super Saiyan 3 form facing left and down, the cost, Instant Transmission
+    after it, no other Goku form, Gogeta's unchanged, the book), `test_frames.py` 15.
+  - The trailer loses the Super Saiyan 4 Dragon Fist shot (cut 8).
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)

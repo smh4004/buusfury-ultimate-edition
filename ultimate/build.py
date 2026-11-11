@@ -219,10 +219,12 @@ def kaioken_remap(pal, one):
 
 
 # The skill book (outfit.c): per party character, the skills the loadout can hold beyond the six slots (record +0x13 is not a seventh: it is the equipment flags byte). 21 is the story's locked Super Saiyan.
+DRAGON_FIST_TEXT = 'Hold the B Button to make a giant dragon of energy; steer its head with the +Control Pad and release to bite. Goku: as a Super Saiyan 3.'
 SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and after the ending) to master it into the Super Kamehameha
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
-# (literal ids: test_build.py reads this with ast.literal_eval; 47 is FP_SKILL)
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
+# (literal ids: test_build.py reads this with ast.literal_eval; 47 is FP_SKILL. Goku's 5, Dragon Fist Explosion as a Super Saiyan 3, fills his
+# sixteenth and last place: the known-skills word has 16 bits.)
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46, 5), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
               3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 # A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,
@@ -1673,7 +1675,7 @@ def add_outfits(rom, clean, at, art):
     lost = [o['form'] for o in cfg['1'] if o['form'] not in [b for b, _ in SAIYAMAN]]
     if lost: sys.exit('Great Saiyaman has no way back to these Gohan outfits (build.py SAIYAMAN, a saiyaman_from_ row in forms.json): %s' % lost)
     pairs = ['{%d,%d}' % (base if isinstance(base, int) else fm[base], 14 if row == 14 else fm[row]) for base, row in SAIYAMAN]
-    c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')))
+    c = open('ultimate/src/outfit.c').read() + '\nconst u16 outfit_index[9][2] = {%s};\nconst struct outfit outfit_table[] = {%s};\nconst u8 saiyaman_map[][2] = {%s};\nconst int saiyaman_count = %d;\nconst u8 ss2_rows[] = {%s,255};\nconst u8 ssj4_rows[] = {%s,255};\nconst u8 ssj3_goku_rows[] = {%s,255};\n' % (','.join(index), ','.join(table) or '{0,0,0,0}', ','.join(pairs), len(pairs), ','.join(str(v) for k, v in fm.items() if k.endswith(('_ss2', '_ss2_b'))), ','.join(str(v) for k, v in fm.items() if k.endswith('ssj4')), ','.join(str(v) for v in SSJ3_GOKU + (fm['kid_goku_ssj3'],)))
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
     c += 'const u8 kk_bar[0x500] = {%s};\n' % ','.join(map(str, kk_bar(rom, clean)))
     c += 'const u8 map_marks[][2] = {%s};\nconst int map_mark_count = %d;\n' % (','.join('{%d,%d}' % m for m in map_marks(clean)), len(map_marks(clean)))
@@ -1977,6 +1979,8 @@ def beam_poses(rom, put, put_art):
 # 18's "blast attack frames fucked", Krillin's "Destructo disc frames fucked"). Armour Vegeta's Final Flash (slot 19: frames 0-1 charging, 2,
 # then 3-4 firing) is his Galick Gun pose's frames (approved Nov 10): the charge, then both hands out; it was LoG2's one-armed ki frames.
 SS2_POSE = 30                    # outfit.c SS2_POSE: Goku's Super Saiyan figures' change into Super Saiyan 2
+FIST_POSE = 29                   # outfit.c FIST_POSE: Goku's Super Saiyan 3 figures' Dragon Fist Explosion
+SSJ3_GOKU = (5, 6, 7, 8)         # the original game's Super Saiyan 3 Goku forms (figures 111 and 112: alive and with his halo, each twice); Kid Goku's is by name
 BEAM_FORMS = ('android13', 'krillin', 'krillin_kaioken', 'tien', 'tien_kaioken', 'future_trunks', 'future_trunks_ss', 'android17', 'super17', 'android18',
               'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2',
               'kid_buu', 'majin_buu')    # the Buus' Kamehameha (Nov 10): their slot 18 is a boss move (Kid Buu's rush, Majin Buu's antenna beam)
@@ -2025,6 +2029,34 @@ def held_poses(rom, put_art):
         if len(g) != 3: sys.exit('%s: no Galick Gun pose' % name)
         struct.pack_into('<I', rom, rec + 0x54 + 4 * 19, put_art(struct.pack('<I', 5) + b''.join(struct.pack('<4I', *f) for f in (g[0], g[0], g[1], g[1], g[2]))))
         done.add(char)
+
+
+def fist_poses(rom, put_art):
+    """Dragon Fist Explosion on Goku's Super Saiyan 3 figures (Nov 11, the owner: "give ssj3 Goku access to the dragon fist explosion"):
+    the move's code (0x0801ABBE) shows the fighter's slot 19 by frame number, 0 to 3 as it winds up and then 2 and 3 in turn while the
+    dragon is out, and their slot 19 is Instant Transmission's three frames. Each gets a pose of its own in slot FIST_POSE (outfit.c
+    dragon_use), as Super Saiyan 4 Goku's slot 19 is built: his stance, his ki blast's wind-up, then its arm out twice (held, not
+    looped: the owner's Nov 10 rule for a figure with no frames of its own for a move)."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    fm = json.load(open(OUT + '/_forms.json')); total = max(fm.values()) + 1
+    forms = SSJ3_GOKU + (fm['kid_goku_ssj3'],)
+    def frames(rec, slot):
+        ap = u(rec + 0x54 + 4 * slot) if slot < rom[rec] else 0
+        if not ap: return []
+        return [[u(ap - ROM_BASE + 4 + 16 * k + 4 * v) for v in range(4)] for k in range(u(ap - ROM_BASE))]
+    figures = {struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] for f in forms}
+    for f in range(total):                           # no Super Saiyan 3 Goku form left out: any form of his on one of these figures
+        row = rom[SPACE + FORM_SIZE * f:SPACE + FORM_SIZE * (f + 1)]
+        if row[0x0C] == 0 and struct.unpack_from('<H', row, 0x0E)[0] in figures and f not in forms:
+            sys.exit('form %d is a Super Saiyan 3 Goku and not in SSJ3_GOKU: he could not use Dragon Fist Explosion in it' % f)
+    for char in sorted(figures):
+        rec = u(ACTORS_AT + 4 * (char - 9)) - ROM_BASE
+        stand, ki = frames(rec, 0), frames(rec, 3)
+        if not stand or len(ki) < 3 or frames(rec, FIST_POSE): sys.exit('figure %d: no stance or three ki frames for a Dragon Fist pose, or slot %d taken' % (char - 9, FIST_POSE))
+        pose = put_art(struct.pack('<I', 4) + b''.join(struct.pack('<4I', *fr) for fr in (stand[0], ki[0], ki[2], ki[2])))
+        n = rom[rec]; new = bytearray(rom[rec:rec + 0x54 + 4 * n]) + bytes(4 * max(0, FIST_POSE + 1 - n))
+        new[0] = max(n, FIST_POSE + 1); struct.pack_into('<I', new, 0x54 + 4 * FIST_POSE, pose)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
 
 
 def front_changes(rom, put_art):
@@ -2274,6 +2306,7 @@ def add_eraser(rom, clean, sym, at, art):
         rows[skill] = row
     beam_poses(rom, put, put_art)
     held_poses(rom, put_art)
+    fist_poses(rom, put_art)
     front_changes(rom, put_art)
     vt = sym['kame_vt'] - ROM_BASE                       # Master Roshi's Kamehameha: the Kamehameha's behaviour with its update wrapped (outfit.c kame_update)
     for k in range(9):
@@ -2482,11 +2515,18 @@ def add_eraser(rom, clean, sym, at, art):
         sys.exit('the skill table ends at %d: update SKILL_IDS_END (outfit.c drops ids past it from saves)' % (max(rows) + 1))
     for k in range(ERASER_SKILL, max(rows) + 1):   # ids not built yet: the empty row, so the table stays in id order
         rows.setdefault(k, bytes(clean[SKILL_ROWS:SKILL_ROWS + 24]))
+    # Dragon Fist Explosion (the original row 5): Gogeta's, and Goku's as a Super Saiyan 3 (outfit.c dragon_can, dragon_use). The
+    # row is changed where it lies, before the table is copied out below; its description (UI string 1321) says whose it is.
+    if struct.unpack_from('<HH', rom, SKILL_ROWS + 24 * 5 + 12) != (1320, 1321) or struct.unpack_from('<II', rom, SKILL_ROWS + 24 * 5 + 16) != (0x08019E9F, 0x08019EB9):
+        sys.exit('skill row 5 is not the original Dragon Fist Explosion')
+    struct.pack_into('<II', rom, SKILL_ROWS + 24 * 5 + 16, sym['dragon_can'] | 1, sym['dragon_use'] | 1)
     if struct.unpack_from('<I', rom, 0x13618)[0] != ROM_BASE + SKILL_ROWS:
         sys.exit('skill table reference moved')
     struct.pack_into('<I', rom, 0x13618, put(bytes(rom[SKILL_ROWS:SKILL_ROWS + 24 * ERASER_SKILL]) + b''.join(rows[k] for k in sorted(rows))))
     ptrs = find_once(rom, clean[UI_TABLE:UI_TABLE + 64], 'UI string table')
-    new = put(bytes(rom[ptrs:ptrs + 4 * ERASER_UI]) + struct.pack('<%dI' % len(strings), *strings))
+    table = bytearray(rom[ptrs:ptrs + 4 * ERASER_UI])                    # (Dragon Fist Explosion's description: Goku's too)
+    struct.pack_into('<I', table, 4 * 1321, put(DRAGON_FIST_TEXT.encode('utf-16-le') + b'\0\0'))
+    new = put(bytes(table) + struct.pack('<%dI' % len(strings), *strings))
     n = 0
     for o in range(0, CODE_END, 4):
         if struct.unpack_from('<I', rom, o)[0] == ROM_BASE + ptrs:

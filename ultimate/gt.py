@@ -260,6 +260,118 @@ def shine_charge(frames, clean):
                 views[v][k] = c
 
 
+# GT Vegeta's change of form (slot 10) in the game's own pose (Nov 11, the owner, of the trailer: "Vegeta ssj4 transformation frames still
+# off"). BF's change is 11 frames: fists out high, then fists clenched out at his sides, two pictures by turns, then his arms coming
+# down; his old hair for the first two, the new form from the third. The sheet draws all 11 for his base looks, with the base head
+# throughout (frames 1, 3, 5, 7, 9 one picture, 2, 4, 6, 8 a brighter one), and none for his Super Saiyan looks, so until now every
+# change was his power-up's crouch (slot 13 frame 0: both gloves down in front of his trousers, which under Super Saiyan 4's aura read
+# as a lavender blob). Now each look that has a form above it plays the sheet's own change with the heads the forms have:
+#   base -> Super Saiyan: frames 0-1 the sheet's, 2-10 the same frames with his Super Saiyan head (the two looks share a body);
+#   Super Saiyan -> 4: frames 0-1 the base look's with his Super Saiyan head, 2-10 the tank-top frames as Super Saiyan 4.
+# Super Saiyan 4's body is made the way the sheet makes it from the tank top (its stance, crouch and Final Flash frames against the
+# tank top's, pixel for pixel): bare arms to fur, the chest bare between the fur down to the trousers, the belt gone, his lighter glove
+# shade, his head, and his tail behind him (so only where nothing else is).
+V_SUIT = (93, 94, 95)                    # BF Vegeta's blue suit: where his body starts, under the head
+V_SKIN = (16, 200, 201, 202, 203)
+V_LAV = (169, 152, 151)                  # gloves and boots
+V_TANK = (31, 32, 104, 34)               # the tank top's reds (the fur's are the first two and 33)
+V_TROUSER = (70, 186)
+V_FUR = {16: 31, 200: 33, 201: 32, 202: 32, 203: 32}       # a bare arm's shades -> the fur's
+V_CHEST = ((202, 201, 202), (202, 200, 202))                # the bare chest between the fur, row by row
+V_TAIL_LOWER = 1                         # the tail one row below where the sheet anchors it: there it lies behind his right arm and fist
+                                         # in this pose, and only a rim of it shows round the glove
+
+
+def _body_top(b, top):
+    """The canvas row where the body starts under the head: BF Vegeta's first row of suit (the sheet's frames lie on BF's rows)."""
+    return top + int(np.nonzero(np.isin(b, V_SUIT).any(1))[0][0])
+
+
+def _swap_head(s, top_s, d, top_d):
+    """Frame `s` with everything above its body (but a raised fist) replaced by frame `d`'s head, set on the same neck."""
+    out = s.copy(); head = np.zeros(s.shape, bool); head[:top_s] = True
+    out[head & ~np.isin(s, V_LAV)] = 0
+    don = np.zeros_like(s); sh = top_s - top_d
+    if sh >= 0: don[sh:top_d + sh] = d[:top_d]
+    else: don[:top_d + sh] = d[-sh:top_d]
+    m = (don != 0) & (out == 0)
+    out[m] = don[m]
+    return out
+
+
+def _ssj4_body(s, top, tail, lower):
+    """A tank-top frame's body from row `top` down as Super Saiyan 4's (see above); the tail `lower` rows below the sheet's anchor."""
+    out = s.copy(); h, w = s.shape
+    ttop = next(r for r in range(top, h) if np.isin(s[r], V_TROUSER).any())
+    belt = ttop - 1 if (s[ttop - 1] == 1).sum() >= 3 else None
+    end = belt if belt is not None else ttop
+    ext = {}
+    for r in range(top, end):
+        red = np.nonzero(np.isin(s[r], V_TANK))[0]
+        if len(red): ext[r] = (int(red[0]), int(red[-1]))
+    mid = int(round(np.median([(a + b) / 2 for a, b in ext.values()])))
+    strip = 0
+    for r in range(top, h):
+        lo, hi = ext.get(r, (mid, mid - 1)) if r < end else (mid, mid - 1)          # (below the torso every skin pixel is an arm's)
+        vee = r < end and s[r, mid] in V_SKIN
+        for x in range(w):
+            v = int(s[r, x])
+            if v in V_SKIN:
+                if lo <= x <= hi: out[r, x] = 201 if v == 203 else v            # the neckline's skin stays
+                else: out[r, x] = V_FUR[v]
+            elif r < end and lo <= x <= hi:
+                if not vee and abs(x - mid) <= 1: out[r, x] = V_CHEST[strip % 2][x - mid + 1]
+                elif v == 104: out[r, x] = 33
+                elif v in (1, 110): out[r, x] = 31 if v == 1 else 32
+            elif v == 152: out[r, x] = 151
+        if r in ext and not vee: strip += 1
+    if belt is not None:
+        xs = np.nonzero(np.isin(s[belt], (1, 110)) & (np.abs(np.arange(w) - mid) <= 5))[0]
+        for k, x in enumerate(xs): out[belt, x] = 186 if k == 2 else 70
+        ttop = belt
+    for y, x, v in tail:
+        Y, X = y + ttop - 37 + lower, x + mid - 33
+        if 0 <= Y < h and 0 <= X < w and out[Y, X] == 0: out[Y, X] = v
+    return out
+
+
+def _tail(ssj4_frame, tank_frame, top):
+    """His tail as the sheet draws it whole (his Final Flash's third frame: arms up, nothing in front of it; trousers from row 37,
+    his middle at column 32, one column right of where it sits on a body as narrow as his stance): the largest patch of fur red
+    below his head that the same frame in the tank top doesn't have."""
+    from scipy import ndimage
+    m = np.isin(ssj4_frame, (31, 32, 33)) & (tank_frame == 0); m[:top] = False
+    lab, n = ndimage.label(m, np.ones((3, 3)))
+    big = max(range(1, n + 1), key=lambda t: (lab == t).sum())
+    return [(int(y), int(x), int(ssj4_frame[y, x])) for y, x in zip(*np.nonzero(lab == big))]
+
+
+def vegeta_changes(frames, clean):
+    """{look: [11 front frames]} for the four GT Vegeta looks with a form above them."""
+    sys.path.insert(0, HERE)
+    import goku_black, bso_import
+    top = bso_import.TOP
+    if not all(n in frames for n in ('vegeta_gt', 'vegeta_gt_tank', 'vegeta_gt_ssj', 'vegeta_gt_tank_ssj', 'vegeta_gt_ssj4')): return {}
+    bf, bf_ss = goku_black.actor_frames(clean, 270), goku_black.actor_frames(clean, 273)
+    tank = frames['vegeta_gt_tank']
+    tops = []
+    for k, b in enumerate(bf[10][0]):
+        dy, dx = offset(b, tank[10][0][k], top)
+        if (dy, dx) != (0, 0): sys.exit('GT Vegeta change frame %d: the sheet is off BF Vegeta\'s rows by %s' % (k, (dy, dx)))
+        tops.append(_body_top(b, top))
+    stand, stand_ss = _body_top(bf[0][0][0], top), _body_top(bf_ss[0][0][0], top)
+    tail = _tail(frames['vegeta_gt_ssj4'][19][0][2], tank[19][0][2], stand)
+    if not 20 <= len(tail) <= 40: sys.exit('GT Vegeta change: no tail found on his Final Flash frame (%d pixels)' % len(tail))
+    head4 = frames['vegeta_gt_ssj4'][0][0][0]
+    four = [_swap_head(_ssj4_body(tank[10][0][k], tops[k], tail, 0 if k == 10 else V_TAIL_LOWER), tops[k], head4, stand) for k in range(11)]
+    out = {}
+    for base, ss in (('vegeta_gt', 'vegeta_gt_ssj'), ('vegeta_gt_tank', 'vegeta_gt_tank_ssj')):
+        own = frames[base][10][0]; gold = [_swap_head(own[k], tops[k], frames[ss][0][0][0], stand_ss) for k in range(11)]
+        out[base] = [own[0], own[1]] + gold[2:]
+        out[ss] = gold[:2] + four[2:]
+    return out
+
+
 def repair(frames):
     """Uub's and Majuub's flying (above), in place; then no Goten navy specks left in either."""
     if 'uub' not in frames: return
@@ -291,8 +403,14 @@ def actors(clean, pal, lengths):
             alt = next((a for a in FILL.get(s, (0,)) + (0,) if _pick(frames[name], a) is not None), 0)
             have[s] = _pick(frames[name], alt); missing.append((s, alt))
         haves[name], gaps[name] = have, missing
+    changes = vegeta_changes(frames, clean)
     for name, have in haves.items():
-        if name.startswith('vegeta_gt'):
+        if name in changes:
+            # (Nov 11: the game's own change pose, vegeta_changes above.) Every view is the front's, as before.
+            have[10] = [list(changes[name]) for v in range(3)]
+            gaps[name] = [m for m in gaps[name] if m[0] != 10]
+        elif name.startswith('vegeta_gt'):
+            # The looks with no form above them (the moustache, Super Saiyan 4) keep the Nov 10 change: it never plays.
             # GT Vegeta's change (slot 10): the sheet has none, and FILL's first choice, his slot 21 (the sheet's "special"), starts with the arms
             # flung out to one side and then the other, which read as the fusion dance (Nov 10, the owner: "his ssj4 transformation he did was the fusion dance not
             # transformation frames"). His own power-up (slot 13: fists down, then the shout) in a retail change's 11 frames, as Goku's

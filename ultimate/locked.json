@@ -1,11 +1,11 @@
 {
  "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose).",
  "forms": {
-  "vegeta_gt": "b467d6af79d9d74479a3d41f4c55f5acb997b8cd",
-  "vegeta_gt_tank": "761c332a7f31fb04596e4a6ba199a8d71dbbb584",
+  "vegeta_gt": "f5e8460b5199f3127d36c931f379b38d7946c04f",
+  "vegeta_gt_tank": "ddf2ed9ce3795f6ceb6ddd8a92f472b50f43679d",
   "vegeta_gt_mustache": "321c60e6eea981eac7dfa9c8b0be9b13c90ac301",
-  "vegeta_gt_ssj": "eb3dee865e49c08b8b111a20852a64d9f4890409",
-  "vegeta_gt_tank_ssj": "b2ecba4853aed83d573e815c84c12d0c6342c5d0",
+  "vegeta_gt_ssj": "821380851155894aaa2c40cdb467c2a4aa5af70c",
+  "vegeta_gt_tank_ssj": "d6cadb7cfd6cf7a0e40dc62f94981431292f9aea",
   "vegeta_gt_ssj4": "8a69b77fc0ba0e7a3248ceb767d8677aa7ef9f39",
   "vegeta_gt_tank_ssj4": "8a69b77fc0ba0e7a3248ceb767d8677aa7ef9f39",
   "broly_fp": "27ed2f0c81780d6259df2591b890035d181f1504",
