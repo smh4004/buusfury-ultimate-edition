@@ -168,7 +168,12 @@ RUSH = ((18, 73), (28, 43), (122, 154), (10, 38), (115, 49), (118, 51), (120, 52
 # Dabura, Majin Buu, Super Janemba, Broly, Super Buu, Super Buu with Gotenks, Kid Buu, Super 13: enemy row and character from spawns.csv.
 # Super Buu with Gohan is row 120: row 119, the other one in his story room, lies still and can't be hit outside his scene.
 # World Tournament: each round draws one opponent at random from its own pool, so nobody can come up twice. Enemy row, character. Stats and HP are set per round.
-TOUR_POOLS = (((147, 303), (111, 252), (49, 143), (85, 206), (80, 201), (63, 164)),                  # Yamu, Spopovich, Idasa, Olibu, Ninja Boss, Knight Destroyer
+# Spopovich is row 112, as in the Time Chamber's sparring and Super Garlic Jr.: row 111 is the story's fight with Videl, whose behaviour
+# (states 550-559) has a grab (558-559, actions 0x08754948 and 0x0875495C; sub_0802C644) that holds the fighter in the "held" pose only
+# Videl's figure has, until five presses of the D-pad. Anyone else was drawn as scrambled tiles, Spopovich's hold with him, and stayed held
+# for as long as the D-pad wasn't mashed (Nov 10: test_zone26's fighter was grabbed before its first punch and never got out; the test
+# had passed while the grab's timing missed it). rush_rows stops the build on any post-game fight with that behaviour.
+TOUR_POOLS = (((147, 303), (112, 252), (49, 143), (85, 206), (80, 201), (63, 164)),                  # Yamu, Spopovich, Idasa, Olibu, Ninja Boss, Knight Destroyer
               ((91, 224), (39, 123), (130, 269), (18, 73), (129, 221), (0, 31)),                    # Pikkon, Goten, Trunks, Dabura, Pharoah, Airship Warlord
               ((122, 154), (10, 38), (28, 43), (115, 49), (61, 47), (BOSS_ROW, 'super13')))          # Super Janemba, Broly, Majin Buu, Super Buu, Kid Buu, Super 13
 TOUR_HP = (15000, 20000, 30000)                     # each opponent adds 10 per place in its pool, so a test can tell them apart
@@ -513,6 +518,9 @@ def rush_rows(W, rom, harmless=False):
         then = garlic.makyan_fall(MORE_PUT, MORE_GET) if name == 'makyan' else garlic.fight_fall(name, rooms, MORE_PUT)
         struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
         rows += r
+    for k in range(STATS_COUNT * 28, len(rows), 28):          # (see TOUR_POOLS: the grab only Videl has frames for)
+        if 550 <= struct.unpack_from('<I', rows, k + 8)[0] <= 559:
+            sys.exit('post-game row %d has the story\'s Videl-against-Spopovich behaviour (stats row 111): use row 112' % (k // 28))
     at = W.put(bytes(rows))
     for o in STATS_REFS:
         if struct.unpack_from('<I', rom, o)[0] != BASE + STATS:

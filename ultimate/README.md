@@ -396,6 +396,19 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     beam pose holds one frame while the beam is out.
   - Majin Buu's Energy Punch was his boss record's attack spread over the ten frames (lightning round his head while held, and no punch):
     his ki blast's wind-up, then its arm out held, as the other guests'.
+- Found that night, testing and shooting the trailer:
+  - The World Tournament's Spopovich was stats row 111, the story's fight with Videl. Its behaviour (states 550-559) has a grab (558-559,
+    `sub_0802C644`) that holds the fighter in the held pose only Videl's figure has, until five presses of the D-pad: anyone else became
+    scrambled tiles, Spopovich's hold with him, for as long as the D-pad wasn't mashed. test_zone26 had passed while the grab's timing
+    missed its fighter; after the frame-drop fix it was grabbed before the first punch and never got out (the suite's "opponent 2 took
+    12 tries" was this, not timing: the loop is back at 12). He is row 112 now, as in the Time Chamber and under Super Garlic Jr. (no
+    grab in that tree), and `zone26.rush_rows` stops the build on any post-game row with the 550-559 behaviour.
+  - The Spirit Bomb skill's blast used the game's disc (native 0xF4, made for the Kid Buu fight's own room). It takes BG0's map and
+    writes its picture over a few of the area's tiles, so in an ordinary area the blast emptied the layer of roofs and tree tops,
+    scrambled every ground tile in those slots (a grid of little squares across West City's grass) and turned whatever shared its
+    palette entry cyan; the Nov 9 build did the same. The skill now draws the sprite only: the orb swells to its largest picture for
+    the blast and shrinks away (`spirit_draw`, `SKILL_SPRITE_ONLY`). The story's finish against Super 13 keeps the disc (the snow
+    arena's map suits it). The white, black, white impact flash is as designed (`impact`).
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)

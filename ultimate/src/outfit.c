@@ -1059,6 +1059,7 @@ static int bomb_show(int x, int y, int r) {
     ((int *)BS.actor)[1] = y;
     return 1;
 }
+#define SKILL_SPRITE_ONLY 1
 static void bomb_hide(void) {
     if (BS.actor) BOMB_LIST_REMOVE(ACTOR_LIST, BS.actor);
     BS.actor = 0;
@@ -1066,6 +1067,13 @@ static void bomb_hide(void) {
 
 static void spirit_draw(void)
 {
+    /* The skill's bomb is the sprite alone, blast included (Nov 10). The game's disc (native 0xF4, made for the Kid Buu fight's own room)
+       takes BG0's map and writes its picture over a few of the area's tiles: in an ordinary area the blast emptied the layer of roofs and
+       tree tops, scrambled every ground tile that used those slots (a grid of little squares across West City's grass) and turned
+       whatever shared its palette entry cyan (found shooting the trailer; the same in the Nov 9 build). The orb swells to its largest
+       picture for the blast and shrinks away; with OBJ memory full it isn't drawn. The story's finish (bomb_at, bomb_fx, in the snow
+       arena, whose map the disc suits) keeps the disc. */
+    if (SKILL_SPRITE_ONLY) { bomb_show(SB.x, SB.y, SB.r > 48 ? 48 : SB.r); return; }
     if (SB.phase < 3 && bomb_show(SB.x, SB.y, SB.r)) return;
     if (!SB.disc) {                 /* the disc takes effect slot 0; whatever was there goes back afterwards. An empty slot can't wait: the game calls every slot it thinks is in use */
         int st[3] = {2, 100, 15};
