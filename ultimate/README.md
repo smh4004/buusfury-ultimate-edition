@@ -426,6 +426,24 @@ screen) with no ki-blast or run animation, as in the retail game. Look at every 
 the arm should be out) isn't something it can see. `test_frames.py` 10-13 check the ROM directly: no template leftovers in any playable
 figure; Big Bang's code's two held frames one pose; run, ki blast and beams not the being-hit frames; changes and power-downs one view.
 
+### Reading a fight from memory (for captures and tests; from the trailer's reshoot, Nov 10 night)
+The owner, on the trailer: "maintain absolute certain no bugs show in any clips or any stupid behaviors by the bot/player that make no
+sense". A recorded fight take is kept only when the recorder has seen, frame by frame, that the move landed, that a follow-up strike
+landed, and that the fighter was not touched. What it reads:
+- A foe's health is the word at its object +0x28C (>> 10): a frame where it falls is a hit that landed. A guarded beam still costs a
+  little each frame (4-10 where an open hit costs 70-150).
+- The fighter's health can't show a hit on him: with a capture's raised stats a hit costs 0 (a red "0" over him) and his health never
+  moves. His object's word at +0x34 is the red hit flash's palette, 0 when he isn't flashing: that is the test. His animation (+0x50)
+  being his figure's slot 9 or 17 (hit, knocked down) is a second one. Slot 18 is not "getting up" here: it is the beam pose for a
+  figure with no slot 31, so it mustn't be in that test. The Super Dragon Fist lights the fighter through +0x34 too (no flash test
+  during it).
+- Standing a fighter a fixed distance beside a foe "wherever he is" can put him behind a ledge (the Cell Games' last room) or outside
+  what the camera can show (the Time Chamber's right side): stand the foe on open floor first.
+- Seen while shooting, and likely the fighters' own behaviours from the original game (not faults): Kid Buu splits in two a few
+  seconds into a fight (each with half his health; a clash take needs the copy beaten first), Super Buu fires his beam as soon as a
+  fighter stands in line with him, the tournament's fighters and Majin Vegeta are out of reach of a strike thrown from 40 pixels
+  (Future Trunks's sword landed from 24), and Broly leaps away after a combo.
+
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The
 raid, the form, the Chou Makouhou, the twice-size drawing and the camera lift are out of the build; all of it, with its notes, is on the
