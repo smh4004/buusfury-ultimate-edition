@@ -108,6 +108,9 @@ SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86
 KAIOKEN_TINT = 0.3                  # how far each colour goes towards red (outlines stay)
 
 
+BOLT_PIECE = 16                     # a crackle bolt's sprite piece (outfit.c BOLT_BYTES is its square)
+
+
 def crackle_frames(seed, glow, core):
     """One bolt of the crackle (outfit.c crackle) as four 32x32 frames of colour indices: it strikes (the top half), stands with a little
     branch, jumps a pixel, then breaks up in the fade colour. A one-pixel core with a one-pixel edge on one side (Nov 9, the owner: "a bit
@@ -2249,14 +2252,25 @@ def add_eraser(rom, clean, sym, at, art):
         for k in range(14):
             fn = (sym[who + '_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
             struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
-    # The crackle around a Super Saiyan 2 and Full Power (outfit.c crackle): three bolts of four 32x32 frames (crackle_frames) per colour set,
-    # in the spark frame format of the hit sparks (0x712FDC): origin x, y, width, height, OAM attributes (256 colours, square, 32x32), tiles
+    # The crackle around a Super Saiyan 2 and Full Power (outfit.c crackle): three bolts of four frames (crackle_frames) per colour set, in
+    # the spark frame format of the hit sparks (0x712FDC): origin x, y, width, height, OAM attributes (256 colours, square, 16x16), tiles.
+    # Each bolt is drawn on a 32x32 frame about its middle, but is at most 10 wide and 14 tall: it is stored as the 16x16 piece that
+    # holds all four of its frames (the same pixels on screen, the origin moved with the cut), so a bolt takes 256 bytes of sprite
+    # memory, not 1 KB. Sprite memory's allocator never joins freed blocks: two 1 KB bolts out at once left a 1 KB block cut off the
+    # largest free one for good, and at Volcano Summit Broly's first conversation, which needs all but 960 bytes of it, then took Broly's
+    # own 4 KB (Nov 11: he wasn't drawn while he spoke to a Super Saiyan 2). The build stops if a bolt no longer fits the piece.
     for who, (g, c) in (('ss2', ((96, 248, 248), (200, 248, 248))), ('fp', FP_BOLTS)):
         gi, ci = one(np.array(g)), one(np.array(c))
         out = bytearray()
         for b in range(3):
-            for img in crackle_frames(31 * b + (7 if who == 'fp' else 3), gi, ci):
-                out += struct.pack('<bbBBHHI', 16, 16, 32, 32, 0x2000, 0x8000, put_art(img.reshape(4, 8, 4, 8).transpose(0, 2, 1, 3).tobytes()))
+            frames_ = crackle_frames(31 * b + (7 if who == 'fp' else 3), gi, ci)
+            ys, xs = np.where(np.any([f > 0 for f in frames_], axis=0))
+            x0, y0 = min(int(xs.min()), 16), min(int(ys.min()), 16)
+            if xs.max() >= x0 + BOLT_PIECE or ys.max() >= y0 + BOLT_PIECE: sys.exit('crackle bolt %s %d does not fit a %dx%d piece' % (who, b, BOLT_PIECE, BOLT_PIECE))
+            for img in frames_:
+                cut = img[y0:y0 + BOLT_PIECE, x0:x0 + BOLT_PIECE]
+                out += struct.pack('<bbBBHHI', 16 - x0, 16 - y0, BOLT_PIECE, BOLT_PIECE, 0x2000, 0x4000,
+                                   put_art(cut.reshape(BOLT_PIECE // 8, 8, BOLT_PIECE // 8, 8).transpose(0, 2, 1, 3).tobytes()))
         rom[sym['bolt_' + who] - ROM_BASE:sym['bolt_' + who] - ROM_BASE + len(out)] = out
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Super Saiyan Rose', 'Press the B Button to transform into Super Saiyan Rose: attacks hit 1.5x as hard.  Press it again to change back.')]
     for form in ('black', 'rose'):

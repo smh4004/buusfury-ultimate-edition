@@ -656,6 +656,22 @@ def add_garlic(W, rom, actor_ids, quest_list, row):
     set_actors(W, rom, e, new + people)
 
 
+SUMMIT, SUMMIT_ROBOT = (15, 32), (100, 240)        # Volcano Summit, where Broly is fought; the post-game Pirate Robot's stats row and character
+
+
+def clear_summit(W, rom):
+    """Volcano Summit (15-32). The original game stands one of its post-game Pirate Robots there once the ending is seen (stats row 100,
+    character 240, condition flag 149: the black one with the blue glow, 27,824 HP; nine places in all). A player who goes to Broly
+    after the ending found the robot beside him, and the two fight each other. The owner, Nov 11, on the trailer's first clip: "Remove
+    the robot in the area with the Broly fight". Its record leaves this area's list; the other eight places keep theirs. Broly himself
+    (row 10, while flag 111 is clear) and the story's War Machine (row 140, before the ending) are as they were."""
+    e, ptrs = area_actors(rom, SUMMIT)
+    keep = [p for p in ptrs if not (struct.unpack_from('<I', rom, p - BASE)[0] == ENEMY_SPAWN
+                                    and (struct.unpack_from('<8I', rom, p - BASE)[2], struct.unpack_from('<8I', rom, p - BASE)[4]) == SUMMIT_ROBOT)]
+    if len(ptrs) != 3 or len(keep) != 2: sys.exit('Volcano Summit: expected three actors, one of them the Pirate Robot (%d, %d kept)' % (len(ptrs), len(keep)))
+    set_actors(W, rom, e, keep)
+
+
 def add_balls(W, rom, actor_ids, popo_list):
     """Each ball stands in its land's person list while you've no such ball and the ending has been seen."""
     for k, (world, area, x, y) in enumerate(BALLS):
@@ -823,6 +839,7 @@ def apply(rom, clean, proto_path, log2_path, at, actor_ids=None, debug_door=Fals
     hub_person(W, rom)
     add_garlic(W, rom, actor_ids, quest_list, garlic_row)
     add_balls(W, rom, actor_ids, popo_list)
+    clear_summit(W, rom)
     if debug_door:          # debug: on Snake Way, Down on the very spot you start reaches 26:1 and the rest of the road stays walkable; x 48-96 walk up reaches Broly; x<48 starts the ending
         e = next(AREAS + 56 * k for k in range(COUNT) if rom[AREAS + 56 * k] == 1 and rom[AREAS + 56 * k + 1] == 1)
         o = W.put(struct.pack('<2I4H2I', WARP[0], WARP[1], *DEBUG_SPOT, 0 | 26 << 8 | 1 << 16 | 1 << 24, 200 << 16 | 120))

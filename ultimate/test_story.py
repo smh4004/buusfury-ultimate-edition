@@ -39,6 +39,31 @@ out = run(b); check('the debug door reaches Broly at Volcano Summit', at(out) ==
 room = b[:b.index('shot broly_room') + 1]
 run(room + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read(); i = w.find(struct.pack('<I', 20240 << 10))
 check('Broly is in the room at full HP', i >= 0)
+# Volcano Summit after the ending (this build's save has seen it): the original game stands a post-game Pirate Robot beside Broly (stats
+# row 100, 27,824 HP), and the two fight each other. Nov 11, the owner: "Remove the robot in the area with the Broly fight" (zone26.py
+# clear_summit). In the room: no fighter with its health. In the ROM (this one and the release beside it): the area lists Broly and the
+# story's War Machine only, and the robot keeps its eight other places.
+check('no Pirate Robot beside Broly at Volcano Summit', w.find(struct.pack('<I', 27824 << 10)) < 0)
+# Broly is drawn while he speaks his first line, whatever Goku wears (his object's +0x0C low word is his sprite memory, 0xFFFF = none):
+# to a Super Saiyan 2 he wasn't, once the robot was gone. The lightning's bolts were 1 KB pieces, and two out together cut 1 KB off the
+# largest free block of sprite memory for good; this conversation needs all but 960 bytes of it, so it took Broly's own 4 KB (and the
+# robot's before). The bolts are 16x16 pieces now (build.py BOLT_PIECE, outfit.c bolt_room).
+for label, form in (('Goku', 0), ('a Super Saiyan', 3), ('a Super Saiyan 2', forms['goku_ss2']), ('a Super Saiyan 2 (second outfit)', forms['goku_ss2_b'])):
+    wear = ['poke8 %08X %02X' % (REC + 0x14, form)] + ['poke8 %08X %s' % (REC + o, v) for o, v in ((0x1C, 'FF'), (0x1D, '03'), (0x1A, 'FF'), (0x1B, '03'), (0x1E, 'FF'), (0x1F, '03'), (0x20, 'FF'), (0x21, '03'))]
+    run(start + fresh + wear + move(pl, 72) + ['keys UP', 'run 8', 'keys', 'run 220', 'shot broly_line_%d' % form, 'dump w 02000000 40000', DUMP])
+    w2 = open(d + '/w.bin', 'rb').read(); j = w2.find(struct.pack('<I', 20240 << 10)); g2 = open(d + '/g.bin', 'rb').read()
+    slot = struct.unpack_from('<I', w2, j - 0x28C + 0x0C)[0] & 0xFFFF if j >= 0x28C else None
+    print('   %s (form %d, now %d): Broly\'s sprite memory slot %s' % (label, form, g2[0x4F8 + 0x14], '%04x' % slot if slot is not None else 'not found'))
+    check('Broly is drawn while he speaks to %s' % label, slot is not None and slot != 0xFFFF and g2[0x4F8 + 0x14] == form)
+for path in (ROM, os.path.join(os.path.dirname(ROM), 'BFU_PERSONAL_USE_ONLY.gba')):
+    if not os.path.exists(path): continue
+    r = open(path, 'rb').read(); tab = struct.unpack_from('<I', r, 0x8A58)[0] - 0x08000000; rows = {}; robots = 0
+    for q in range(452):
+        e = tab + 56 * q; n = r[e + 4]; lst = struct.unpack_from('<I', r, e + 0x14)[0] - 0x08000000
+        recs = [struct.unpack_from('<8I', r, a - 0x08000000) for a in struct.unpack_from('<%dI' % n, r, lst)] if n else []
+        if (r[e], r[e + 1]) == (15, 32): rows = sorted(x[2] for x in recs if x[0] == 0x0800FD55)
+        robots += sum(1 for x in recs if x[0] == 0x0800FD55 and (x[2], x[4]) == (100, 240))
+    check('%s: Volcano Summit lists Broly and the War Machine only; the Pirate Robot keeps its 8 other places' % os.path.basename(path), rows == [10, 140] and robots == 8)
 # Broly guards for a while (how long moves with the build's timing): keep striking, a few blows at a time, until one lands.
 run(b + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read()
 x, y = struct.unpack_from('<II', w, i - 0xEC); p2 = ptr(b)

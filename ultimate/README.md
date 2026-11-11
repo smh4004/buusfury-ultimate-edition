@@ -458,6 +458,25 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   built from this code (the same take, place and timing). Delivered: release, debug and debug zone from commit 7dcde33, the very ROMs
   the full suite ran on (32 scripts, 1,101 checks, none failing).
 
+- Nov 11, 11:56, the owner on the trailer's first clip: "Remove the robot in the area with the Broly fight and also remake the trailer
+  without that robot in the first clip with Broly".
+  - The robot is the original game's post-game Pirate Robot (stats row 100, character 240: the black one with the blue glow, 27,824
+    HP, 236,265 EXP), which the game stands in nine places once the ending is seen (condition flag 149, or 180 in the volcano's caves);
+    one of them is Volcano Summit (15-32), beside Broly, and the two fight each other. `zone26.clear_summit` takes that one record out of
+    the area's list; the other eight stay. Broly (row 10, while flag 111 is clear) and the story's War Machine (row 140, flag 119 until
+    the ending) are untouched. `test_story.py`: no fighter with its health in the room, and the area's list in the zone and release ROMs.
+  - What the robot had been hiding: Broly's first conversation (script 435) is short of sprite memory. The actor list's allocator
+    (0x0801124C; 32 KB, best fit, 64-byte units; a block cut off a larger one is never joined to it again) has one free block of 9,152
+    bytes there and the conversation takes all but 960 of it. With the robot in the room the robot's 4 KB was taken instead (it
+    vanished as the box opened; nobody missed it). With it gone, a Super Saiyan 2 lost Broly: the lightning's bolts (`outfit.c crackle`)
+    were 1 KB sparks, two out together cut 1 KB off that block for good, and the conversation then took Broly's own 4 KB, so he wasn't
+    drawn while he spoke (found retaking the clip; base, Super Saiyan and Super Saiyan 3 were fine). A bolt is at most 10 wide and 14
+    tall, so each is now stored as the 16x16 piece that holds its four frames (256 bytes, `build.py BOLT_PIECE`; the same pixels on
+    screen: 120 frames of a Super Saiyan 2 compared between the builds, none differ), and a bolt is only drawn when a free block holds
+    it, never by taking another sprite's memory (`bolt_room`). `test_story.py` reads Broly's sprite memory slot (object +0x0C, 0xFFFF =
+    none) while he speaks to Goku, a Super Saiyan and both Super Saiyan 2 looks.
+  - Trailer cut 10: the first clip retaken on that build (`v7/broly_talk_new.py`), the same take.
+
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
 and any form id that moved: run it after each sprite or build change and account for every line. `python3 ultimate/pose_strip.py` draws

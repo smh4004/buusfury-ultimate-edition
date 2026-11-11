@@ -2389,6 +2389,20 @@ void fp_use(u8 *record, void *sprite) {
    of it, so the game's random numbers are left alone. */
 const u32 bolt_ss2[36] = {1}, bolt_fp[36] = {1};      /* three bolts x four frames x (origin, attributes, tiles): build.py fills them */
 #define BOLT_NEXT (*(volatile u32 *)0x0203F26C)
+/* A bolt's sprite memory. NewSpark asks the actor list's allocator (0x0801124C: best fit over the free blocks, in 64-byte units, a chain
+   from the list's first byte; block k is 10 bytes at +0x694: +4 its size, +8 the next free one; a block cut off a larger one is never
+   joined to it again) and, when nothing is free, makes room (0x08011732) by taking another sprite's tiles. So a bolt is a 16x16 piece
+   (build.py BOLT_PIECE: 256 bytes; as 1 KB pieces two bolts out together cut 1 KB off the largest free block for good, and Broly's
+   first conversation at Volcano Summit, which needs nearly all of it, took Broly's own tiles: he wasn't drawn while he spoke to a
+   Super Saiyan 2, Nov 11), and it is only drawn when a free block holds it: a bolt never takes another sprite's memory. */
+#define BOLT_BYTES 0x100
+static int bolt_room(int bytes) {
+    const u8 *list = (const u8 *)ACTORS;
+    int k = list[0], n;
+    for (n = 0; k != 0xFF && n < 64; n++, k = list[k * 10 + 0x69C])
+        if (*(const u16 *)(list + k * 10 + 0x698) >= (bytes >> 6)) return 1;
+    return 0;
+}
 static u32 bolt_hash(void) { u32 x = FRAMES * 0x9E3779B1u; x ^= x >> 15; x *= 0x85EBCA77u; x ^= x >> 13; return x; }
 static void crackle(void) {
     u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = *(u8 **)0x03001C34;
@@ -2404,7 +2418,8 @@ static void crackle(void) {
     SpriteBox(box, me); VecOp(v, box, box + 2);
     dx = 5 + (h >> 8) % 6;
     pos[0] = (v[0] >> 1) + (h >> 12 & 1 ? dx : -dx); pos[1] = (v[1] >> 1) - 10 - (int)((h >> 16) % 10);
-    { void *spark = NewSpark(0, pos, set + 12 * ((h >> 20) % 3), 4, 0x6000, 0x400, 0x38); if (spark) ListAdd(ACTORS, spark); }
+    if (!bolt_room(BOLT_BYTES)) return;
+    { void *spark = NewSpark(0, pos, set + 12 * ((h >> 20) % 3), 4, 0x6000, BOLT_BYTES, 0x38); if (spark) ListAdd(ACTORS, spark); }
 }
 void majuub_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
