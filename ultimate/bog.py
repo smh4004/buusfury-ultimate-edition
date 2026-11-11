@@ -199,6 +199,7 @@ def steps(more_get, more_put):
     say('told3', WHIS, "Lord Beerus, you can't destroy a planet with pudding this good. Time to go home.")
     say('told4', BEERUS, "...I'm sleepy. The Earth stays, for now. Save me some pudding.")
     say('told5', NARR, "Goku keeps the power of a Super Saiyan God!")
+    say('told6', NARR, "Gogeta's Dragon Ball Super looks are open now! See Switch Character.")     # outfits.json: flag 2000 + MORE_BOG_DONE
     code('told_end', put(more_put, MORE_BOG_TOLD, 1) + '    push {END}\n    end\n')
     say('after', WHIS, "Lord Beerus is napping back home. Oh, is that more pudding? How kind!")
     code('after_end', '    push {END}\n    end\n')

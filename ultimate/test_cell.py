@@ -75,8 +75,15 @@ for k, room in enumerate(rooms):
 check('the last fall brings you home', at() == (1 << 8 | 3))
 check('and the flag is set', flag(zone26.CELL_WON) == 1)
 z0 = mem(ZENIE)[0]
+# The prize's unlocks (Nov 11, the owner: "Unlock the saiyan armor for Gohan trunks and vegeta after beating the Cell Games along with
+# future trunks"): outfit flags 873-875 and 879 (outfits.json). A debug build starts with every outfit flag set, so they are cleared first.
+UNLOCKS = (873, 874, 875, 879)
+for f in UNLOCKS:
+    a = G + 0x55 + f // 8; send('poke8 %08X %02X' % (a, mem(a)[0] & 255 & ~(1 << f % 8)))
+send('run 2'); before = [flag(f) for f in UNLOCKS]
 talk(*zone26.HUB_AT); send('run 200'); sheet('prize'); send('tap A 20', 'run 60')
 check('the board pays the prize', mem(ZENIE)[0] - z0 == zone26.CELL_PRIZE and flag(zone26.CELL_PAID) == 1)
+check('the prize opens the Saiyan armor (Gohan, Trunks, Vegeta) and Future Trunks: flags %s' % [flag(f) for f in UNLOCKS], before == [0, 0, 0, 0] and all(flag(f) == 1 for f in UNLOCKS))
 check('no bad jumps', not bad[0])
 W.save(D + '/cell.png'); p.stdin.close()
 if fails: print('FAILED:', fails); sys.exit(1)

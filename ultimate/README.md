@@ -477,6 +477,29 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     none) while he speaks to Goku, a Super Saiyan and both Super Saiyan 2 looks.
   - Trailer cut 10: the first clip retaken on that build (`v7/broly_talk_new.py`), the same take.
 
+- Nov 11, 12:01-12:06, the owner on the unlock list (`BFU_Unlock_List_Nov11.pdf`): "Keep the Android unlocks from the super 13 fight, keep
+  full power Broly. Unlock the saiyan armor for Gohan trunks and vegeta after beating the Cell Games along with future trunks ... Change
+  Piccolo Krillin and Videl to tournament unlocks ... make Gogeta DBS and SSB unlock from Battle of Gods ... keep DBZ Gogeta as an unlock
+  how he was in base game from getting all the exhibits ... [Super Saiyan 4 Gogeta] the hardest trials or tournament reward for now".
+  Every outfit keeps a flag of its own (`outfits.json`; a debug build sets all of those below 2000 at its start, so a prize's own "paid"
+  flag can't double as one); what changed is who sets it:
+  - Super 13's reward sets 876 (Full Power Broly), 877 (Android 13) and 880 (Androids 17 and 18), and joins Android 13. It no longer
+    sets 873-875, 878 or 879, and no longer joins Gogeta.
+  - The Cell Games' prize (`cell_won_go`, `CELL_UNLOCKS`) sets 873-875 (the Saiyan armor) and 879 (Future Trunks; it was Piccolo's).
+  - Krillin and Videl are on 2000 with Yamcha (the Normal bracket), Piccolo on 2002 with Pikkon (the Hard bracket); the Dojo's Piccolo too.
+  - Gogeta (`outfit.c story_sync`, once the ending is seen): the original game's look (878) opens with all 15 Z-Fighter exhibits in the
+    museum (their count is the four flags from 346, the official's "of 15 Z-Fighter exhibits"; likely the original's own condition for
+    him: its scripts give nobody a reward for the count, so this is the owner's account of it); DBS and SSB Gogeta are on 2053 (Battle of
+    Gods finished), Super Saiyan 4 Gogeta on 2046 (all four Trials II). His slot joins the party the first time one of his looks is open,
+    wearing it (`gogeta_open`); `gogeta_keep` keeps him on any of them.
+  - A save that already has a flag keeps what it opened (873-875, 878, and 879 now means Future Trunks); Piccolo, Krillin and Videl
+    wait for the brackets. A look that is worn stays worn; Up and Down only skip it afterwards (`cycle`).
+  - Tests: `test_zone26.py` (the reward's flags with all eight cleared first, Android 13's join, Gogeta's join by himself, the
+    exhibits' flag with 15 and with 14), `test_cell.py` (the prize's four flags), `test_nov10.py` 6.
+  - Still to do from the same list: Vegito as a Potara fusion opened by all four Trials, Super Saiyan 4 Gogeta as a fusion of Super
+    Saiyan 4 Goku and Vegeta, and Teen Gohan for the Cell Games (LoG2 has his purple-gi base, record r50; his Super Saiyan and 2 only in
+    the armor, r56 and r55, which Gohan's Saiyan armor already uses).
+
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
 and any form id that moved: run it after each sprite or build change and account for every line. `python3 ultimate/pose_strip.py` draws

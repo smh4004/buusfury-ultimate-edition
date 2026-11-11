@@ -2105,8 +2105,13 @@ static const u16 story_unlocks[] = STORY_UNLOCKS, story_marks[][2] = STORY_MARKS
 /* Gogeta after the ending: no fusion time limit, and back in the party if a pick unfused him (Nov 10). Only once party_join has given him his
    five skills (a new game's record has three): the reward sets his flag a moment before it joins him, and putting him in between made
    party_join see him joined and skip his form, level and skills (test_zone26, depending on the frame count). */
+static int gogeta_open(void) {                 /* is any of Gogeta's looks unlocked? (-1, or the first that is) */
+    int first = outfit_index[7][0], n = outfit_index[7][1], i;
+    for (i = 0; i < n; i++) if (outfit_open(&outfit_table[first + i])) return first + i;
+    return -1;
+}
 void gogeta_keep(void) {
-    if (GetFlag(G_FLAGS, 149) && GetFlag(G_FLAGS, GOGETA_FLAG)) {
+    if (GetFlag(G_FLAGS, 149) && gogeta_open() >= 0) {
         u8 *g = REC(7);
         *(int *)(g + 8) = -1;
         if (g[0x0C] >= 5) g[0] |= 1;
@@ -2130,6 +2135,20 @@ static void story_sync(int post) {
                 party_join(st);
                 break;
             }
+    }
+    /* Gogeta's unlocks (Nov 11, the owner: "keep DBZ Gogeta as an unlock how he was in base game from getting all the exhibits", "make
+       Gogeta DBS and SSB unlock from Battle of Gods", Super Saiyan 4 Gogeta "the hardest trials ... reward"). His first look, the original
+       game's (GOGETA_FLAG), opens once the ending is seen with all 15 Z-Fighter exhibits in the museum (their count is the four flags
+       from 346: the official's "of 15 Z-Fighter exhibits"); the others have their own flags (outfits.json). His slot joins the party
+       the first time one of his looks is open, wearing it; before, the Super 13 reward joined him. */
+    if (post) {
+        int k;
+        if (GetFlag(G_FLAGS, 346) && GetFlag(G_FLAGS, 347) && GetFlag(G_FLAGS, 348) && GetFlag(G_FLAGS, 349))
+            FLAG_BYTE(GOGETA_FLAG) |= 1 << (GOGETA_FLAG & 7);
+        if (!(REC(7)[0] & 1) && (k = gogeta_open()) >= 0) {
+            int st[3] = {2, 7, outfit_table[k].form};
+            party_join(st);
+        }
     }
     /* Post-game Gogeta stays fused (Nov 10, the owner: "Selected Gogeta in character select and he fucking unfused and got deleted from
        character select"). A fusion's time left is record +8 (frames; -1 = no limit; script native 0xA8 sets it), and the fighter HUD counts

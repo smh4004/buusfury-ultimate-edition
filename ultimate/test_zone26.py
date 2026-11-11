@@ -86,14 +86,36 @@ home = end[:end.index('tap A 40')]
 # either (flag 111): with it set and the guest slot empty, skills_sync's story_sync joins Broly there (a save from the original game), every
 # 64 frames, and whether one of those came between the poke and the reward depended on the frame count (Nov 9: it did after the Great Ape).
 no_broly = 'poke8 %08X %02X' % (0x03001068 + 0x55 + 111 // 8, g[0x55 + 111 // 8] & ~(1 << 111 % 8))
-reward = talk(home + ['poke8 %08X 02' % (0x03001560 + 8 * 0x68), 'poke8 %08X 02' % (0x03001560 + 7 * 0x68), no_broly]) + ['shot said', 'tap A 60', 'shot said2'] + ['tap A 60'] * 7 + ['run 60', 'shot after', 'dump g 03001068 8a8']
+# The reward's unlocks (Nov 11, the owner's list): Full Power Broly (876), Android 13 (877), Androids 17 and 18 (880). The Saiyan armor
+# (873-875) and Future Trunks (879) are the Cell Games' now, Piccolo, Krillin and Videl the tournament's, and Gogeta no longer joins
+# here (878: his own unlocks, below). A debug build starts with every outfit flag set, so all eight are cleared first.
+def clear(*flags):
+    by = {}
+    for f in flags: by[f // 8] = by.get(f // 8, g[0x55 + f // 8]) & ~(1 << f % 8)
+    return ['poke8 %08X %02X' % (0x03001068 + 0x55 + k, v) for k, v in by.items()]
+reward = talk(home + ['poke8 %08X 02' % (0x03001560 + 8 * 0x68), no_broly] + clear(*range(873, 881), 883)) + ['shot said', 'tap A 60', 'shot said2'] + ['tap A 60'] * 7 + ['run 60', 'shot after', 'dump g 03001068 8a8']
 out = run(reward); g = open(d + '/g.bin', 'rb').read()
-check('the resident gives the rewards: Saiyan armor and Broly Full Power', all(flag(n) for n in (873, 874, 875, 876, 877, 878, 879, 883)))
+print('   reward flags 873-880, 883:', [flag(n) for n in list(range(873, 881)) + [883]])
+check('the resident gives the rewards: Full Power Broly, Android 13, Androids 17 and 18', all(flag(n) for n in (876, 877, 880, 883)))
+check('and no longer the Saiyan armor, Future Trunks or Gogeta (the Cell Games\' and the exhibits\' now)', not any(flag(n) for n in (873, 874, 875, 878, 879)))
 forms = json.load(open('ultimate/out/BFU_debug_zone.map.json'))['forms']; rec = lambda c: g[0x4F8 + c * 0x68:0x4F8 + (c + 1) * 0x68]
-check('the reward adds DBS Gogeta and Android 13 to the party', rec(7)[0] & 1 == 1 and rec(8)[0] & 1 == 1 and rec(7)[0x14] == forms['gogeta_dbs'] and rec(8)[0x14] == forms['android13'])
+check('the reward adds Android 13 to the party', rec(8)[0] & 1 == 1 and rec(8)[0x14] == forms['android13'])
 check('joining as Android 13, the guest has SS Deadly Bomber, not Eraser Cannon, and can become Super 13', list(rec(8)[0x0C:0x12]) == [5, 7, 8, 25, 29, 30])
 check('Gohan learns Special Beam Cannon from the reward', 26 in list(rec(1)[0x0D:0x0D + rec(1)[0x0C]]))
-check('DBS Gogeta keeps his own moves and gains both transformations', list(rec(7)[0x0C:0x12]) == [5, 7, 3, 5, 20, 44])      # Blue: its own row since Nov 9
+# Gogeta's own unlocks (outfit.c story_sync, after the ending): his slot joins the first time one of his looks is open, wearing it. A debug
+# build has every look past flag 2000 open (DBS, SSB, Super Saiyan 4), so with the original's flag (878) clear he joins as DBS Gogeta;
+# with all 15 Z-Fighter exhibits in the museum (their count is the four flags from 346) the original's flag comes on, and a Gogeta not
+# yet joined joins as the original game's (form 41).
+EX = (346, 347, 348, 349)
+unjoin = 'poke8 %08X 02' % (0x03001560 + 7 * 0x68)
+out = run(home + clear(878, *EX) + [unjoin, 'run 200', 'dump g 03001068 8a8']); g = open(d + '/g.bin', 'rb').read()
+check('Gogeta joins by himself once one of his looks is open (a debug build: DBS Gogeta), with his moves and both transformations',
+      rec(7)[0] & 1 == 1 and rec(7)[0x14] == forms['gogeta_dbs'] and list(rec(7)[0x0C:0x12]) == [5, 7, 3, 5, 20, 44] and not flag(878))
+on = lambda *flags: ['poke8 %08X %02X' % (0x03001068 + 0x55 + k, v) for k, v in {f // 8: g[0x55 + f // 8] | sum(1 << x % 8 for x in flags if x // 8 == f // 8) for f in flags}.items()]
+out = run(home + clear(878) + on(*EX) + [unjoin, 'run 200', 'dump g 03001068 8a8']); g = open(d + '/g.bin', 'rb').read()
+check('all 15 Z-Fighter exhibits open the original game\'s Gogeta (flag 878), and he joins wearing it', flag(878) == 1 and rec(7)[0] & 1 == 1 and rec(7)[0x14] == 41)
+out = run(home + clear(878) + on(346, 347, 348) + clear(349) + ['run 200', 'dump g 03001068 8a8']); g = open(d + '/g.bin', 'rb').read()
+check('fourteen exhibits don\'t', flag(878) == 0)
 print('   Gogeta joined at', list(rec(7)[0x28:0x2B]), 'guest at', list(rec(8)[0x28:0x2B]))
 
 # Start of the quest: from 26:1's road back to West City, walk up to the same resident, get sent in.

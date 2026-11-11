@@ -1,5 +1,5 @@
 {
- "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Extras will use post-game reward flags. Flags from 600 up are ours. Flags 610-612 are post-game rewards; side content will set them. GT looks (flag 2028) open when Ledgic falls, with Pan; Uub (2030) after his own challenge. \"bench\": outfits that share one fighter's progress (Pan's looks; Brapan, the Bulma-Pan fusion from Black Star Odyssey, is a fighter of her own).",
+ "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Reward flags (Nov 11, the owner's list): 873-875 the Saiyan armor and 879 Future Trunks, set by the Cell Games' prize; 876 Full Power Broly, 877 Android 13 and 880 Androids 17 and 18, the Super 13 reward; 878 the original game's Gogeta, set once the ending is seen and all 15 Z-Fighter exhibits are in the museum (outfit.c story_sync); 887 the Boss Rush. Flags from 2000 are the more flags (zone26.py): 2000 the Normal bracket (Yamcha, Krillin, Videl), 2002 the Hard bracket (Pikkon, Piccolo), 2046 all four Trials II (Super Saiyan 4 Gogeta), 2053 Battle of Gods finished (DBS and SSB Gogeta). GT looks (flag 2028) open when Ledgic falls, with Pan; Uub (2030) after his own challenge. \"bench\": outfits that share one fighter's progress (Pan's looks; Brapan, the Bulma-Pan fusion from Black Star Odyssey, is a fighter of her own).",
  "characters": {
   "1": [
    {
@@ -97,13 +97,13 @@
    },
    {
     "form": "piccolo",
-    "flag": 879,
+    "flag": 2002,
     "name": "Piccolo"
    },
    {
     "form": "future_trunks",
     "also": "future_trunks_ss",
-    "flag": 880,
+    "flag": 879,
     "name": "Future Trunks"
    },
    {
@@ -119,12 +119,12 @@
    },
    {
     "form": "krillin",
-    "flag": 880,
+    "flag": 2000,
     "name": "Krillin"
    },
    {
     "form": "videl",
-    "flag": 880,
+    "flag": 2000,
     "name": "Videl"
    },
    {
@@ -228,18 +228,18 @@
    {
     "form": "gogeta_dbs",
     "also": "gogeta_dbs_ss",
-    "flag": 878,
+    "flag": 2053,
     "name": "DBS Gogeta"
    },
    {
     "form": "gogeta_ssb_skin",
-    "flag": 878,
+    "flag": 2053,
     "name": "SSB Gogeta"
    },
    {
     "form": "gogeta_ssj4",
     "name": "Super Saiyan 4",
-    "flag": 2028
+    "flag": 2046
    }
   ],
   "0": [

@@ -71,6 +71,7 @@ SHELVED_FORMS = ('kid_goku', 'vegeta_gt', 'vegeta_gt_tank')     # forms 159, 160
 SHELVED_FIRST_FORM = 159
 SKILL_IDS_END = 50               # one past the last skill row (checked once the table is built)
 MYSTIC_FLAG = 860                # outfits.json: the Elder Kai's scene gives Gohan the orange gi (outfit 110)
+CELL_UNLOCKS = (873, 874, 875, 879)    # outfits.json: the Cell Games' prize opens the Saiyan armor (Gohan, Trunks, Vegeta) and Future Trunks
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
 # picture, slot 0 body 1 hands 2 feet 3 accessory, STR POW PDEF KDEF SPD, EXP bonus /256, picture hue or None)
 GEAR_POTARA, GEAR_GRAVITY, GEAR_SHADES, GEAR_SHELL, GEAR_POUCH, GEAR_NECKLACE = 162, 163, 164, 165, 166, 167
@@ -414,7 +415,7 @@ step auto code
     push 25
     end
 step auto say 0x85 "The signal stopped! You beat Super 13!"
-step auto say 0x85 "Saiyan armor from Capsule Corp, and new allies! See the Switch Character menu."
+step auto say 0x85 "And you've made new allies out there! See the Switch Character menu."
 step auto say 0x85 "And Goku, you learned the Spirit Bomb! Press L to select it."
 step auto code
     pushn 883
@@ -423,25 +424,13 @@ step auto code
     call 0xA4
     pushn 1, 26
     call 0xA4
-    pushn 873
-    call set_flag
-    pushn 874
-    call set_flag
-    pushn 875
-    call set_flag
     pushn 876
     call set_flag
     pushn 877
     call set_flag
-    pushn 878
-    call set_flag
-    pushn 879
-    call set_flag
     pushn 880
     call set_flag
     pushn 8, %d
-    call 0x%X
-    pushn 7, %d
     call 0x%X
     push 25
     end
@@ -580,7 +569,7 @@ step auto code
     end
 step auto code
     end
-''' % (form_row('android13'), JOIN_NATIVE, form_row('gogeta_dbs'), JOIN_NATIVE, absorb, super13, super13, super13, super13, super13, super13)
+''' % (form_row('android13'), JOIN_NATIVE, absorb, super13, super13, super13, super13, super13, super13)
 
 
 def tournament_npc(src):
@@ -873,7 +862,7 @@ L4:
     code('endless_go', '    call 0x78(30)\n    push 26\n' + lad(0) + '    pushn 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\n')
     steps.append(('endless_done', 'saycode 0x%02X "That run: %%d wins. Your best: %%d."\n' % speaker + lad(4) + lad(5) + '    end\n'))
     code('endless_done_go', put(zone26.MORE_ENDLESS_NEW, 0) + '    push {start}\n    end\n')
-    say('hard_won', "Hard bracket cleared! 300,000 Zenie, Endless is open, and Pikkon joins you.")
+    say('hard_won', "Hard bracket cleared! 300,000 Zenie, Endless is open, and Pikkon and Piccolo join you.")
     code('hard_won_go', put(zone26.MORE_HARD_PAID, 1) + put(zone26.MORE_PIKKON, 1) + '    push {start}\n    end\n')
     say('herc_won', "Hercule says he let you win, and he's joining your team to teach you more!")
     code('herc_won_go', put(zone26.MORE_HERCULE, 1) + '    push {start}\n    end\n')
@@ -950,7 +939,7 @@ L1:
     status('rewards', 887, "Boss Rush: cleared! Majin Buu, Super Janemba and Kid Buu are on your side.", "Boss Rush: win it and Majin Buu, Super Janemba and Kid Buu join you.", 'rew2')
     status('rew2', 890, "World Tournament: cleared! Each win pays 100,000 Zenie.", "World Tournament: each win pays 100,000 Zenie.", 'rew3')
     status('rew3', zone26.TRIAL_ALL, "Trials: all four cleared! You earned the Geromantium Bandana.", "Trials: Zenie and gear each. All four: Geromantium Bandana and ten Senzu Beans.", 'rew5')
-    status('rew5', zone26.CELL_PAID, "Cell Games: cleared! You earned 200,000 Zenie.", "Cell Games: beat all four fights to win 200,000 Zenie.", 'rew6')
+    status('rew5', zone26.CELL_PAID, "Cell Games: cleared! You won Saiyan armor, Future Trunks and 200,000 Zenie.", "Cell Games: win all four fights for Saiyan armor, Future Trunks and 200,000 Zenie.", 'rew6')
     say('rew6', "Dragon Balls: seven lie near the landing pads of seven lands. Bring them to Mr. Popo.")
     code('rew6_go', '    push {rew4}\n    end\n')
     say('rew4', "Time Chamber: Mr. Popo on Kami's Lookout lets you spar with old foes, for less EXP.")
@@ -974,7 +963,7 @@ L1:
     for k, t in enumerate(zone26.TRIALS2):
         say('trial2_%d' % k, "Well done, %s! You beat %s! Take %s Zenie and the %s." % (t[1], t[4], '{:,}'.format(zone26.TRIAL2_PRIZE), t[6]))
         code('trial2_%d_go' % k, put(zone26.MORE_T2_PAID + k, 1) + '    pushn %d\n    call 0x%X\n    call 0x93(%d)\n    push {END}\n    end\n' % (zone26.TRIAL2_PRIZE, zone26.ADD_ZENIE, t[5]))
-    say('all2_won', "All of Trials II cleared! Take the Geromantium Kataginu, Gloves and Tabi, and ten Senzu Beans.")
+    say('all2_won', "All of Trials II cleared! Geromantium gear, ten Senzu Beans, and Super Saiyan 4 Gogeta joins you!")
     code('all2_won_go', put(zone26.MORE_T2_ALL, 1) + '    pushn %d, %d\n    call 0x81\n' % (zone26.TRIAL_ITEM, zone26.TRIAL_ITEMS) + ''.join('    call 0x93(%d)\n' % g for g in zone26.TRIAL2_GEAR) + '    push {END}\n    end\n')
     # Dojo: a page of fighters, then a fight with a CPU copy of the one picked, if you have them
     say('dojo', "The Dojo: spar with a copy of any fighter you've met. Each win pays %s Zenie." % '{:,}'.format(zone26.DOJO_PRIZE))
@@ -1013,9 +1002,9 @@ L1:
     code('dare_go', '    call 0x78(30)\n    pushn 26, %d, 1, 360, 420\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\n' % zone26.hercule_room())
     say('cell', "The Cell Games! Four fights in a row at the old arena. Your health carries over. Good luck!")
     code('cell_go', '    pushn %d\n    call clear_flag\n    pushn %d\n    call clear_flag\n    call 0x78(30)\n    pushn 26, %d, 1, %d, %d\n    call 0x77\n    call 0x79(30)\n    push {END}\n    end\n' % (*zone26.CELL_COUNT, zone26.cell_first(), *zone26.CELL_START))
-    say('cell_won', "You beat Perfect Cell! Here's 200,000 Zenie, champion!")
-    code('cell_won_go', '    pushn %d\n    call set_flag\n    pushn %d\n    call 0x%X\n    push {END}\n    end\n' % (zone26.CELL_PAID, zone26.CELL_PRIZE, zone26.ADD_ZENIE))
-    say('tour_won', "You won the World Tournament! 100,000 Zenie, and Yamcha wants to join you!")
+    say('cell_won', "You beat Perfect Cell! 200,000 Zenie, Saiyan armor for three, and Future Trunks joins you!")
+    code('cell_won_go', ''.join('    pushn %d\n    call set_flag\n' % f for f in (zone26.CELL_PAID,) + CELL_UNLOCKS) + '    pushn %d\n    call 0x%X\n    push {END}\n    end\n' % (zone26.CELL_PRIZE, zone26.ADD_ZENIE))
+    say('tour_won', "You won the World Tournament! 100,000 Zenie, and Yamcha, Krillin and Videl want to join you!")
     code('tour_won_go', '    pushn 890\n    call set_flag\n' + put(zone26.MORE_YAMCHA, 1) + '    push {END}\n    end\n')
     say('rush_won', "You beat all nine! Majin Buu, Super Janemba and Kid Buu join you. See Switch Character.")
     code('rush_won_go', '    pushn 887\n    call set_flag\n    push {END}\n    end\n')

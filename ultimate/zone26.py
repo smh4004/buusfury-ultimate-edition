@@ -242,7 +242,7 @@ WAVE_HP, WAVE_POINTS, WAVE_ZENIE = (3, 2), 3, 30000
 # Dojo (More, then Next): fight a CPU copy of a fighter you have, on Kid Buu's row (beams, so it can clash with you).
 # (name, character number or actor name, what unlocks it: None, ('flag', n) or ('more', n), as their guest outfits)
 DOJO = (('Saiyans', (('Goku', 115, None), ('Vegeta', 279, None), ('Gohan', 110, None))),
-        ('Friends', (('Piccolo', 'piccolo', ('flag', 879)), ('Android 18', 'android18', ('flag', 880)), ('Pan', 'pan', ('more', MORE_GT)))),
+        ('Friends', (('Piccolo', 'piccolo', ('more', MORE_PIKKON)), ('Android 18', 'android18', ('flag', 880)), ('Pan', 'pan', ('more', MORE_GT)))),
         ('Rivals', (('Broly', 38, ('flag', 111)), ('Goku Black', 'goku_black', ('more', MORE_BLACK)), ('Uub', 'uub', ('more', MORE_UUB)))))
 DOJO_HP, DOJO_STATS, DOJO_ROW, DOJO_PRIZE = 40000, (152, 85, 85, 85), 61, 20000
 

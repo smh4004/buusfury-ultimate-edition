@@ -59,8 +59,9 @@ check('the Skills tab reaches the sixth skill and SELECT swaps it', len(held) ==
 
 # 6. Gogeta after the ending (the --debug build: Switch Character opens at the end of its intro). a: joined, his story fusion's time spent
 # (+8 = 0): picked, he stays fused. b: a pick in the delivered build unfused him (bit 0 clear) after the reward gave him five skills: he is
-# back. c: never joined (a new game's three skills) with his flag set, as between the reward's flag and its join: not put in the party
-# (party_join would then skip his form, level and skills).
+# back. c: never joined (a new game's three skills) with his flag set: this screen's keep leaves him out (party_join would then skip
+# his form, level and skills); in play, story_sync joins him the first time one of his looks is open (Nov 11; test_zone26.py; before,
+# the Super 13 reward did).
 ROMD = T.ROM.replace('_debug_enemy_', '_debug_')
 route = [l for l in open('tools/harness/long.txt').read().split('\n')[:93] if not l.startswith('shot ')]
 R7 = 0x03001560 + 7 * 0x68
@@ -88,7 +89,7 @@ check('Gogeta picked after the ending stays fused and in play', cur == 7 and rec
 cur, rec = gogeta(2, 0, 5, False)
 check('a Gogeta a pick had unfused is back in the party', rec & 1)
 cur, rec = gogeta(2, -1, 3, False)
-check('a Gogeta the reward has not joined yet is left for its join', not rec & 1)
+check('a Gogeta never joined (three skills) is not put in the party by this screen: his own join does that', not rec & 1)
 
 # 7. pools at 1023 with an EP maximum of 64: where the HUD starts drawing the bars (0x0800BB8A), the two pool lengths (sp + 0x502, + 0x503) are
 # within the 41 columns (they were 0x8F each: 102 columns past the table, three stray bytes a column)
