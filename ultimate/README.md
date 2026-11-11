@@ -449,7 +449,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     before the skill table is copied out (the game reads the copy at the pointer in `0x13618`). Its text (UI string 1321) says who
     can use it. `test_nov11.py` (in game: the pose on every Super Saiyan 3 form facing left and down, the cost, Instant Transmission
     after it, no other Goku form, Gogeta's unchanged, the book), `test_frames.py` 15.
-  - The trailer loses the Super Saiyan 4 Dragon Fist shot (cut 8).
+  - The trailer loses the Super Saiyan 4 Dragon Fist shot (cut 8): its two bars went to the Spirit Bomb (the same frames, a little
+    slower: after them the two fighters only stand there), the beam struggle, the Skills tab, the first roster shot and the Challenge
+    Board. The roster changes fighter every 20 frames, so the first roster shot ends on Kid Buu and the later one starts on Tien's
+    first frame (292).
+- Nov 11, 11:26, the owner on the previews (the in-game GIFs and the before/now sheet): "Looks good reshoot it and send new rom after
+  too". The four GT Vegeta looks stay locked on the new frames. Trailer cut 9 is cut 8 with his Super Saiyan 4 shot retaken on a rig
+  built from this code (the same take, place and timing). Delivered: release, debug and debug zone from commit 7dcde33, the very ROMs
+  the full suite ran on (32 scripts, 1,101 checks, none failing).
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
