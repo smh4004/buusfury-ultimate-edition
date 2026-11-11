@@ -2521,6 +2521,15 @@ def add_eraser(rom, clean, sym, at, art):
     for k in range(14):
         fn = (sym[mine[k]] | 1) if k in mine else ROM_BASE + BEAM_ACTOR_VT + struct.unpack_from('<i', clean, BEAM_ACTOR_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    # The boss bar (outfit.c bossbar): which stats rows are the mod's boss fights (zone26.boss_table). The bar itself is the game's own:
+    # its actor, art and code; the mod's bars use the game's table with one entry of ten answered by the mod.
+    import zone26
+    tab, _ = zone26.boss_table()
+    struct.pack_into('<2I', rom, sym['boss_tab'] - ROM_BASE, len(tab), put(tab))
+    vt = sym['bossbar_vt'] - ROM_BASE; GAME_BAR_VT = 0x4CE28            # the game's boss bar table, its 'shown?' (3) answered by outfit.c
+    for k in range(10):
+        fn = (sym['bossbar_visible'] | 1) if k == 3 else ROM_BASE + GAME_BAR_VT + struct.unpack_from('<i', clean, GAME_BAR_VT + 4 * k)[0]
+        struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
     vt = sym['absorb_vt'] - ROM_BASE
     for k in range(14):
         fn = (sym['absorb_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]

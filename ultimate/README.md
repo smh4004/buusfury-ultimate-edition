@@ -536,6 +536,48 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     seconds; Super 13 stood at (56, 208), 24 px across and 8 down, inside the reach `arena_chase` let him stand at, punching). A punch
     goes straight out the way he faces: fighting in place for a second and a half with no hit landing (the fighter's health hasn't
     dropped), he now lines up with the fighter on the nearer axis, then closes to 16 px on the other.
+- Nov 11, 13:51 and 14:53, the owner: "can you give every single new boss fight a custom health bar too", then "Add health bars to all
+  the bosses in game right now and reuse Buus fury assets for it for now. We can make new bars later." And at 16:01, of the bar the mod
+  first drew by itself (the fighter's HUD turned round in the top right corner): "That's not what I meant by the boss hp bars at all.
+  Use the ones that already existed in Buus Fury for boss fights."
+  - Buu's Fury has a boss bar: the slanted red bar that slides in at the top right of the story's boss fights (Broly's, for one).
+    The first attempt was built on a wrong reading ("the game draws no enemy health at all") and never looked for it; it is gone,
+    all of it. Look at a story boss fight in the unmodified game before building anything the game may already have.
+  - The game's bar: an actor of the HUD's layer (vtable 0x0804CE28) made by 0x080195A8, which the story's scripts call through
+    natives 0x8F (a target, the whole bar) and 0x90 (a target and a part of the bar, for a boss in phases); native 0x91 sends it
+    away (message 0x13: its speed byte +0x17 becomes 0xFF and it slides up off the screen and off the list). Two 32x8 sprites at
+    x 160 and 192 on 0x200 bytes of tiles (art 0x087196E4), 53 slanted columns of four pixels (table 0x087198E4) blacked from the
+    right (0x08019658). It shows its target's health (the enemy's method at vtable +0x64, 0x0804F874: health x 53 / the row's
+    health, rounded down) plus its byte +0x15, or with no target that byte alone. Its 'shown?' (the fourth of its ten functions) is
+    a plain yes, so it stays up through text boxes: Broly's stays, empty, through "Goku has reached level 73!" until his script
+    sends it away. `lib/bossbar.py` is its model.
+  - The mod's fights have no script that makes one, so `outfit.c bossbar_tick` asks the game for it (the same call as native 0x8F,
+    with no target) at the player's input while the HUD is shown, and nothing of the mod's is drawn. Who gets one
+    (`zone26.boss_table`, a byte per stats row in the ROM): every row the mod adds (`foe_names`, in the order `rush_rows` makes
+    them, which checks the count) but the Makyans' pack, and Android 13's and Super 13's. The room's boss is the foe whose row has
+    the most health; foes of one name share the bar (the three Cell Juniors: their health added up, out of the most there was).
+    The story's own boss fights are not touched: their rows are not in the table, and while any boss bar is on the list none is
+    made (one of the mod's leaves at once if a script makes the fight's own).
+  - The mod's bars answer with the game's table of ten functions with one replaced (`bossbar_vt`, filled by build.py: 'shown?',
+    asked every frame, is `bossbar_visible`): there the columns are kept by the game's rule (rounded down), and when the boss has
+    no health left, or is gone, the bar is emptied and told to leave the game's way (+0x17 = 0xFF). The game holds its actors
+    still while a text box is up, so after a fall the empty bar waits for the box to close, exactly as the story's do.
+  - It is there from the fight's first moment, on the screen or not (Semi-Perfect Cell starts his fight 33 pixels above the top
+    edge; a first version that waited until a boss was seen or hurt came up late there).
+  - A table the build fills in after compiling must be `volatile` in outfit.c when the code reads fixed places of it (`boss_tab[0]`):
+    the compiler otherwise uses the `{1}` it saw (the bar never came up; `bomb_frames` is read by a variable index, which hid this).
+  - `test_bossbar.py` (debug zone build): the ROM's table whole; the game's art, columns, maker and table unchanged in the ROM; the
+    mod's table the game's but for 'shown?'; no bar on the way; in Android 13's room the game's bar actor, one, at rest, full, its
+    tiles the game's art; there with him off the screen; half, one point (no column: rounded down), a real punch; at his fall
+    empty and told to leave; none in his change; Super 13's own. `lib/barcheck.py` reads the bar back from the actor list, OAM
+    and sprite memory and is called in the other tests' own fights: `test_cell` (each Cell, the Juniors' shared bar going down as
+    they fall), `test_ladder` (Hard bracket, Hercule, Goku Black and Rose, Ledgic, Uub and Majuub, Trials II, the Dojo),
+    `test_chamber` (every sparring partner), `test_bog` (Beerus), `test_garlic` (each of them; the Makyans none), and
+    `test_story` (Broly's own bar is the game's, made by his script with him as its target: one actor, as before the mod; with him
+    fallen it is that one bar, empty, or none, and never one of the mod's; when his last scene is over none is left).
+  - The suite (34 tests) passed but for one line of `test_story` (run again by `test_dragon`): it expected no bar at all 500 frames
+    after Broly's fall, and the game keeps his, empty, through the level-up text. The line was the test's mistake about the game; it
+    now says what the game does, with the end-of-scene check added, and both tests pass on the suite's ROMs.
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)

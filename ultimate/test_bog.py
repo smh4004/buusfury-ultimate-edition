@@ -9,7 +9,7 @@ Beerus spares the Earth. Goku is a level 150 fighter made the game's way (fightr
 measured (the Garlic Jr. quest is balanced below these)."""
 import os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, bog, floorcheck, fightrig
+import zone26, bog, floorcheck, fightrig, barcheck
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='bog'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
@@ -73,6 +73,8 @@ def beat(hp, name, fighting):
     """As test_cell.py: Beerus (the first enemy) left at 2 HP, Goku just below him facing up, three punches; again while `fighting()`."""
     foe = mem(ENEMIES)[0]
     check('%s: Beerus is there with %d HP' % (name, hp), foe and mem(foe + 0x28C)[0] == hp << 10)
+    seen = barcheck.expect(barcheck.Bar(open(ROM, 'rb').read(), mem), send, 'Beerus', full=True)        # the boss bar (outfit.c bossbar)
+    check('%s: Beerus\'s bar is up and full: %s' % (name, seen[1]), seen[0])
     if fighting(): RIG.spar('Beerus, ' + name)
     for _ in range(60):
         if not fighting(): break

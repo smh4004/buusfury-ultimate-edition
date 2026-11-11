@@ -3,7 +3,7 @@
   python3 ultimate/test_cell.py [work dir]"""
 import json, os, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, floorcheck
+import zone26, floorcheck, barcheck
 from PIL import Image
 ROM = 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
@@ -40,6 +40,13 @@ W = Image.new('RGB', (6 * 240, 5 * 160)); cell = [0]
 def sheet(tag):
     send('shot ' + tag); mem(G)
     if cell[0] < 30: W.paste(Image.open('%s/%s.png' % (D, tag)).convert('RGB'), (cell[0] % 6 * 240, cell[0] // 6 * 160)); cell[0] += 1
+BAR = barcheck.Bar(open(ROM, 'rb').read(), mem)      # the boss bar (outfit.c bossbar): each fight's own name, the Juniors' three healths on one
+def bar_now(**kw):
+    for _ in range(24):                              # (drawn in the frame after the health changes; sixteen frames to slide down)
+        got, wrong = BAR.check(**kw)
+        if not wrong: break
+        send('run 1')
+    return got, wrong
 send('guardon 0x09000000', *start); mem(G)
 send(flag_on(149)); send(flag_on(862)); send(flag_on(883)); mem(G)
 door = [x for x in zone26.links(json.load(open('ultimate/zone26.json')), {a: zone26.floor_mask(open(os.environ['BFU_PROTO'], 'rb').read(), os.environ['BFU_PROTO'], a) for a in range(1, 16)})[1] if 'world' in x][0]
@@ -59,6 +66,9 @@ for k, room in enumerate(rooms):
     want = [c for c in zone26.cell_rows() if c[0] == room]; n = mem(COUNT)[0]
     fighters = sum(1 for p_ in mem(ENEMIES, n) if p_ and mem(p_ + 0x28C)[0] >> 10 == want[0][2])
     check('fight %d has %d fighter(s)' % (k + 1, len(want)), fighters == len(want))
+    whole = sum(c[2] for c in want); ok, seen = barcheck.expect(BAR, send, zone26.CELL[k][0], tries=90, full=True, max_hp=whole)    # (he walks into view, the bar slides down)
+    check('fight %d: the boss is %s and his bar is full: %s' % (k + 1, zone26.CELL[k][0], seen), ok)
+    falls = []
     for direction in ('DOWN', 'LEFT', 'RIGHT', 'UP'):
         pl = mem(PLAYER)[0]; foe = mem(ENEMIES)[0]; x, y = mem(foe + 0x1A0, 2)
         send(*strong(), 'poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (70 << 8)), 'run 60')
@@ -68,6 +78,13 @@ for k, room in enumerate(rooms):
         if at() != (room << 8 | 26) or not mem(COUNT)[0]: break
         foe = mem(ENEMIES)[0]; x, y = mem(foe + 0x1A0, 2); pl = mem(PLAYER)[0]
         send(*strong(), 'poke %08X %08X' % (foe + 0x28C, 2 << 10), 'poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (20 << 8)), 'poke8 %08X 01' % (pl + 0x10), 'run 2', 'tap A 14', 'tap A 14', 'tap A 14', 'run 30')
+        if len(want) > 1 and at() == (room << 8 | 26) and BAR.boss()[0]:
+            got, wrong = bar_now(max_hp=whole); falls.append((got, wrong))
+            print('   Juniors: health %s, bar %s, actors %s%s' % ([mem(p_ + 0x28C)[0] >> 10 if mem(p_ + 0x28C)[0] < 1 << 31 else -1 for p_ in mem(ENEMIES, mem(COUNT)[0])], got,
+                                                             [(y, sp, c, w) for _, y, sp, c, _, w in BAR.actors()], ' ' + '; '.join(wrong) if wrong else ''), flush=True)
+    if len(want) > 1:
+        print('   the Juniors\' bar as they fall:', falls, flush=True)
+        check('the Juniors share one bar, which goes down as each of them falls', len(falls) >= 2 and not any(w for _, w in falls) and falls[-1][0] < falls[0][0] <= barcheck.bossbar.COLS * 2 // 3 + 1)
     for w in range(14):
         send('run 160', 'tap A 20')
         if at() != (room << 8 | 26): break

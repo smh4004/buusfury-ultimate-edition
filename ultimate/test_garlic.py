@@ -13,7 +13,7 @@ Goku is a level 150 fighter made the game's way (fightrig.py); every fight start
 the hits he needs for each foe and the share of his health each of theirs takes."""
 import json, os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, garlic, floorcheck, fightrig
+import zone26, garlic, floorcheck, fightrig, barcheck
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='garlic'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 ACTORS = json.load(open(OUT + '/BFU_debug_zone.map.json'))['actors']
@@ -75,6 +75,7 @@ def watch(until, presses=40):
         send('tap A 40')
     send('run 120'); mem(G)
     return until()
+BAR = barcheck.Bar(open(ROM, 'rb').read(), mem)
 def foes(row=None):
     """[(object, HP)] of the foes on the screen (the enemy list; team 1 is the player's side); only those of stats row `row` if given
     (the object's +0x224 points at its row)."""
@@ -88,6 +89,9 @@ def beat(name, fighting, hp=None, row=None):
     if hp is not None:
         f = foes(row)
         check('%s is there with %d HP' % (name, hp), bool(f) and f[0][1] == hp)
+        who = zone26.row_names().get((mem(f[0][0] + 0x224)[0] - BAR.table) // 28) if f else None     # the boss bar (outfit.c bossbar)
+        seen = barcheck.expect(BAR, send, who, full=True) if who else (False, 'his stats row has no name')
+        check('%s: his bar is up and full (%s): %s' % (name, who, seen[1]), seen[0])
     if name not in RIG.BAL and fighting(): RIG.spar(name, row)
     for _ in range(60):
         if not fighting(): break
@@ -181,6 +185,7 @@ f = foes()
 check('two Makyans of %d HP are on the main street' % garlic.MAKYAN[2], sum(hp == garlic.MAKYAN[2] for _, hp in f) == 2)
 check('the tournament official keeps his post', standing(*zone26.HUB_AT))
 alive = lambda: [e for e, hp in foes(MAKYAN_ROW) if hp > 0]
+got, wrong = BAR.check(); check('the Makyans, a pack and nobody\'s boss fight, have no boss bar: %s' % (wrong or got), got is None and not wrong and BAR.boss()[0] is None)
 heal(); beat('a Makyan', lambda: len(alive()) >= 2, row=MAKYAN_ROW)
 for _ in range(20):                               # (his defeat script runs once he has fallen and faded, and any level-up box is closed)
     if more(garlic.GJ_FIGHT): break

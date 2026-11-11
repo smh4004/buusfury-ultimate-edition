@@ -2,7 +2,7 @@
 """Emulator test of the story-side unlocks (build `--debug --zone` first; set BFU_PROTO). Uses that build's Snake Way debug doors: x 48-96 up = story Broly, x<48 = the
 game's real ending from its last scene. Checks: beating Broly adds him to the party; the ending flies you out free and you can land in West City and be sent to Zone 26;
 the Super 13 reward adds Android 13, who can become Super 13, and keeps Broly's outfit if he had already joined."""
-import json, os, struct, subprocess, sys, tempfile
+import json, os, shutil, struct, subprocess, sys, tempfile
 H, ROM = 'tools/harness/harness', os.environ.get('BFU_ZONE_ROM', 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba')      # BFU_ZONE_ROM: another build of it
 d = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix='story')
 forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
@@ -39,6 +39,13 @@ out = run(b); check('the debug door reaches Broly at Volcano Summit', at(out) ==
 room = b[:b.index('shot broly_room') + 1]
 run(room + ['dump w 02000000 40000']); w = open(d + '/w.bin', 'rb').read(); i = w.find(struct.pack('<I', 20240 << 10))
 check('Broly is in the room at full HP', i >= 0)
+# The story's own boss bar (Nov 11, the owner: "Use the ones that already existed in Buus Fury for boss fights"): Broly's fight has the
+# game's bar from its script, as it always did, and the mod adds none to it: one bar actor, with a target (the script's: the mod's own
+# have none), at rest, drawn with the game's art.
+sys.path[:0] = ['ultimate', 'ultimate/lib']; import barcheck
+run(b + barcheck.DUMPS); BAR = barcheck.Bar(open(ROM, 'rb').read(), barcheck.dumped(d)); got, wrong = BAR.check(); acts = BAR.actors()
+check('Broly, a boss of the story, fights under the game\'s own boss bar, made by his script: %s (%s columns, actors %s)' % (wrong or 'right', got, [(hex(a), y, hex(t), w) for a, y, _, _, t, w in acts]),
+      not wrong and BAR.boss()[0] is None and got is not None and got >= barcheck.bossbar.COLS - 1 and len(acts) == 1 and acts[0][4] != 0 and acts[0][5] == 'game' and acts[0][1] == barcheck.bossbar.Y)
 # Volcano Summit after the ending (this build's save has seen it): the original game stands a post-game Pirate Robot beside Broly (stats
 # row 100, 27,824 HP), and the two fight each other. Nov 11, the owner: "Remove the robot in the area with the Broly fight" (zone26.py
 # clear_summit). In the room: no fighter with its health. In the ROM (this one and the release beside it): the area lists Broly and the
@@ -74,8 +81,16 @@ for k in range(30):          # (8 tries were enough until the Nov 10 frame-drop 
     run(kill + ['dump w 02000000 40000'])
     if struct.unpack_from('<I', open(d + '/w.bin', 'rb').read(), i)[0] != 2 << 10: landed = True; break        # a blow landed
 check('a blow lands on Broly within 30 tries', landed)
-kill += ['poke8 03001577 7F', 'run 500', 'shot broly_end0', 'tap A 100', 'shot broly_end1', 'tap A 100', 'tap A 100', 'tap A 100', 'run 60', 'shot broly_end2', 'run 500', 'shot broly_end3', 'tap A 60', 'shot broly_end4', 'tap A 60', 'run 300', 'shot broly_end5', DUMP, 'keys LEFT', 'run 20', 'keys', 'mem 03001C34 1']
+kill += ['poke8 03001577 7F', 'run 500', 'shot broly_end0', *barcheck.DUMPS, 'tap A 100', 'shot broly_end1', 'tap A 100', 'tap A 100', 'tap A 100', 'run 60', 'shot broly_end2', 'run 500', 'shot broly_end3', 'tap A 60', 'shot broly_end4', 'tap A 60', 'run 300', 'shot broly_end5', *[l.replace('dump bar_', 'dump end_') for l in barcheck.DUMPS], DUMP, 'keys LEFT', 'run 20', 'keys', 'mem 03001C34 1']
 out = run(kill); flag, rec = state(); r = rec(8)
+BAR = barcheck.Bar(open(ROM, 'rb').read(), barcheck.dumped(d)); got, wrong = BAR.check(); bars = BAR.actors()
+# The game holds its actors still while a text box is up, so Broly's own bar stays, empty, through "Goku has reached level ..." until his
+# script sends it away (seen in a build without the mod's bars, Nov 11). It must be that one or none: never one the mod asked for.
+check('with Broly fallen the only bar is his script\'s own, empty: %s (bar %s, actors %s)' % (wrong or 'none', got, [b[5] for b in bars]),
+      not wrong and got in (None, 0) and len(bars) <= 1 and all(b[5] == 'game' for b in bars))
+for n in 'wiov': shutil.copy('%s/end_%s.bin' % (d, n), '%s/bar_%s.bin' % (d, n))
+BAR = barcheck.Bar(open(ROM, 'rb').read(), barcheck.dumped(d))
+check('when his last scene is over no boss bar is left (bar %s, actors %d)' % (BAR.read(), len(BAR.actors())), BAR.read() is None and not BAR.actors())
 check('no bad jumps through the end of the Broly fight', 'bad pc' not in out)
 check('beating Broly sets flag 111 and adds him to the party', flag(111) == 1 and r[0] & 1 == 1)
 check('he joins on the Broly outfit', r[0x14] == forms['broly'])

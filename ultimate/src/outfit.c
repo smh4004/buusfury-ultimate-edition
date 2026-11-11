@@ -358,6 +358,7 @@ void heap_init(void) {
     BENCH.magic = 0;
     CL.active = 0; CL.cool = 0; CL.surge = 0; CL.p_at = 0; CL.e_at = 0;
     *(u32 *)0x0203F300 = 0;                /* no bomb sprite */
+    *(u32 *)0x0203F280 = 0;                /* no boss bar */
     ENDLESS_ON = 0; ENDLESS_WINS = 0;
     *(u32 *)0x03003488 = (u32)block;
     block[0] = 0; block[1] = HEAP_WORDS; block[2] = 0;
@@ -681,11 +682,13 @@ static void arena_keep(void) {
     }
 }
 static void crackle(void);
+static void bossbar_tick(void);
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
     kk_track();
     arena_keep();
     crackle();
+    bossbar_tick();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
     /* Battle of Gods: Beerus fights Vegeta at the party, on Capsule Corporation's own grounds, which has no fighting (area record +8
@@ -2608,6 +2611,117 @@ static int postgame_foe(const u8 *e) {
     return i >= STATS_ROWS || i == PHASE1_ROW || i == BOSS_ROW;
 }
 static u16 boss_stat(int s) { return s > BOSS_REF ? BOSS_REF + (s - BOSS_REF) / 4 : s; }
+/* The boss bar (Nov 11, the owner: "give every single new boss fight a custom health bar too", "Add health bars to all the bosses in
+   game right now and reuse Buus fury assets", and, of the bar this file drew by itself at first, "That's not what I meant by the boss
+   hp bars at all. Use the ones that already existed in Buus Fury for boss fights.").
+   Buu's Fury has a boss bar: the slanted red bar that slides in at the top right of the story's boss fights. It is an actor of the
+   HUD's layer (vtable 0x0804CE28, made by 0x080195A8, which the story's scripts call through natives 0x8F and 0x90): two 32x8 sprites
+   at x 160 and 192 on 0x200 bytes of tiles, 53 slanted columns, blacked from the right as the health goes (0x08019658). It shows its
+   target's health (the enemy's method at vtable +0x64: health x 53 / the row's health, rounded down), or, with no target, the
+   columns in its byte +0x15.
+   The mod's fights have no script that makes one, so this file does, and nothing here draws: the game's own actor, art and code.
+   Every fight the mod added (a stats row with a byte in build.py's boss_tab, from zone26.boss_table: the rows the mod adds and
+   Android 13's and Super 13's; the Makyans' packs have none) gets the game's bar with no target, and its columns are kept here by
+   the game's own rule (rounded down), so that foes of one name share it (the three Cell Juniors: their health added up, out of the
+   most there was in this fight; a Junior who has fallen leaves the list). The story's own boss fights are not touched: their
+   scripts make their bars as they always did, and while any boss bar is on the list none is made here.
+   The room's boss is the foe with a bar whose row has the most health: there from the fight's first moment, as the story's are
+   (the mod's bosses stand in their own rooms or come with their scenes; Semi-Perfect Cell starts a little above the screen's top
+   edge, and a bar that waited to see him came up late). The bar is made at the player's input while the HUD is shown (0x03001069
+   bit 1), so never during a scene. The story's scripts send their bars
+   away themselves when the boss has fallen (native 0x91); the mod's fights end in many ways, so the mod's bars look after
+   themselves: theirs is the game's table of ten functions with one answered here (bossbar_vt: "is it shown?", which the game asks
+   every frame and its own answers with a plain yes). There the columns are kept, and when the boss has no health left, or is no
+   longer there, the bar slides out as the story's do (its speed byte +0x17 = 0xFF: it takes itself off the list above the screen). */
+struct bossbar { u8 *actor; int max; u16 area; u8 name, pad; };
+#define BB (*(struct bossbar *)0x0203F280)
+const volatile u32 boss_tab[2] = {1}; /* build.py: how many stats rows have a byte in the table; the table (rows of one name share a number, 255: no bar).
+                                         Volatile: the build fills it in after the compiler has seen {1, 0}, which it would otherwise use for good */
+#define BOSSBAR_VT 0x0804CE28u                                       /* the game's boss bar */
+extern const int bossbar_vt[10];                                     /* the same, but for 'shown?' (build.py fills it) */
+#define BossBar_New ((u8 *(*)(u8 *, u8 *, int, int))0x080195A9)      /* (0: allocate it, its target, from and to in hundredths of the bar) */
+#define BOSSBAR_COLS 53
+#define HUD_ON (*(volatile u8 *)0x03001069 & 2)
+static int boss_name(const u8 *e) {
+    const u8 *row, *t = STATS_TABLE;
+    u32 i;
+    if (!IN_EWRAM(e) || e[0x1D0] == 1) return 255;                     /* team 1: the player's side */
+    row = *(const u8 * const *)(e + 0x224);
+    if (row < t || (row - t) % 28) return 255;
+    i = (row - t) / 28;
+    return i < boss_tab[0] ? ((const u8 *)boss_tab[1])[i] : 255;
+}
+static int boss_now(int *hp, int *full) {      /* the room's boss: -> his number (255: nobody); the health of everyone of that name, and their rows' */
+    int i, n = ENEMY_COUNT, name = 255, most = -1, sum = 0, all = 0;
+    if (n > 32) n = 32;
+    for (i = 0; i < n; i++) {
+        const u8 *e = ENEMY_LIST[i];
+        int k = boss_name(e), whole;
+        if (k == 255) continue;
+        whole = *(const int *)(*(const u8 * const *)(e + 0x224) + 4);
+        if (whole > most) { most = whole; name = k; }
+    }
+    for (i = 0; i < n && name != 255; i++) {
+        const u8 *e = ENEMY_LIST[i];
+        int h;
+        if (boss_name(e) != name) continue;
+        h = *(const int *)(e + 0x28C) >> 10;
+        if (h > 0) sum += h;
+        all += *(const int *)(*(const u8 * const *)(e + 0x224) + 4);
+    }
+    *hp = sum; *full = all;
+    return name;
+}
+static u8 *bossbar_listed(const u8 *mine, int other) {   /* a boss bar on the actor list: ours (other 0: -> it, if it is still there) or any but ours */
+    const int *shown = (const int *)((const u8 *)ACTOR_LIST + 4), *away = (const int *)((const u8 *)ACTOR_LIST + 0x40C);
+    int i, k;
+    for (k = 0; k < 2; k++) {                             /* shown, and unloaded for a moment */
+        const int *l = k ? away : shown;
+        for (i = 0; i < l[0] && i < 128; i++) {
+            u8 *a = (u8 *)l[i + 1];
+            if (!IN_EWRAM(a) || (*(const u32 *)a != BOSSBAR_VT && *(const u32 *)a != (u32)bossbar_vt)) continue;
+            if (other ? a != mine : a == mine) return a;
+        }
+    }
+    return 0;
+}
+int bossbar_visible(u8 *a) {                              /* every frame, for a bar made here: its columns; away when the boss is */
+    int hp, full, name, cols;
+    if (a != BB.actor || a[0x17] == 0xFF) return 1;       /* (on its way out already) */
+    name = boss_now(&hp, &full);
+    if (name != BB.name || hp <= 0) {                     /* fallen, or gone: empty, and out */
+        if (name == BB.name) a[0x15] = 0;
+        a[0x17] = 0xFF; BB.actor = 0;
+        return 1;
+    }
+    if (full > BB.max) BB.max = full;
+    if (hp > BB.max) BB.max = hp;
+    cols = (int)((u32)hp * BOSSBAR_COLS / (u32)BB.max);   /* the game's own rule (0x0804F874): rounded down */
+    a[0x15] = cols > BOSSBAR_COLS ? BOSSBAR_COLS : cols;
+    return 1;
+}
+static void bossbar_tick(void) {
+    int hp, full, name;
+    u16 at = *(volatile u16 *)0x0300197C;
+    u8 *a = BB.actor ? bossbar_listed(BB.actor, 0) : 0;               /* (the list was emptied under it, or it has left) */
+    if (a && a[0x17] == 0xFF) a = 0;                                  /* on its way out (a scene's native 0x91) */
+    BB.actor = a;
+    name = boss_now(&hp, &full);
+    if (name == 255) { BB.name = 255; return; }                       /* nobody: the next boss here is another fight */
+    if (a && bossbar_listed(a, 1)) {                                  /* a script has made the fight's own: ours goes at once */
+        BOMB_LIST_REMOVE(ACTOR_LIST, a);
+        BB.actor = 0;
+        return;
+    }
+    if (a || !HUD_ON || hp <= 0 || bossbar_listed(0, 1)) return;      /* (one leaving has to be gone first) */
+    a = BossBar_New(0, 0, 0, 100);                                    /* no target: it shows the columns in +0x15, kept in bossbar_visible */
+    if (!a) return;
+    *(u32 *)a = (u32)bossbar_vt;
+    if (BB.area != at || BB.name != name || (hp >= full && full >= BB.max)) BB.max = 0;       /* another fight, or this one from its start */
+    BB.area = at; BB.name = name; BB.actor = a;
+    Actor_Add(ACTOR_LIST, a);
+}
+const int bossbar_vt[10] = {1};
 void combat_orig(void *defender, int *hit);
 __asm__(".syntax unified\n.thumb\n.thumb_func\ncombat_orig:\npush {r4, r5, r6, r7, lr}\nadds r6, r0, #0\nadds r4, r1, #0\nadds r1, #8\nldr r3, =0x0800E9E1\nbx r3\n.ltorg\n");
 void combat_hook(void *defender, int *hit) {

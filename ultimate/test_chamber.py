@@ -5,7 +5,7 @@
 Talks to Mr. Popo after the ending, spars with every partner on the list in turn, and checks the fight, the reduced EXP, the way back and Broly's lock."""
 import json, os, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, floorcheck
+import zone26, floorcheck, barcheck
 from PIL import Image
 OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='chamber'); os.makedirs(D, exist_ok=True)
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
@@ -30,6 +30,7 @@ def mem(a, n=1):
         if not l: raise SystemExit('harness ended')
         if 'bad pc' in l: bad[0] = True
         if l.startswith('mem %08x' % a): return [int(x, 16) for x in l.split(':')[1].split()]
+BAR = barcheck.Bar(open(ROM, 'rb').read(), mem)
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
 def talk(x, y):
     FLOOR.guard(at(), x, y + 22, 'Goku')
@@ -74,6 +75,8 @@ for c, (cat, people) in enumerate(zone26.SPAR):
         if name == 'Broly' and not mem(G + 0x55 + 111 // 8)[0] >> (111 % 8) & 1:
             sheet('locked'); check('Broly stays locked until his story fight', at() == (1 << 8 | 6)); send('tap A 20', 'run 60'); send(flag_on(111)); pick()
         check('%s: into the Chamber' % name, at() == (room << 8 | 26))
+        seen = barcheck.expect(BAR, send, name, tries=90, full=True)     # the boss bar (outfit.c bossbar)
+        check('%s: his bar is up and full: %s' % (name, seen[1]), seen[0])
         sheet('s_' + name.replace(' ', ''))
         e0 = mem(REC0 + 0x24)[0]
         send('run 60')

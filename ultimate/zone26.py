@@ -434,6 +434,44 @@ def tour_next(k, rnd, tier=0):
     return endless + ordered + (prize if rnd == len(TOUR_POOLS) - 1 else tour_draw(rnd + 1, tier) + '    end\n')
 
 
+RUSH_NAMES = ('Dabura', 'Majin Buu', 'Super Janemba', 'Broly', 'Super Buu', 'Buu with Gotenks', 'Buu with Gohan', 'Kid Buu', 'Super 13')
+FOE_NAMES = {'goku_black': 'Goku Black', 'goku_rose': 'Super Saiyan Rose', 'ledgic': 'Ledgic', 'uub': 'Uub', 'majuub': 'Majuub', 'spice': 'Spice',
+             'vinegar': 'Vinegar', 'mustard': 'Mustard', 'salt': 'Salt', 'garlic_jr': 'Garlic Jr.', 'super_garlic': 'Super Garlic Jr.'}
+
+
+def foe_names():
+    """Who fights on each stats row the mod adds, in the order rush_rows makes them (it checks the count): the boss bar's names
+    (outfit.c bossbar, lib/bossbar.py). None: no bar (the Makyans come in packs and are nobody's boss fight). Fighters of one room who
+    share a name share a bar (the three Cell Juniors)."""
+    out = list(RUSH_NAMES) + [TOUR_NAMES[rnd][place] for rnd, place, _, _ in tour_list()] + [t[4] for t in TRIALS] + [who[0] for who in spar_list()]
+    for name, _, _, _, _, count in CELL: out += [name] * count
+    out += [TOUR_NAMES[rnd][place] for _ in TIER_HP for rnd, place, _, _ in tour_list()] + ['Hercule']
+    for c in CHALLENGES:
+        who = c['who']
+        if who.startswith('trial2_'): out.append(TRIALS2[int(who[7:])][4])
+        elif who.startswith('wave'): out += [name for name, _, _ in SPAR[int(who[4:])][1]]
+        elif who.startswith('dojo'): out.append(dojo_list()[int(who[4:])][0])
+        else: out += [FOE_NAMES[actor] for actor, _, _, _ in c['fights']]
+    out += ['Beerus'] * len(bog.ROWS) + [None] + [FOE_NAMES[f[0]] for f in garlic.FIGHTS]
+    return out
+
+
+def row_names():
+    """{stats row: name} of every fight the mod gives the game's boss bar (outfit.c bossbar): the rows the mod adds (foe_names) and
+    Android 13's and Super 13's own. Foes of one name in a room share the bar. The story's own boss fights are not here: their scripts
+    make their bars themselves (natives 0x8F, 0x90), as they always did."""
+    out = {STATS_COUNT + k: n for k, n in enumerate(foe_names()) if n}
+    out[PHASE1_ROW] = 'Android 13'; out[BOSS_ROW] = 'Super 13'
+    return out
+
+
+def boss_table():
+    """The boss bar's table (outfit.c boss_tab): a byte for each stats row, the same for rows of one name, 255 for a row with no bar."""
+    named = row_names(); names = sorted(set(named.values())); tab = bytearray([255]) * (max(named) + 1)
+    for row, name in named.items(): tab[row] = names.index(name)
+    return bytes(tab), names
+
+
 def rush_rows(W, rom, harmless=False):
     """The Boss Rush's copies of the bosses, on new rows of a moved stats table: each death sends you to the next room."""
     import bfscript
@@ -519,6 +557,7 @@ def rush_rows(W, rom, harmless=False):
         then = garlic.makyan_fall(MORE_PUT, MORE_GET) if name == 'makyan' else garlic.fight_fall(name, rooms, MORE_PUT)
         struct.pack_into('<II', r, 0x14, 0x08708920, W.put(bytes(bfscript.asm(then))))
         rows += r
+    if len(rows) // 28 - STATS_COUNT != len(foe_names()): sys.exit('zone26.foe_names lists %d fights, rush_rows made %d rows' % (len(foe_names()), len(rows) // 28 - STATS_COUNT))
     for k in range(STATS_COUNT * 28, len(rows), 28):          # (see TOUR_POOLS: the grab only Videl has frames for)
         if 550 <= struct.unpack_from('<I', rows, k + 8)[0] <= 559:
             sys.exit('post-game row %d has the story\'s Videl-against-Spopovich behaviour (stats row 111): use row 112' % (k // 28))

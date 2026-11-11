@@ -3,7 +3,7 @@
   python3 ultimate/test_ladder.py <work dir>"""
 import json, os, subprocess, sys
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
-import zone26, floorcheck
+import zone26, floorcheck, barcheck
 D = sys.argv[1]; os.makedirs(D, exist_ok=True)
 ROM = 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
@@ -26,6 +26,9 @@ def mem(a, n=1):
         if not l: raise SystemExit('harness ended')
         if 'bad pc' in l: bad[0] = True
         if l.startswith('mem %08x' % a): return [int(x, 16) for x in l.split(':')[1].split()]
+BAR = barcheck.Bar(open(ROM, 'rb').read(), mem)      # the boss bar (outfit.c bossbar): every fight here starts under a full one
+def barsay(name):
+    ok, seen = barcheck.expect(BAR, send, name, full=True); check('the boss is %s and his bar is full: %s' % (name, seen), ok)
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
 FLAGS2 = 0x0203F1E2                                    # more flags 32-63: after the bench's 21 entries (outfit.c struct bench)
 more_at = lambda n: BENCH_FLAGS + n // 8 if n < 32 else FLAGS2 + (n - 32) // 8
@@ -89,6 +92,7 @@ for rnd in range(3):
     check('Hard round %d is in the right rooms' % (rnd + 1), first + size <= r < first + size + 6)
     foe = mem(ENEMIES)[0]; hp = mem(foe + 0x28C)[0] >> 10
     check('Hard round %d has its HP (%d)' % (rnd + 1, hp), zone26.TIER_HP[0][rnd] <= hp <= zone26.TIER_HP[0][rnd] + 50)
+    barsay(zone26.TOUR_NAMES[rnd][(r - first - size)])
     if not beat(r): check('Hard round %d: beaten' % (rnd + 1), False); break
     if rnd < 2: settle(lambda: 0) if False else None; [send('run 100') for _ in range(2)]; mem(G)
 check('Hard: winning comes home', settle(HUB))
@@ -139,6 +143,7 @@ check('Endless: best run saved', mem(BENCH_FLAGS)[0] >> 16 & 255 == 13)
 hub_talk(); send('tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'shot more', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'shot challengers', 'tap A 150', 'shot dare', 'tap A 200', 'run 200', 'shot hercule')
 check("Hercule's dare: into his room", at() == zone26.hercule_room() << 8 | 26)
 foe = mem(ENEMIES)[0]; check("Hercule's dare: he has %d HP" % zone26.HERCULE_HP, mem(foe + 0x28C)[0] >> 10 == zone26.HERCULE_HP)
+barsay('Hercule')
 check("Hercule's dare: beaten", beat(zone26.hercule_room()))
 check("Hercule's dare: comes home", settle(HUB))
 strong(); talk(*zone26.HUB_AT); send('run 60', 'shot herc_won'); dismiss(2)
@@ -149,6 +154,7 @@ check('Goku Black: not joined yet', more(zone26.MORE_BLACK) == 0)
 hub_talk(); send('tap A 150', *['tap DOWN 12'] * 3, 'tap A 150', 'tap DOWN 12', 'tap DOWN 12', 'tap A 150', 'tap DOWN 12', 'tap A 150', 'shot black', 'tap A 200', 'run 200', 'shot black_room')
 check('Goku Black: into his room', at() == zone26.black_room(0) << 8 | 26)
 foe = mem(ENEMIES)[0]; check('Goku Black: he has %d HP' % zone26.BLACK_FIGHT[0][1], mem(foe + 0x28C)[0] >> 10 == zone26.BLACK_FIGHT[0][1])
+barsay('Goku Black')
 check('Goku Black: beaten', beat(zone26.black_room(0)))
 for _ in range(12):
     send('run 60')
@@ -156,6 +162,7 @@ for _ in range(12):
 send('run 60', 'shot rose_room')
 check('Rose comes on in the next room', at() == zone26.black_room(1) << 8 | 26)
 foe = mem(ENEMIES)[0]; check('Rose has %d HP' % zone26.BLACK_FIGHT[1][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.BLACK_FIGHT[1][1])
+barsay('Super Saiyan Rose')
 check('Rose: beaten', beat(zone26.black_room(1)))
 check('Rose: comes home', settle(HUB))
 check('the win is waiting to be told', more(zone26.MORE_BLACK_WON) == 1)
@@ -169,6 +176,7 @@ check('Uub: locked before Ledgic', at() == HUB and more(zone26.MORE_GT) == 0)
 hub_talk(); send(*GT_MENU, 'tap A 150', 'shot ledgic', 'tap A 200', 'run 200', 'shot ledgic_room')
 check('Ledgic: into his room', at() == zone26.challenge_room('ledgic') << 8 | 26)
 foe = mem(ENEMIES)[0]; check('Ledgic: he has %d HP' % zone26.LEDGIC_FIGHT[0][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.LEDGIC_FIGHT[0][1])
+barsay('Ledgic')
 for k in range(6): send('run 20', 'shot ledgic_fight_%d' % k)
 check('Ledgic: beaten', beat(zone26.challenge_room('ledgic')))
 check('Ledgic: comes home', settle(HUB))
@@ -178,6 +186,7 @@ check('Pan and the GT looks open', more(zone26.MORE_GT) == 1 and more(zone26.MOR
 hub_talk(); send(*GT_MENU, 'tap DOWN 12', 'tap A 150', 'shot uub', 'tap A 200', 'run 200', 'shot uub_room')
 check('Uub: into his room', at() == zone26.challenge_room('uub') << 8 | 26)
 foe = mem(ENEMIES)[0]; check('Uub: he has %d HP' % zone26.UUB_FIGHT[0][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.UUB_FIGHT[0][1])
+barsay('Uub')
 check('Uub: beaten', beat(zone26.challenge_room('uub')))
 for _ in range(12):
     send('run 60')
@@ -185,6 +194,7 @@ for _ in range(12):
 send('run 60', 'shot majuub_room')
 check('Majuub comes on in the next room', at() == zone26.challenge_room('uub', 1) << 8 | 26)
 foe = mem(ENEMIES)[0]; check('Majuub has %d HP' % zone26.UUB_FIGHT[1][1], foe and mem(foe + 0x28C)[0] >> 10 == zone26.UUB_FIGHT[1][1])
+barsay('Majuub')
 check('Majuub: beaten', beat(zone26.challenge_room('uub', 1)))
 check('Majuub: comes home', settle(HUB))
 strong(); talk(*zone26.HUB_AT); send('run 60', 'shot uub_won', 'tap A 60', 'run 30', 'shot uub_joins'); dismiss(1)
@@ -200,6 +210,7 @@ for k, t in enumerate(zone26.TRIALS2):
     check('Trials II %d: into the room' % (k + 1), at() == zone26.challenge_room('trial2_%d' % k) << 8 | 26)
     check('Trials II %d: %s plays' % (k + 1, t[1]), mem(G)[0] & 255 == t[0])
     foe = mem(ENEMIES)[0]; check('Trials II %d: %s has %d HP' % (k + 1, t[4], zone26.TRIAL2_HP), foe and mem(foe + 0x28C)[0] >> 10 == zone26.TRIAL2_HP)
+    barsay(t[4])
     check('Trials II %d: beaten' % (k + 1), beat(zone26.challenge_room('trial2_%d' % k)))
     check('Trials II %d: comes home' % (k + 1), settle(HUB))
     z0 = zenie(); talk(*zone26.HUB_AT); send('run 60', 'shot trial2_paid%d' % k); dismiss(1)
@@ -215,6 +226,7 @@ for c, (cat, people) in enumerate(zone26.DOJO):
             check('Dojo %s: locked until met' % name, at() == HUB); dismiss(1); n += 1; continue
         check('Dojo %s: into the room' % name, at() == zone26.challenge_room('dojo%d' % n) << 8 | 26)
         foe = mem(ENEMIES)[0]; check('Dojo %s: %d HP' % (name, zone26.DOJO_HP), foe and mem(foe + 0x28C)[0] >> 10 == zone26.DOJO_HP)
+        barsay(name)
         send('run 30', 'shot dojo%d_fight' % n)
         check('Dojo %s: beaten' % name, beat(zone26.challenge_room('dojo%d' % n)))
         check('Dojo %s: comes home and pays' % name, settle(HUB) and zenie() - z0 == zone26.DOJO_PRIZE)
