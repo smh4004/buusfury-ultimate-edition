@@ -578,6 +578,20 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - The suite (34 tests) passed but for one line of `test_story` (run again by `test_dragon`): it expected no bar at all 500 frames
     after Broly's fall, and the game keeps his, empty, through the level-up text. The line was the test's mistake about the game; it
     now says what the game does, with the end-of-scene check added, and both tests pass on the suite's ROMs.
+- Nov 11, previews waiting for the owner's word. Neither is in the build: no ROM has them.
+  - Beerus (16:01 "improve the Beerus portrait and sprites a lot"; 16:16 "Preserve the front view"; 16:28 "back view isn't that bad
+    the side view sucks though"; 16:55 "Don't draw a whole new view just base it off a buus fury shape or the existing sprite
+    already and fill it in better"; 16:59 "Maybe super janemba tbh"; 17:02 "Use janemba but fix the eyes and ears and maintain
+    visual clarity and attention to detail"; 17:03 "make the sprite a bit taller potentially but not janemba full height").
+    `ultimate/beerus_preview.py OUTDIR` makes the pictures he was sent: a new side head on Super Janemba's shape with the owner's
+    own ear, eye and earring pixels (`HEAD_SIDE_NEW`), and Beerus 2 or 4 rows taller by seams through Kid Buu's bare chest and
+    trousers (never his belt, wristbands, shoes or head), in every frame of all three views. Standing he is 30 rows today (Goku
+    31, Super Janemba 59). Once approved: the head and the lengthening go into `lib/beerus.py`, and `sprites.composed_actor` must
+    let a frame's box grow (a piece more; Kid Buu's record reserves 2 KB of sprite memory a frame, and his largest frames, 32x64,
+    already fill it); then his fights are tested. He has no portrait: `bog.say` shows his lines in the narrator's box.
+  - Teen Gohan in the purple gi, base, Super Saiyan and Super Saiyan 2 (12:01 to 13:12): `ultimate/teen.py` with `lib/headfit.py`
+    composes all 212 frames from LoG2's records and checks every one (a frame that can't be placed or fails a check stops it).
+    Not wired into the build; his preview PDF and GIFs are with the owner.
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
