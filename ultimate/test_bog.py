@@ -148,7 +148,8 @@ send('shot ritual'); mem(G)
 check('beating him there leads on to the ritual, and fighting is off again', at() == CAPSULE and more(bog.MORE_BOG_PARTY) and mem(COMBAT)[0] == 0)
 # 3. The ritual: Super Saiyan God; the god fight starts in West City
 scene(104, 264, in_area(WEST), menu=True); send('shot god_west'); mem(G)
-for _ in range(5):          # skills_sync grants it within 64 frames of the ritual's flag (Nov 9: one run checked a few frames too soon)
+for _ in range(40):         # skills_sync grants it within 64 frames when Goku is in play, within 512 when he is a party member (Nov 9: one run
+                            # checked a few frames too soon; Nov 10: the frame-drop fix moved the party's turn 32 frames, past the old 80)
     if 46 in held(): break
     send('run 16'); mem(G)
 check('the ritual makes Goku a Super Saiyan God (the skill is his)', more(bog.MORE_BOG_RITUAL) and 46 in held())
