@@ -13,16 +13,22 @@ fur on the whole arm, the dark wristband, skin on the fist only, nothing outside
 
 Each entry is a list for one frame (slot, frame, view): (row, column, letters) in patch.ABC ('_' leaves a pixel, 's' is BF's own skin),
 or ('arm' | 'bare' | 'fist' | 'band', (row0, row1, col0, col1)) as patch.apply reads them. Slots 0-2 only so far (idle, walk, run)."""
+# From behind his head and his shoulder pads are one piece: the owner, 22:25, of the first fix (pads laid on BF Goku's shoulders, which
+# shift a pixel or two under his head as his arms swing, and a head set one column left in the first walk frame): "The back ones still
+# doing it it's by a pixel or two moving slightly to the side". ('stand', 1, row) lays his standing head and pads (and, walking, the
+# tops of his arms) one row lower, which is BF's own bob on the two contact frames; nothing in them steps sideways, only his arms and
+# legs move under them. BF's run sways his body a pixel left and right under his head on those two frames (his belt's middle: 56, 55,
+# 54, 55): ('shift', 58, n) takes that out, so his body stays under his shoulders. Entries run in order; what follows a 'shift' or a
+# 'stand' is in the frame's new places.
 BACK = {
     # walk, from behind
-    (1, 0, 1): [(56, 46, '..#OOO'), (57, 46, '.#OPPOO'), (58, 48, 'pP'), (58, 52, 'O'), (59, 48, 'pP')],
-    (1, 1, 1): [(55, 48, 'OO'), (56, 48, 'OOOO'), (57, 47, 'pPPO'), (58, 47, 'pP'), (59, 47, 'p')],
-    (1, 2, 1): [(56, 59, 'OO#'), (57, 58, 'OPpO#.'), (58, 59, 'Ppp'), (59, 59, 'ppp'), (59, 48, 'pp#'), (60, 48, 'xxx')],
+    (1, 0, 1): [(59, 48, 'pP'), ('stand', 1, 57)],
+    (1, 1, 1): [('stand', 0, 56), (57, 47, 'pPPO'), (58, 47, 'pP'), (59, 47, 'p')],
+    (1, 2, 1): [(59, 59, 'ppp'), (59, 48, 'pp#'), (60, 48, 'xxx'), ('stand', 1, 57)],
     # run, from behind
-    (2, 0, 1): [(56, 47, '..#OOO'), (57, 47, '.#OPPOO'), (58, 49, 'pPP'), (58, 53, 'O'), (59, 49, 'pP'),
-                (56, 59, 'oO'), (56, 61, 'p'), (57, 61, 'p'), (58, 61, 'p')],
-    (2, 1, 1): [(55, 48, 'OO'), (56, 48, 'OO'), (57, 48, 'p'), (58, 48, 'p'), (55, 61, 'OO'), (56, 61, 'OO'), (57, 61, 'Pp'), (58, 62, 'p')],
-    (2, 2, 1): [(56, 60, '##'), (57, 58, 'Pp'), (58, 58, 'Ppp'), (59, 58, 'Ppp')],
+    (2, 0, 1): [(58, 49, 'pPP'), (59, 49, 'pP'), ('shift', 58, -1), ('stand', 1, 56), (58, 59, '#OPp')],
+    (2, 1, 1): [('stand', 0, 56), (57, 48, 'p'), (58, 48, 'p'), (57, 61, 'Pp'), (58, 62, 'p')],
+    (2, 2, 1): [(58, 58, 'Ppp'), (59, 58, 'Ppp'), ('arm', (58, 59, 48, 49)), ('shift', 58, 1), ('stand', 1, 56), (58, 48, 'PPO'), (58, 57, '#')],
 }
 BACK[1, 3, 1] = BACK[1, 1, 1]; BACK[2, 3, 1] = BACK[2, 1, 1]
 # (the see-through spot over his eye is filled in every side frame by fixed.hole, wherever his head is: no entry here)

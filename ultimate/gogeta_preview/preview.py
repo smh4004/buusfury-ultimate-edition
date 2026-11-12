@@ -39,6 +39,17 @@ for d,v in VIEWS: still(d,'from the '+v if v!='back' else 'from behind').save('%
 gif(OUT+'/ssj4_gogeta_walk_now_and_fixed.gif',[(1,f) for f in range(4)],ms=150)
 gif(OUT+'/ssj4_gogeta_run_now_and_fixed.gif',[(2,f) for f in range(4)],ms=110)
 gif(OUT+'/ssj4_gogeta_stand_walk_run_now_and_fixed.gif',[(0,0)]*4+[(1,f) for f in range(4)]*2+[(0,0)]*2+[(2,f) for f in range(4)]*3,ms=130,reps=1)
+# from behind alone, bigger: now beside fixed (the owner, 22:25: "The back ones still doing it it's by a pixel or two moving slightly to the side")
+def gif_back(path,seq,ms,z=8,reps=3):
+    frames=[]; band=22
+    for _ in range(reps):
+        for s,f in seq:
+            img=Image.new('RGB',(2*W*z,H*z+band),BG); dr=ImageDraw.Draw(img); dr.rectangle((0,0,2*W*z,band),fill=(30,40,30))
+            dr.text((6,3),'now',fill=(255,255,255),font=F); dr.text((W*z+6,3),'fixed',fill=(255,255,255),font=F)
+            img.paste(big(np.concatenate([now((s,f,1)),new((s,f,1))],1),z),(0,band)); frames.append(img)
+    frames[0].save(path,save_all=True,append_images=frames[1:],duration=ms,loop=0)
+gif_back(OUT+'/ssj4_gogeta_from_behind_walk_now_and_fixed.gif',[(1,f) for f in range(4)],170)
+gif_back(OUT+'/ssj4_gogeta_from_behind_run_now_and_fixed.gif',[(2,f) for f in range(4)],120)
 # his head from the side, close: the see-through spot over his eye
 z=14; hb=(40,57,44,64)
 def head(c):

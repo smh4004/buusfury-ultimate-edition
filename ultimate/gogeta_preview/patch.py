@@ -28,12 +28,25 @@ def show(key,rows,cols,after=None,bf=None):
 PLUM={200:129,201:129,203:129,202:127,16:127,17:127,205:127,206:127,207:127}
 BAND={157:1,159:111,161:112}
 NAVY=(157,159,161)
+STAND=40                      # from behind, standing: his head's top row (his two rows of shoulder pads are 55 and 56, his arms begin on 57)
 def apply(c,b,rows):
     """rows: (row, col, 'letters') puts letters ('_' leaves a pixel, 's' is BF's own skin there);
     ('arm', (r0, r1, c0, c1)): BF's skin in the box becomes fur (what is fur already stays);  ('bare', box): the same, only where he is skin now;
-    ('fist', box): BF's skin in the box is skin, in BF's own shades;  ('band', box): BF's navy in the box is the dark wristband"""
+    ('fist', box): BF's skin in the box is skin, in BF's own shades;  ('band', box): BF's navy in the box is the dark wristband;
+    ('stand', rows down, last row): from behind, his standing frame from his head's top to that row (56: his head and shoulder pads; 57: the
+    tops of his arms too), exactly, that many rows lower;
+    ('shift', row, columns): every row from there down moves that many columns"""
     out=c.copy()
     for e in rows:
+        if e[0]=='stand':
+            # his head and his two rows of shoulder pads as he stands, one piece, e[1] rows lower: nothing in it steps sideways
+            st=fr(GOG,0,0,1); dy,last=e[1],e[2]; out[STAND+dy:last+1+dy]=st[STAND:last+1]
+            if dy>0: out[STAND:STAND+dy]=0
+            continue
+        if e[0]=='shift':
+            # everything from row e[1] down moves e[2] columns (BF's run from behind sways a pixel under his head: taken out)
+            out[e[1]:]=np.roll(out[e[1]:],e[2],1)
+            continue
         if isinstance(e[0],str):
             op,(r0,r1,c0,c1)=e
             for r in range(r0,r1+1):

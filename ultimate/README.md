@@ -689,11 +689,19 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     pads are grey);
   - arms left bare (often one column of BF's skin down the outside of a fur arm) and fists turned to fur instead, some with a blue ankle
     band across them; his standing side frame's fist is fur too.
-  `gogeta_preview/fixes.py` holds the fixes as text patches per frame (28 frames of slots 0-2, 475 pixels; pads on BF's sleeves in the pad's
+  `gogeta_preview/fixes.py` holds the fixes as text patches per frame (28 frames of slots 0-2; pads on BF's sleeves in the pad's
   own two oranges, fur on the whole arm, the dark wristband, skin on the fist only; nothing outside a frame's outline, no colour he didn't
   have), `fixed.py` applies them and fills the see-through spot wherever his side head is, `preview.py` makes the now-and-fixed stills
   and GIFs. **A preview only: he is locked, nothing is in the build until the owner approves** (then `BFU_RELOCK=gogeta_ssj4`). Still to
   read the same way: his fighting frames (slots 3 and up; a first screening flags fists in fur and half-turned arms there too).
+  22:25, the owner, of that first preview: "The back ones still doing it it's by a pixel or two moving slightly to the side". Measured
+  (his head against his standing head, frame by frame): from behind his head sits one column left in the first walk frame and nowhere
+  else (BF Goku's own head does it there, and Super Saiyan 4 Goku's with it), and the first fix laid the pads on BF's shoulders, which
+  shift a pixel or two under the head as the arms swing (and BF's run sways the whole body a pixel left, then right). From behind his head
+  and his two rows of shoulder pads are now one piece, his standing frame's exactly, in all eight walk and run frames (`('stand', rows
+  down, last row)` in `fixes.py`; one row lower on the two contact frames, BF's own bob); the run's sideways sway is taken out below it
+  (`('shift', row, columns)`), so only his arms and legs move under his shoulders. A fist that BF shows poking out beside the shoulder
+  on the far arm is hidden behind the pad. From the side and the front his head keeps one column through the walk and the run already.
   The same reading showed leftovers of the same kind in the locked Super Saiyan 4 Goku's walk and run (from the side, walk frames 2 and
   4: BF's sleeve left as a blue band on his shoulder over a bare upper arm; the run from behind and from the front: part of an arm bare).
   Not touched (the owner, 18:13: "Don't make changes to SSJ4 Goku without verifying first"): to be shown to him as its own preview.
