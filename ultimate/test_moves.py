@@ -36,10 +36,12 @@ def setup(skills, form=None, presses=()):
 
 PLAYER_OBJ = 0x0202CC7C            # the player's object (0x03001C34 points here in this fight): +0x50 its animation, +0x11 the frame a move's code shows
 watched = []
-def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=(), watch=False):
+def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=(), watch=False, health=9000):
     """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in does nothing (test_build), so one goes first.
-    watch: also note (animation, frame shown) every 5 frames of the hold in `watched`."""
-    L = setup(skills, form, presses) + list(extra) + AWAY + ['run 1', 'poke %s %x' % (ENEMY_HP, 9000 << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']
+    watch: also note (animation, frame shown) every 5 frames of the hold in `watched`.
+    health: what the Bomber starts with. A move that takes it all kills him, and his health is then whatever took his place in memory
+    (Nov 11: the Super Dragon Fist takes 10,690 of his 9,000, and read as a huge negative number), so such a move gets more."""
+    L = setup(skills, form, presses) + list(extra) + AWAY + ['run 1', 'poke %s %x' % (ENEMY_HP, health << 10), 'keys LEFT', 'run 2', 'keys', 'run 2']
     o = run(L + ['mem %s 2' % PX], name); m = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o)[-1]
     near = ['poke %s %x' % (ENEMY_X, int(m[0], 16) - (40 << 8)), 'poke %s %x' % (ENEMY_Y, int(m[1], 16))]
     L += near + ['poke8 %08X %02X' % (R + 0x15, slot)] + FULL
@@ -50,7 +52,7 @@ def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=N
     o = run(L + ['mem %s 1' % ENEMY_HP, 'mem %08X 1' % (R + 0x14)], name)
     if watch: watched[:] = list(zip(last(o, '%08X' % (PLAYER_OBJ + 0x50)), [v >> 8 & 255 for v in last(o, '%08X' % (PLAYER_OBJ + 0x10))]))
     hp = last(o, ENEMY_HP)[-1]; hp = hp - (1 << 32) if hp >= 1 << 31 else hp
-    return 9000 - hp / 1024, last(o, '%08X' % (R + 0x14))[-1] & 255, 'bad pc' in o
+    return health - hp / 1024, last(o, '%08X' % (R + 0x14))[-1] & 255, 'bad pc' in o
 
 if __name__ == '__main__':
     kame, _, b0 = fire('kame', [7, 15, 38], 1)
@@ -70,9 +72,9 @@ if __name__ == '__main__':
     check('Final Shine in Super Saiyan 4: about 1.5x his Final Flash', f2 == forms['vegeta_gt_ssj4'] and ff > 0 and 1.3 < sh / ff < 1.7 and not b3)
     sh0, _, _ = fire('shine_base', [7, 40], 1, forms['vegeta_gt'])
     check('Final Shine does nothing outside Super Saiyan 4', sh0 == 0)
-    df, g1, _ = fire('dragon4', [7, 15, 20, 22, 41, 36], 4, forms['kid_goku'], (2, 2, 3, 5), hold=90, after=90)
+    df, g1, b4 = fire('dragon4', [7, 15, 20, 22, 41, 36], 4, forms['kid_goku'], (2, 2, 3, 5), hold=90, after=90, health=30000)
     print('   Kid Goku Super Saiyan 4: Super Dragon Fist %.1f (form %d)' % (df, g1))
-    check('the Super Dragon Fist hits in Super Saiyan 4', g1 == forms['kid_goku_ssj4'] and df > 0)
+    check('the Super Dragon Fist hits in Super Saiyan 4 (and the Bomber, given 30,000, lives to be measured)', g1 == forms['kid_goku_ssj4'] and 0 < df < 30000 and not b4)
     check("its name is the Super Dragon Fist", 'Super Dragon Fist'.encode('utf-16-le') in open(ROM, 'rb').read())
     # Vegeta himself, the debug picker's fourth fighter (his own record and figures). The Kamehameha's code shows frames 0-2 of the pose it sets; his
     # figures' slot 18 is his two-frame Big Bang, so they get a Galick Gun pose of their own (build.py beam_poses): no frame shown may be missing,

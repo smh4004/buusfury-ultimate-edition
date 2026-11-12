@@ -679,6 +679,29 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   two idle frames differ by more than 20 pixels in a view show its first frame for both (a pointer, nothing redrawn), and
   `test_frames.py` check 16 fails a ROM where any form's do. The owner was shown all seven now and still (`idle_now_and_still.gif`,
   20:50) with the plan; `vegeta_gt_ssj4` and `vegeta_gt_tank_ssj4` were relocked for it.
+- Nov 11, 21:38, the owner, shown Super Saiyan 4 Gogeta again: "Some weird clipping with Ssj4 Gogeta head and neck on side and back
+  views especially on walk frames mainly". Read frame by frame against BF Goku's frame under each (`gogeta_preview/three.py`, one canvas
+  for BF Goku, Super Saiyan 4 Goku and Gogeta). His frames in the ROM are the owner's sheet pixel for pixel, so it is the sheet's art; its
+  standing, walking and running frames (slots 0-2) were made by another road than its fighting frames. Found:
+  - from the side his head has two see-through pixels over his eye, in every side frame of every slot;
+  - his orange shoulder pads come and go between frames: BF's sleeve was painted vest grey, black or the sash's blue, so a pad is whole in
+    one frame, half in the next, gone in the third, with blue on his shoulder (walk and run, all three views; from the front the run's
+    pads are grey);
+  - arms left bare (often one column of BF's skin down the outside of a fur arm) and fists turned to fur instead, some with a blue ankle
+    band across them; his standing side frame's fist is fur too.
+  `gogeta_preview/fixes.py` holds the fixes as text patches per frame (28 frames of slots 0-2, 475 pixels; pads on BF's sleeves in the pad's
+  own two oranges, fur on the whole arm, the dark wristband, skin on the fist only; nothing outside a frame's outline, no colour he didn't
+  have), `fixed.py` applies them and fills the see-through spot wherever his side head is, `preview.py` makes the now-and-fixed stills
+  and GIFs. **A preview only: he is locked, nothing is in the build until the owner approves** (then `BFU_RELOCK=gogeta_ssj4`). Still to
+  read the same way: his fighting frames (slots 3 and up; a first screening flags fists in fur and half-turned arms there too).
+  The same reading showed leftovers of the same kind in the locked Super Saiyan 4 Goku's walk and run (from the side, walk frames 2 and
+  4: BF's sleeve left as a blue band on his shoulder over a bare upper arm; the run from behind and from the front: part of an arm bare).
+  Not touched (the owner, 18:13: "Don't make changes to SSJ4 Goku without verifying first"): to be shown to him as its own preview.
+- Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
+  Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
+  the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
+  move takes the same 10,689.7 on the Nov 11 12:37 build and on this one, measured with 30,000. The check now gives him 30,000
+  (`fire(..., health=)`) and passes.
 - Nov 11, noted for after this (the owner, 19:26 and 19:49): Super Saiyan God Goku's eyes match his red hair; Super Saiyan Blue Goku,
   Vegeta and Gogeta: eyebrows and pupils match their hair, a light cyan glowing aura and Super Saiyan 2's bolts toned down in Blue's
   colour; and, after everything, test all postgame content: every enemy must fight and be a challenge, never wait to be hit.
