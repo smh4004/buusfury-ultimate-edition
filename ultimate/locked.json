@@ -1,5 +1,5 @@
 {
- "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose). Nov 11 21:01: Super Saiyan 4 Goku after his touch-up (\"Lock that Goku for now\").",
+ "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose). Nov 11 21:01: Super Saiyan 4 Goku after his touch-up (\"Lock that Goku for now\"). Nov 12: Teen Gohan in the purple gi, base, Super Saiyan and 2 (approved Nov 11, 18:12: \"Teen Gohan looks good to lock\").",
  "forms": {
   "vegeta_gt": "f5e8460b5199f3127d36c931f379b38d7946c04f",
   "vegeta_gt_tank": "ddf2ed9ce3795f6ceb6ddd8a92f472b50f43679d",
@@ -22,6 +22,9 @@
   "gogeta_ssb": "c90fd69d9ec829e0a7406a89550a067142db4979",
   "roshi": "4fd970a3d0414b355b914c8f3acc599293dd19cc",
   "roshi_max": "4fd970a3d0414b355b914c8f3acc599293dd19cc",
-  "kid_goku_ssj4": "a31a3e0ace0a6076dec8850a4e729f03af2d025e"
+  "kid_goku_ssj4": "a31a3e0ace0a6076dec8850a4e729f03af2d025e",
+  "teen_gohan": "171a17fd84ecb08ae20c73bae699fd5beb26c8a4",
+  "teen_gohan_ss": "0064bc9dcdcd797dea42d4b0926f1bce015f693d",
+  "teen_gohan_ss2": "bc1067de47b4c1422af4403a3e7fc3139744f573"
  }
 }

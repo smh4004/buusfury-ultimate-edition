@@ -517,12 +517,23 @@ def cut(canvas, box):
     px = min(max(px, x1 - 31), x0); py = min(max(py, y1 - 31), y0)
     return canvas[OY + py:OY + py + 32, OX + px:OX + px + 32].copy(), (px, py, 32, 32)
 def made(form):
-    """sprites.log2_anim's frame source for the figure: (record, animation, view, frame) -> (pixels as shown, box), or None for a frame
-    it leaves to the record (an animation not in ANIMS: the purple record's own, which the build doesn't use for these figures)."""
+    """sprites.log2_anim's frame source for the figure: (record, animation, direction, frame) -> (pixels as shown, box as shown); None for
+    another record's. An animation of the purple record that isn't in ANIMS stops the build (it would be the purple record's own frames,
+    long black hair: actors.json gives the figures none). Direction 3 (facing right) is the side view mirrored, as the purple record shows it: its entry is the side view's pixels
+    with the mirror flag (checked here), and the game stores a mirrored frame's box where it is shown (x = 16 - w - x)."""
     def source(rec, k, d, f):
-        if rec != REC['P'] or k not in ANIMS[form]: return None
+        if rec != REC['P']: return None
+        if k not in ANIMS[form]: raise Off('Teen Gohan %s: a slot asks for the purple record\'s animation %d, which teen.py doesn\'t make' % (form, k))
         v = min(d, views(k) - 1); box = L.raw(REC['P'], k, v, f)[:4]
-        return cut(frame(form, k, v, f), box)
+        px, (x, y, w, h) = cut(frame(form, k, v, f), box)
+        a2, a = (L.raw(REC['P'], k, e, f)[5] & 0x10000000 for e in (v, d))
+        if v == d or views(k) == 1:
+            if a: raise Off('Teen Gohan %s, animation %d direction %d frame %d: the purple record mirrors it' % (form, k, d, f))
+            return px, (x, y, w, h)
+        r2, r3 = L.raw(REC['P'], k, v, f), L.raw(REC['P'], k, d, f)
+        if d != 3 or a2 or not a or not np.array_equal(r3[4], r2[4][:, ::-1]) or (r3[0], r3[1]) != (16 - r2[2] - r2[0], r2[1]):
+            raise Off('Teen Gohan %s, animation %d direction %d frame %d: not the side view mirrored in the purple record' % (form, k, d, f))
+        return px[:, ::-1], (16 - w - x, y, w, h)
     return source
 if __name__ == '__main__':
     import os

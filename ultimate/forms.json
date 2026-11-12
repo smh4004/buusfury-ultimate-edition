@@ -1,5 +1,5 @@
 {
- "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS). rows_after: rows placed after the build's own (Kaioken, Blue, God, Full Power and the shelved Great Ape at 159-161), so no saved form id moves: new forms go there, from 162.",
+ "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS). rows_after: rows placed after the build's own (Kaioken, Blue, God, Full Power and the shelved Great Ape at 159-161), so no saved form id moves: new forms go there, from 162. Teen Gohan (Nov 12): his own guest (owner 8, name 1588 'Teen Gohan'), purple gi (teen_gohan, from 163) and the Saiyan armor (gohan_armor's three rows, adult Gohan's until Nov 12: the rows keep their ids, now owner 8).",
  "rows": [
   {
    "id": "broly",
@@ -99,16 +99,16 @@
    "id": "gohan_armor",
    "copy": 10,
    "actor": "gohan_armor",
-   "owner": 1,
-   "name": 1186,
+   "owner": 8,
+   "name": 1588,
    "up": "gohan_armor_ss"
   },
   {
    "id": "gohan_armor_ss",
    "copy": 16,
    "actor": "gohan_armor_ss",
-   "owner": 1,
-   "name": 1186,
+   "owner": 8,
+   "name": 1588,
    "down": "gohan_armor",
    "up": "gohan_armor_ss2"
   },
@@ -253,9 +253,10 @@
    "id": "gohan_armor_ss2",
    "copy": 16,
    "actor": "gohan_armor_ss2",
-   "owner": 1,
+   "owner": 8,
    "up": 255,
-   "down": "gohan_armor"
+   "down": "gohan_armor",
+   "name": 1588
   },
   {
    "id": "trunks_ss2",
@@ -762,6 +763,32 @@
    "name": 1186,
    "up": 255,
    "down": "gohan_armor"
+  },
+  {
+   "id": "teen_gohan",
+   "copy": 10,
+   "actor": "teen_gohan",
+   "owner": 8,
+   "name": 1588,
+   "up": "teen_gohan_ss"
+  },
+  {
+   "id": "teen_gohan_ss",
+   "copy": 16,
+   "actor": "teen_gohan_ss",
+   "owner": 8,
+   "name": 1588,
+   "down": "teen_gohan",
+   "up": "teen_gohan_ss2"
+  },
+  {
+   "id": "teen_gohan_ss2",
+   "copy": 16,
+   "actor": "teen_gohan_ss2",
+   "owner": 8,
+   "name": 1588,
+   "up": 255,
+   "down": "teen_gohan"
   }
  ],
  "edit": {

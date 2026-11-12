@@ -922,6 +922,31 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - `test_slots.py` (on a slot-test build of this code): all 57 checks, with a new section 9: a version 2 bench saved by the Nov 12
     slot-test build (Broly, Piccolo, Goku Black, Roshi, and mastery bytes poked in) carries over, every fighter's progress and the
     mastery with it, and version 2's mastery group is no fighter's.
+- Nov 12, Teen Gohan wired in (the owner's approval of his frames, Nov 11, 18:12: "Teen Gohan looks good to lock"; the armour: "Teen Gohan
+  only"). His own guest, apart from adult Gohan, opened by the Cell Games' prize (flag 873), in two looks that share one fighter's
+  progress (bench group 20): the purple gi and the Saiyan armor.
+  - Purple gi: base is LoG2's purple record (r50, long black hair) as it is; Super Saiyan and Super Saiyan 2 are r50's animations with
+    the frames `teen.py` makes (212, every one checked before the build writes any; a frame that fails stops it). `actors.json`
+    `log2_source` names the maker; `sprites.log2_anim` takes a frame source (`source(rec, k, d, f)` -> pixels and box as shown) and stores
+    each frame as one 32x32 piece with the entry's flips; `teen.made` mirrors the side view for direction 3, checked against how the
+    purple record shows it (the side view's pixels mirrored, the box at 16 - w - x). A slot asking for an animation teen.py doesn't make
+    stops the build. Where LoG2 has no frames for Super Saiyan 2 (power-up, flying) the figure does as the armour's does (the stance, the
+    hit); the changes and power-downs are the power-up's frames (build.py `LOG2_CHANGES`), the charged hit (slot 23) is the first combo
+    hit, as base armour Gohan's; Masenko (slot 12) and the beam pose (slot 31) as the armour's. The idle rule (no head moving) made his
+    Super Saiyan 2 idle still, as it does every figure's.
+  - The armor: adult Gohan's three forms (65, 66, 83) keep their ids, now owner 8 and named "Teen Gohan". Adult Gohan's outfit list loses
+    it. A save from before with Gohan in the armor (or in Great Saiyaman over it) puts him in his first open look: when the Switch screen
+    opens (`restore_borrowed`, even if he is the fighter in play), or once he isn't the fighter in play (`shelved_fix`).
+  - Forms 163-165 (`teen_gohan`, `_ss`, `_ss2`, in `rows_after`); his name is UI 1588 ("Teen Gohan", after Majuub's text); portraits are
+    Gohan's (copied rows 10 and 16). Moves (`outfit.c teen`): ki blasts, Energy Punch, Masenko, Kamehameha, Super Saiyan; Super Saiyan 2
+    through the Super Saiyan skill with no story flag (`ss2_open`: the Cell Games opened him). No transformation mastery (a guest's,
+    as Future Trunks').
+  - Locked (`locked.json`): teen_gohan, teen_gohan_ss, teen_gohan_ss2.
+  - Tests: `test_teen.py` (new): every frame of his Super Saiyan and 2 figures in the ROM is one teen.py makes, shown as made for its
+    direction, and his base is the purple record's own; every slot filled; the forms' owner, name and chain; in the Bomber fight each
+    look's ki blast and Kamehameha hit and its Masenko goes, in base, Super Saiyan and 2, with his beam pose held. `test_build.py`: both
+    looks chosen with his moves and going Super Saiyan; Super Saiyan 2 in both; the armor's transform loop for both looks; an old save
+    with Gohan in the armor. `test_slots.py` 7b: the two looks share one fighter's progress, apart from Pan's.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

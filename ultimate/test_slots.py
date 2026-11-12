@@ -64,7 +64,8 @@ CANCEL = ['tap B 200', 'run 120']
 # tournament unlocks now, flags past 2000, which a debug build has open. The route's poke of flag 883 clears the rest of its byte,
 # Androids 17 and 18's 880 and the Boss Rush's 887 with it.)
 OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'krillin', 'videl', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black',
-        'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub', 'roshi']     # Master Roshi (Nov 9)
+        'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub', 'roshi',     # Master Roshi (Nov 9)
+        'teen_gohan', 'gohan_armor']     # Teen Gohan, the purple gi and the Saiyan armor (Nov 12: the Cell Games' flag 873, which this route leaves set)
 OPEN_V1 = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule']       # what the build before version 2 had open
 def go(a, b, open_=OPEN):
     """Down presses from guest a to guest b, round the list."""
@@ -229,6 +230,22 @@ c3 = talk_at(c2, *zone26.HUB_AT) + GUEST + go('pan_gi_red', 'uub') + CONFIRM + p
 c4 = talk_at(c3, *zone26.HUB_AT) + GUEST + go('uub', 'pan_bug') + CONFIRM + state('c4')
 out = fresh(c4); a = read('c4')
 check('Uub keeps his own; Pan comes back with hers', 'bad pc' not in out and a['form'] == forms['pan_bug'] and a['exp'] == 1100000 and a['stat'] == 80)
+
+# 7b. Teen Gohan (Nov 12): one fighter in two looks (the purple gi and the Saiyan armor share bench group 20), with his own moves.
+t1 = talk_at(c4, *zone26.HUB_AT) + poke_rec(exp=1300000, stat=91) + GUEST + go('pan_bug', 'teen_gohan') + CONFIRM + state('t1')
+out = fresh(t1); a = read('t1')
+check('Teen Gohan on, level with the guest who was out', 'bad pc' not in out and a['form'] == forms['teen_gohan'] and a['exp'] == 1300000)
+r = a['raw'][0x4F8 + 8 * REC:0x4F8 + 9 * REC]
+check('and his moves: ki blasts, rush, Masenko, Kamehameha, Super Saiyan', list(r[0x0C:0x0D + r[0x0C]]) == [5, 7, 8, 17, 15, 20])
+t2 = talk_at(t1, *zone26.HUB_AT) + poke_rec(exp=1400000, stat=92) + GUEST + go('teen_gohan', 'gohan_armor') + CONFIRM + state('t2')
+out = fresh(t2); a = read('t2')
+check('his Saiyan armor is the same fighter: same progress', 'bad pc' not in out and a['form'] == forms['gohan_armor'] and a['exp'] == 1400000 and a['stat'] == 92)
+t3 = talk_at(t2, *zone26.HUB_AT) + GUEST + go('gohan_armor', 'pan') + CONFIRM + state('t3')
+out = fresh(t3); a = read('t3')
+check('Pan comes back with hers', 'bad pc' not in out and a['form'] == forms['pan'] and a['exp'] == 1300000 and a['stat'] == 91)
+t4 = talk_at(t3, *zone26.HUB_AT) + GUEST + go('pan', 'teen_gohan') + CONFIRM + state('t4')
+out = fresh(t4); a = read('t4')
+check('and Teen Gohan with his, in the purple gi', 'bad pc' not in out and a['form'] == forms['teen_gohan'] and a['exp'] == 1400000 and a['stat'] == 92)
 
 # 8. A bench saved by a build before version 2 (pass its slot-test ROM as a fourth argument): every fighter's progress carries over.
 OLD_SLOT = sys.argv[4] if len(sys.argv) > 4 else None

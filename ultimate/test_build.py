@@ -135,7 +135,10 @@ check('Piccolo can be chosen and has Energy Blast, Masenko and Special Beam Cann
 check('Piccolo attacks and uses all three skills with no bad jumps', 'bad pc' not in o)
 # The Super 13 reward also brings Future Trunks, Android 17 and 18, Krillin and Videl to the guest slot, each with their own moves.
 # (Nov 10, the owner: "give all playable Buus forms kamehameha": Majin Buu and Kid Buu hold the Kamehameha too, outfit.c `buu`.)
-for name_, downs_, want_ in (('Future Trunks', 4, [5, 7, 20, 4, 11, 38]), ('Android 18', 6, [4, 7, 27, 28, 29]), ('Krillin', 7, [5, 7, 15, 28, 42, 37]), ('Videl', 8, [2, 7, 37]), ('Majin Buu', 9, [3, 7, 8, 15]), ('Super Janemba', 10, [2, 7, 8]), ('Kid Buu', 11, [3, 7, 8, 15]), ('Master Roshi', 24, [4, 7, 8, 15, 45])):
+# Teen Gohan (Nov 12): his own guest, in the purple gi and in the Saiyan armor, with ki blasts, rush, Masenko, Kamehameha and Super Saiyan.
+TEEN = [5, 7, 8, 17, 15, 20]
+for name_, downs_, want_ in (('Future Trunks', 4, [5, 7, 20, 4, 11, 38]), ('Android 18', 6, [4, 7, 27, 28, 29]), ('Krillin', 7, [5, 7, 15, 28, 42, 37]), ('Videl', 8, [2, 7, 37]), ('Majin Buu', 9, [3, 7, 8, 15]), ('Super Janemba', 10, [2, 7, 8]), ('Kid Buu', 11, [3, 7, 8, 15]), ('Master Roshi', 24, [4, 7, 8, 15, 45]),
+                             ('Teen Gohan', 25, TEEN), ('Teen Gohan in armor', 26, TEEN)):
     gl = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * 5 + ['tap DOWN 40'] * downs_ + ['tap A 200', 'run 60', 'dump p 03001068 8a8', 'keys RIGHT', 'run 8', 'keys', 'tap A 12', 'tap A 12', 'tap A 12', 'keys A', 'run 60', 'keys', 'run 60']
     for i_ in range(want_[0]):
         gl += ['poke8 %08X %02X' % (R + 0x15, i_), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'run 2', 'keys B', 'run 60', 'keys', 'run 200', 'mem %08X 1' % (R + 0x14), 'shot %s%d' % (name_.replace(' ', ''), i_)]
@@ -144,15 +147,19 @@ for name_, downs_, want_ in (('Future Trunks', 4, [5, 7, 20, 4, 11, 38]), ('Andr
     check('%s attacks and uses every move with no bad jumps' % name_, 'bad pc' not in o)
     if name_ == 'Future Trunks':
         check('Future Trunks goes Super Saiyan, and no further', [int(l.split(':')[1].split()[0], 16) & 255 for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x14))][1] == forms['future_trunks_ss'])
-# Gohan fires Special Beam Cannon in his armor without a bad jump (the debug build gives it to him).
+    if name_.startswith('Teen Gohan'):
+        base_ = 'teen_gohan' if name_ == 'Teen Gohan' else 'gohan_armor'
+        got_ = [int(l.split(':')[1].split()[0], 16) & 255 for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x14))]
+        check('%s: in his look, and Super Saiyan from his last skill' % name_, r8[0x14] == forms[base_] and got_[-1] == forms[base_ + '_ss'])
+# Gohan fires Special Beam Cannon without a bad jump (the debug build gives it to him). (In the Saiyan armor until Nov 12: it is Teen Gohan's now.)
 R1 = 0x03001560 + REC
-gh = ['guardon 0x09000000'] + route + ['poke8 %08X %02X' % (R1 + 0x14, forms['gohan_armor']), 'tap A 60', 'tap A 60', 'run 30', 'tap RIGHT 40', 'tap A 200', 'run 60', 'dump h 03001068 8a8']
+gh = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30', 'tap RIGHT 40', 'tap A 200', 'run 60', 'dump h 03001068 8a8']
 h1 = None
 o = run(rom, gh, d); h1 = open(d + '/h.bin', 'rb').read()[0x4F8 + REC:0x4F8 + 2 * REC]
 at_ = list(h1[0x0D:0x0D + h1[0x0C]]).index(26) if 26 in h1[0x0D:0x0D + h1[0x0C]] else 0
 check('debug: Gohan has Special Beam Cannon', 26 in h1[0x0D:0x0D + h1[0x0C]])
 o = run(rom, gh + ['poke8 %08X %02X' % (R1 + 0x15, at_), 'poke8 %08X FF' % (R1 + 0x1A), 'poke8 %08X 00' % (R1 + 0x1B), 'keys RIGHT', 'run 8', 'keys', 'run 3', 'keys B', 'run 60', 'shot gohan_beam', 'keys', 'run 200'], d)
-check('Gohan fires Special Beam Cannon in his armor', 'bad pc' not in o)
+check('Gohan fires Special Beam Cannon', 'bad pc' not in o)
 # Super Saiyan 2 is its own skill (Nov 9), from Super Saiyan. Goku goes on to Super Saiyan 3 from there; back down from the top. VRAM stays intact (slot 10 on Super Saiyan actors).
 def chain(c, rights, form, skills, presses, lock=None):
     R_ = 0x03001560 + c * REC
@@ -167,8 +174,12 @@ ok_, got_ = chain(0, 0, None, [7, 20, 35, 22], [1, 2, 3])
 check('Goku: Super Saiyan, Super Saiyan 2, Super Saiyan 3', ok_ and got_[:3] == [4, forms['goku_ss2_b'], 6])
 ok_, got_ = chain(4, 3, None, [7, 20, 35], [1, 2, 2])
 check('Vegeta: Super Saiyan, Super Saiyan 2, back', ok_ and got_[:3] == [28, forms['vegeta_ss2'], 26])
-ok_, got_ = chain(1, 1, forms['gohan_armor'], [7, 20, 35], [1, 2])
-check('Gohan in armor: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [forms['gohan_armor_ss'], forms['gohan_armor_ss2']])
+ok_, got_ = chain(8, 5, forms['gohan_armor'], [7, 20, 35], [1, 2])
+check('Teen Gohan in armor: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [forms['gohan_armor_ss'], forms['gohan_armor_ss2']])
+ok_, got_ = chain(8, 5, forms['teen_gohan'], [7, 20, 35], [1, 2, 2])
+check('Teen Gohan: Super Saiyan, Super Saiyan 2, back', ok_ and got_[:3] == [forms['teen_gohan_ss'], forms['teen_gohan_ss2'], forms['teen_gohan']])
+ok_, got_ = chain(8, 5, forms['teen_gohan'], [7, 20], [1, 1])
+check('Teen Gohan: Super Saiyan 2 through the Super Saiyan skill (no story flag needed)', ok_ and got_[:2] == [forms['teen_gohan_ss'], forms['teen_gohan_ss2']])
 ok_, got_ = chain(3, 2, None, [7, 20, 35], [1, 2])
 check('Trunks: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [22, forms['trunks_ss2']])
 ok_, got_ = chain(3, 2, forms['trunks_armor'], [7, 20, 35], [1, 2])
@@ -231,22 +242,28 @@ h = open(d + '/h.bin', 'rb').read()[GOHAN + FORM]; i = open(d + '/i.bin', 'rb').
 check('saiyaman: no bad jumps', 'bad pc' not in o)
 check('saiyaman: costume on from the orange gi', h == forms['saiyaman_from_orange'])
 check('saiyaman: costume off returns to the orange gi', i == 13)
-# ... and to the Saiyan armour (Nov 10: armour Gohan came back in the school uniform; build.py now refuses a Gohan outfit with no way back)
+# A save from before Nov 12 with Gohan in the Saiyan armor (Teen Gohan's now), or in Great Saiyaman over it: the Switch screen puts him in his first
+# open look, played or not; out of play the party's sync does it.
 arm = '%08x' % (0x03001068 + GOHAN + FORM)
-o = run(rom, pick + ['tap A 150', 'run 100', 'poke8 %s %02x' % (arm, forms['gohan_armor']), 'run 30'] + use('j') + use('k'), d)
-j = open(d + '/j.bin', 'rb').read()[GOHAN + FORM]; k = open(d + '/k.bin', 'rb').read()[GOHAN + FORM]
-check('saiyaman: costume on from the Saiyan armour, off back to it', 'bad pc' not in o and j == forms['saiyaman_from_armor'] and k == forms['gohan_armor'])
+for f_ in ('gohan_armor', 'gohan_armor_ss2', 'saiyaman_from_armor'):
+    o = run(rom, ['guardon 0x09000000'] + route + ['poke8 %s %02x' % (arm, forms[f_]), 'run 2', 'tap A 60', 'tap A 60', 'run 30', 'dump j 03001068 8a8', 'tap B 150', 'run 60', 'dump k 03001068 8a8'], d)
+    j = open(d + '/j.bin', 'rb').read(); k = open(d + '/k.bin', 'rb').read()
+    check('old save, Gohan in %s: the Switch screen gives him his school uniform' % f_, 'bad pc' not in o and j[GOHAN + FORM] == 10 and k[GOHAN + FORM] == 10)
+o = run(rom, ['guardon 0x09000000'] + route + ['poke8 %s %02x' % (arm, forms['gohan_armor']), 'run 600', 'dump j 03001068 8a8'], d)
+j = open(d + '/j.bin', 'rb').read()
+check('old save, Gohan in the armor while Goku plays: back in his school uniform within 10 s', 'bad pc' not in o and j[0] == 0 and j[GOHAN + FORM] == 10)
 flag_byte = lambda f: '%08x' % (0x03001068 + 0x55 + f // 8)
 lock = [x for x in pick if x not in ('tap DOWN 30', 'shot outfit')]
 at = lock.index('tap RIGHT 40')
-lock[at:at] = ['poke8 %s 00' % flag_byte(858), 'poke8 %s 00' % flag_byte(873)]
+lock[at:at] = ['poke8 %s 00' % flag_byte(858)]
 o = run(rom, lock + ['tap DOWN 30', 'tap DOWN 30', 'tap A 150', 'run 100', 'dump j 03001068 8a8'], d)
 print('flag byte value test')
 j = open(d + '/j.bin', 'rb').read()
 check('unlocks: locked outfits are skipped (only the GT looks are left: a debug build opens them)', j[GOHAN + FORM] == forms['gohan_gt_noglasses'])
 
 # Saiyan armor: each outfit transforms and returns, attacks, and uses beam skills without hanging. Scrolling keeps sprites inside the frame.
-for who, char, rights, key, base, ss in (('Gohan', 1, 1, 'DOWN', 'gohan_armor', 'gohan_armor_ss'), ('Trunks', 3, 2, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss')):
+for who, char, rights, key, base, ss in (('TeenGohan', 8, 5, 'DOWN', 'gohan_armor', 'gohan_armor_ss'), ('Trunks', 3, 2, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss'),
+                                        ('TeenGohanGi', 8, 5, 'DOWN', 'teen_gohan', 'teen_gohan_ss')):
     presses = [o_['form'] for o_ in json.load(open('ultimate/outfits.json'))['characters'][str(char)]].index(base)    # the armor's place on the list
     rec = 0x03001560 + REC * char
     pk = ['poke8 %08x %02x' % (rec + 0x0C, 3), 'poke8 %08x %02x' % (rec + 0x0D, 20), 'poke8 %08x %02x' % (rec + 0x0E, 15), 'poke8 %08x %02x' % (rec + 0x0F, 10)]

@@ -346,7 +346,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
                 if str(k).startswith('r'): src, k = str(k).split(':', 1)    # "r51:3@0:2" = LoG2 actor 51, anim 3
                 k, sl = (str(k).split('@') + [None])[:2]
                 sl = ([int(v) for v in sl.split(',')] if ',' in sl else slice(*map(int, sl.split(':')))) if sl else None   # a..b or an exact list of frames
-                ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post)
+                ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post, a.get('log2_source'))
                 if ptr: struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ptr)
         ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
@@ -457,13 +457,16 @@ def log2_colour_map(l2, usable, pal_rgb):
     return m.astype(np.uint8)
 
 
-def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=None, grow=None, limit=1024, post=None):
+def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=None, grow=None, limit=1024, post=None, source=None):
     """Convert LoG2 animation k of the actor record at slice offset `rec` into a BF animation. Returns ptr or 0.
     sl = frames a..b-1 only (a slice with a step, e.g. 3:-5:-1, plays them backwards); want = repeat frames evenly to
     that count (the replaced BF slot's own frame count). edit(k, d, pixels) -> (key, pixels): optional pixel edit of each
     frame (LoG2 colour indices, h x w) before conversion, e.g. tools/onearm.py. scale: shrink each frame by this factor
     (majority vote per block) and fit it into one 32x32 piece (big LoG2 actors such as Cell are 64x64; BF characters
-    get 1 KB of OBJ VRAM per frame)."""
+    get 1 KB of OBJ VRAM per frame). source(rec, k, d, f) -> (32x32 LoG2 colour indices as shown, (x, y, 32, 32) as
+    shown) or None: a frame made elsewhere (teen.py's Teen Gohan) in place of the record's own, in the place and with
+    the flips of the record's entry for that view (a mirrored entry stores its pixels turned back; the box is where the
+    frame is shown, as the game stores a mirrored frame's)."""
     from wfz import decompress_stream
     u = lambda o: struct.unpack_from('<I', l2, o)[0]
     dirs = [u(rec + 0x4C + 16 * k + 4 * d) for d in range(4)]
@@ -486,6 +489,20 @@ def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=No
             x, y, w, h = struct.unpack_from('<bbBB', l2, r)
             attr, tp = struct.unpack_from('<II', l2, r + 4)
             assert scale or w * h <= limit, 'LoG2 frame %dx%d at %x is over the 1 KB one-piece budget' % (w, h, r)
+            got = source(rec, k, d, f) if source else None
+            if got is not None:                          # a frame made elsewhere: one 32x32 8bpp piece
+                img, fbox = got
+                img = np.asarray(img, np.uint8)
+                if img.shape != (32, 32) or tuple(fbox[2:]) != (32, 32): raise ValueError('log2_anim source: not one 32x32 piece')
+                if attr & 0x10000000: img = img[:, ::-1]      # shown mirrored: stored turned back
+                data = cmap[img].reshape(4, 8, 4, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+                key = ('source', data, tuple(fbox))
+                if key not in cache: cache[key] = (cache.get(('source', data)) or ins.put(struct.pack('<II', 0, len(data)) + data), tuple(fbox))
+                cache[('source', data)] = cache[key][0]
+                tptr, fbox = cache[key]
+                box = struct.pack('<bbBB', *fbox)
+                ptrs.append(ins.put(struct.pack('<I', 1) + box + box + struct.pack('<II', (attr & 0x30000000) | 0x80002000, tptr)))
+                continue
             ek = edit(rec, k, d, None)[0] if edit else None
             key = (tp, ek, scale, grow and tuple(grow))
             if key not in cache:

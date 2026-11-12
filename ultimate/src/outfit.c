@@ -31,6 +31,13 @@ extern const u16 outfit_index[9][2];           /* first entry, count, per charac
 extern const struct outfit outfit_table[];
 extern const u8 form_table[];
 
+/* Teen Gohan's forms (Nov 12): the purple gi and the Saiyan armor (adult Gohan's until then), base, Super Saiyan and 2. */
+static const u8 teen_forms[] = {TEEN_FORMS};
+static int is_teen(int form) {
+    int i;
+    for (i = 0; i < (int)sizeof teen_forms; i++) if (teen_forms[i] == form) return 1;
+    return 0;
+}
 /* The guest slot has one skill list but different fighters, so the list follows the outfit. A story form (Hercule, say) leaves it alone. */
 static void guest_sync(void) {
     static const u8 broly[] = {3, 7, 8, ERASER_SKILL}, thirteen[] = {5, 7, 8, BOMBER_SKILL, WAVE_SKILL, SUPER13_SKILL}, piccolo[] = {3, 7, 17, BEAM_SKILL},
@@ -41,6 +48,7 @@ static void guest_sync(void) {
         pan[] = {3, 7, 8, 20}, pan_plain[] = {2, 7, 8},  /* Pan: ki blasts and her rush; Super Saiyan in the two looks that have it. Brapan (the Bulma-Pan fusion) fights as Pan */
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
+        teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -63,6 +71,7 @@ static void guest_sync(void) {
     else if (form == FORM_UUB || form == FORM_MAJUUB) list = uub;
     else if (form == FORM_ROSHI || form == FORM_ROSHI_MAX) list = roshi;
     else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU) list = buu;
+    else if (is_teen(form)) list = teen;
     else if (form == FORM_JANEMBA) list = fighter;
     else return;
     r[0x0C] = list[0];
@@ -872,14 +881,23 @@ static void scroll_row(void *obj, int first_frame) {
     }
 }
 
+/* Adult Gohan wore the Saiyan armor until Nov 12; it is Teen Gohan's now (is_teen). A save from before with Gohan in it (or in Great Saiyaman
+   over it) puts him in his first open look: when the Switch screen opens (restore_borrowed), or once he isn't the fighter in play (shelved_fix). */
+static int old_armor(int form) { return is_teen(form) || form == FORM_SAIYAMAN_ARMOR; }
+static void gohan_out_of_armor(void) {
+    int k;
+    for (k = 0; k < outfit_index[1][1]; k++)
+        if (outfit_open(&outfit_table[outfit_index[1][0] + k])) { FORM_OF(1) = outfit_table[outfit_index[1][0] + k].form; return; }
+}
 /* The story borrows the guest slot for Hercule and Android 18. Afterwards it holds that form, which the guest's outfit list doesn't have,
-   so a joined guest comes back in the first outfit it has unlocked when the screen opens. Skipped if that form is the one being played. */
+   so a joined guest comes back in the first outfit it has unlocked when the screen opens. Skipped if that form is the one being played.
+   Gohan in the armor from an older save, too (old_armor), played or not. */
 static void restore_borrowed(void *obj) {
     int n = *field(obj, OBJ_COUNT), s, i;
     for (s = 0; s < n; s++) {
-        int c = *field(obj, OBJ_LIST + s * 8), first, count, have = 0;
-        if (c != 7 && c != 8) continue;
-        if (c == *(u8 *)0x03001068) continue;
+        int c = *field(obj, OBJ_LIST + s * 8), first, count, have = 0, armor = c == 1 && old_armor(FORM_OF(1));
+        if (c != 7 && c != 8 && !armor) continue;
+        if (c == *(u8 *)0x03001068 && !armor) continue;
         first = outfit_index[c][0]; count = outfit_index[c][1];
         for (i = 0; i < count; i++) if (outfit_table[first + i].form == FORM_OF(c) || outfit_table[first + i].also == FORM_OF(c)) have = 1;
         if (have) continue;
@@ -1968,6 +1986,7 @@ static int is_ss2(int form) {
 /* The story sets SS2_FLAG + owner when that character reaches it. Goku learns Super Saiyan 3 in the same scene, so a save made after it counts too. */
 static int ss2_open(const u8 *record, int owner) {
     int i;
+    if (is_teen(record[0x14])) return 1;              /* Teen Gohan comes with it: the Cell Games opened him */
     if (GetFlag((void *)0x03001068, SS2_FLAG + owner)) return 1;
     for (i = 0; i < record[0x0C]; i++) if (record[0x0D + i] == 22) return 1;
     return 0;
@@ -2368,6 +2387,7 @@ const u8 shelved_forms[][2] = SHELVED_FORMS;
 static void shelved_fix(int c, u8 *rec) {
     int i, k, n = 0, pick = 0;
     for (k = 0; k < 16; k++) if (skill_book[c][k] == 255) KNOWN(rec) &= ~(1 << k);
+    if (c == 1 && old_armor(rec[0x14]) && c != *(u8 *)0x03001068) gohan_out_of_armor();     /* (the fighter in play: the Switch screen does it) */
     for (k = 0; k < (int)(sizeof shelved_forms / sizeof shelved_forms[0]); k++)
         if (rec[0x14] == shelved_forms[k][0]) rec[0x14] = shelved_forms[k][1];
     for (i = 0; i < rec[0x0C]; i++) {
