@@ -812,6 +812,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   165 of his 327 frames change, 1,723 pixels; checked: in every frame Daima has skin, fur and wristband where Goku's fixed frame
   has them, and no hair pixel changed. Previews: `daimafix.py` -> `ssj4_daima_arms_back_before_fixed.pdf`, `allforms.py daima`
   (now the fixed one; `daima_saved` for the Nov 11 one). In no build.
+  09:00, the owner: "Ok preview the other fixes too". `daimafix.fixed`: also the see-through pixels in every view (found on his GT
+  frame, filled as the nearest black there: plum in his hair, as his own head has no black) and heads.py in his colours: the spin's
+  legs from the front in his boots' blues and trousers' oranges (`LEG_MAP`, read off his standing and walking feet against BF's), the
+  spin from the side his fixed front mirrored and moved 16 pixels, hit 2 from the side Gogeta's head with every dark plum (as his own
+  head) and the eye his hair's colour, the special's last frame its frame before held. Checked: in every frame but costume out 5-8
+  his shape is Goku's preview's exactly (so no see-through pixel Goku hasn't) and his skin and fur are where Goku's are; the spin
+  sides are his fronts mirrored. Preview `ssj4_daima_heads_legs_holes_before_fixed.pdf` (57 pictures). In no build.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

@@ -3,7 +3,7 @@ the same), so the owner can check each one (Nov 12 08:11: "dont even touch the o
 Nothing here changes a figure; it only draws them.
   goku    Super Saiyan 4 Goku as the preview has him (plainback.fixed: the arms, plain back, heads and legs; not in the game yet);
           the charged punch (slots 22, 23) as the game has it          BFU_GOG_ROM=<debug build>
-  daima   Daima Super Saiyan 4 Goku, the preview (daimafix.fixed: the saved one with Goku's arm fur and plain back; in no build)
+  daima   Daima Super Saiyan 4 Goku, the preview (daimafix.fixed: the saved one with every fix Goku's preview has; in no build)
                                                     BFU_GOG_ROM=<debug build> BFU_SSJ4_ROM=<a build from before the touch-up>
   daima_saved   Daima as saved on Nov 11 (v4.frame(..., 'daima_pic'))   BFU_SSJ4_ROM=<a build from before the touch-up>
   gogeta  Super Saiyan 4 Gogeta as the game has him                    BFU_GOG_ROM=<debug build>
@@ -36,7 +36,7 @@ def source(which):
             return ('Daima Super Saiyan 4 Goku', 'the saved preview (not in the game), as it was saved', R, slots,
                     lambda s, f, d: v4.frame(s, f, d, 'daima_pic'), {})
         import daimafix
-        return ('Daima Super Saiyan 4 Goku', 'the preview (not in the game): arm fur and plain back as on SSJ4 Goku, nothing else', R,
+        return ('Daima Super Saiyan 4 Goku', 'the preview (not in the game): every fix SSJ4 Goku\'s preview has, in his colours', R,
                 slots, lambda s, f, d: daimafix.fixed((s, f, d)), {})
     from frames import R
     rom = os.environ.get('BFU_GOG_ROM', 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba')
