@@ -741,6 +741,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   `walkfix.tail` now: the tail off, his legs whole (BF's legs in his own leg colours), stray skin and blue off his trousers, and a tail
   of his reds hanging from the base of his spine (under the middle of his sash) straight down between his legs to his knees; the first
   walk frame from behind moved whole one column (not his head alone, which bent his back at the seam).
+  01:43, the owner: "His back is still totally fucked", "It was fine before wtf did you even do to it", "It should just have his back
+  not a tail on top of his back and then another tail at the bottom". So: every walk and run change above is dropped (`walkfix.py`,
+  `walkpreview.py` removed; the game never had any of them). What he means: from behind the sheet drew a tail lying over his back (a red
+  band shaded like a tail, dark-light-light-mid-dark, from his waist up across his back and over his sash) as well as the tail hanging
+  at the bottom. `ssj4_preview/plainback.py`: his back plain, nothing else: where BF Goku has his gi's back above the belt, his fur in
+  BF's own shading (dark orange 79 -> 31, 63/64 -> 32, light 65 -> 104), where BF has his belt, the sash's blue across; his hair, arms,
+  legs and the tail at the bottom as they are; frames that show his back only (27 of his 61 pictures from behind). A preview.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
