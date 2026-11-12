@@ -180,17 +180,46 @@ def fill(img, hair, under, ramp, same=None):
     return hair
 
 
-def tint(rom, ss, base, to, sides=False):
+EYE_GREYS = (117, 118)          # the eyes' grey (their shaded white)
+LOG2_IRIS = (12, 11)            # the armour Vegetas' eyes (Gero's Legacy greens): light, dark
+CROSS = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
+
+
+def face(img, out, under, to, iris=IRIS):
+    """Blue's eyes and brows (Nov 11, the owner: "eyebrows and pupils match their hair"). The pupils' green takes the hair's blue (the
+    light green) and its dark blue (the dark green). The brows are the face's dark shades (16 and 202) in the row over the eyes, from two
+    pixels before the first eye to two past the last: never at the figure's edge (the forehead's outline, seen from the side), never a
+    pixel the base figure draws in the same skin shade (Goku's forehead by his hairline), never one the hair already took. They take the
+    hair's colour for that shade. `iris` is (light, dark)."""
+    from scipy import ndimage
+    eyes = np.isin(img, iris)
+    if not eyes.any(): return out
+    out = out.copy()
+    out[img == iris[0]] = to[202]; out[img == iris[1]] = to[16]
+    whites = (np.isin(img, (2, 120))) & ndimage.binary_dilation(eyes, np.ones((3, 3), bool))
+    ys, xs = np.nonzero(eyes | np.isin(img, EYE_GREYS) | whites)
+    r0 = ys.min()
+    if r0 == 0: return out
+    band = np.zeros(img.shape, bool); band[r0 - 1, max(0, xs.min() - 2):xs.max() + 3] = True
+    edge = ndimage.binary_dilation(img == 0, CROSS); edge[0, :] = edge[-1, :] = edge[:, 0] = edge[:, -1] = True
+    same = (under == img) & ~np.isin(under, (1, 16)) if under is not None else np.zeros(img.shape, bool)
+    brow = band & np.isin(img, (16, 202)) & (out == img) & ~edge & ~same
+    for k in (16, 202): out[brow & (img == k)] = to[k]
+    return out
+
+
+def tint(rom, ss, base, to, sides=False, eyes=False, iris=IRIS):
     """A tint function (sprites.tinted_actor) turning Super Saiyan figure `ss`'s hair blue: {ramp index: blue index} `to`, the hair found
     against base figure `base` (or the old rule alone when base is None); `sides`: the hair round his ears seen from the side (sideburns;
-    Goku only)."""
+    Goku only); `eyes`: the pupils and brows too (face)."""
     under = base_under(rom, ss, base) if base is not None else {}
     ramp = list(to)
     def fn(img):
-        hair = hair_mask(img, under.get((img.shape, img.tobytes())), ramp, sides)
+        u = under.get((img.shape, img.tobytes()))
+        hair = hair_mask(img, u, ramp, sides)
         out = img.copy()
         for k, v in to.items(): out[hair & (img == k)] = v
-        return out
+        return face(img, out, u, to, iris) if eyes else out
     return fn
 
 
@@ -242,7 +271,7 @@ def actor_frames(rom, actor):
     return out
 
 
-def gogeta_frames(rom, to, lengths=None):
+def gogeta_frames(rom, to, lengths=None, eyes=False):
     """{slot: [[canvas, ...] for views]} of Blue Gogeta: actor 93's frames (goku_black.actor_frames canvases) with his hair blue. `to` is
     {Goku gold index: blue index} (build.SSB_HAIR through the indexer). His change (slot 10) is his power-up's (slot 13) two poses,
     the crouch twice and the shout eight times, then his stance: a retail change's 11 frames."""
@@ -252,7 +281,7 @@ def gogeta_frames(rom, to, lengths=None):
     def blue(c):
         hair = gogeta_hair_mask(c); out = c.copy()
         for k, v in lut.items(): out[hair & (c == k)] = v
-        return out
+        return face(c, out, None, to) if eyes else out
     out = {s: [[blue(c) for c in views[v]] for v in range(3)] for s, views in frames.items()}
     for s, src in GOGETA_FILL.items():
         if s not in out: out[s] = out[src]

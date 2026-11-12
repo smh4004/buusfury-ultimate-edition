@@ -99,6 +99,12 @@ SS_KAIOKEN = ('goku_ss', 'goku_ss_b', 'kid_goku_ssj')     # their rows go after 
 # Super Saiyan God: each of Goku's base looks -> (its form, owner, the actor its red-haired copy is made from). Rows after Super Saiyan Kaioken's.
 SSG_LOOKS = {'goku_ssg': (0, 0, 106), 'goku_b_ssg': (1, 0, 107), 'goku_halo_ssg': (2, 0, 108)}
 SSG_HAIR = ((120, 32, 64), (200, 32, 64))         # his hair: edge and fill (crimson, from colours the game has)
+# Nov 11 (the owner, 19:26 and 19:49): Super Saiyan God's eyes red as his hair; Super Saiyan Blue's pupils and brows the hair's blues, a
+# light cyan aura (Super Saiyan's gold shade for shade, SSB_AURA), and Super Saiyan 2's bolts toned down in Blue's colours (SSB_BOLTS,
+# outfit.c crackle). Built with BFU_LOOK170=1 until the owner approves the preview.
+LOOK170 = bool(os.environ.get('BFU_LOOK170'))
+SSB_AURA = {(248, 168, 0): (48, 176, 232), (248, 208, 0): (96, 232, 248), (248, 248, 0): (160, 248, 248), (248, 248, 144): (208, 248, 248), (248, 248, 216): (232, 248, 248)}
+SSB_BOLTS = ((32, 128, 248), (200, 248, 248))     # glow, core
 # Full Power Mystic: Gohan's orange-gi form -> (its form, owner, its figure: the orange gi's). Rows after Super Saiyan God's.
 FP_LOOKS = {'gohan_mystic_fp': (13, 1, 101)}
 FP_BOLTS = ((176, 200, 248), (248, 248, 248))     # the crackle's lightning: a cool white fade and a white core (Max Power's aura is the same white)
@@ -201,9 +207,11 @@ def body_block(frames):
 
 def ssg_hair(one):
     """Goku's black hair -> Super Saiyan God's crimson. His hair is the only big black patch on him (eyes and brows are a few pixels each):
-    every black area of 12 pixels or more, its edge darker."""
+    every black area of 12 pixels or more, its edge darker. LOOK170: his eyes too, red as his hair (the pupil's black the edge's red,
+    its grey middle the fill's): the black beside an eye's white, and the dark grey (113) between."""
     from scipy import ndimage
     edge, fill = one(np.array(SSG_HAIR[0])), one(np.array(SSG_HAIR[1]))
+    cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
     def fn(img):
         black = img == 1
         lab, n = ndimage.label(black, np.ones((3, 3)))
@@ -211,6 +219,9 @@ def ssg_hair(one):
         hair = np.isin(lab, [k + 1 for k, v in enumerate(sizes) if v >= 12])
         inner = ndimage.binary_erosion(hair, np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]))
         out = img.copy(); out[hair] = edge; out[inner] = fill
+        if LOOK170:
+            mid = (img == 113) & ndimage.binary_dilation(img == 2, cross)
+            out[(img == 1) & ~hair & ndimage.binary_dilation((img == 2) | mid, cross)] = edge; out[mid] = fill
         return out
     return fn
 
@@ -283,7 +294,7 @@ ACTOR_BASE = 298
 def new_actor_ids():
     """Ids add_actors will give: actors.json's new actors in order, then Super 13 and Android 13. Checked after the build."""
     cfg = json.load(open('ultimate/actors.json'))
-    n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a)
+    n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a and not a.get('last'))
     return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}, 'goku_black': n + 32, 'goku_rose': n + 33, **{k: n + 34 + i for i, k in enumerate(gt.ACTORS)}, **{k: n + 34 + len(gt.ACTORS) + i for i, k in enumerate(garlic_art.ACTORS)}}
 
 
@@ -1371,7 +1382,7 @@ def add_actors(rom, clean):
     # (lib/ssb.py gogeta_frames). Nov 9-10 tries on DBS Gogeta's sheet figure are gone (the owner: "Literally look at SSJ Gogeta, turn that
     # hair blue colored and use SSB Gokus hair as a reference but DONT CHANGE THE SSJ GOGETA HAIR SHAPE", "Get the fucking hair RIGHT
     # according to BUUS FURY GOGETA"). He changes to it from DBS Gogeta's Super Saiyan as before (outfit.c ssb_use).
-    cfg['gogeta_ssb'] = {'template': ssb.GOGETA, 'raw_frames': {str(k): v for k, v in ssb.gogeta_frames(clean, {k: one(np.array(v)) for k, v in SSB_HAIR.items()}).items()},
+    cfg['gogeta_ssb'] = {'template': ssb.GOGETA, 'raw_frames': {str(k): v for k, v in ssb.gogeta_frames(clean, {k: one(np.array(v)) for k, v in SSB_HAIR.items()}, eyes=LOOK170).items()},
                          'compress': True, 'high': True, 'grow': lengths}
     for name in ('piccolo', 'android17', 'android18', 'krillin', 'future_trunks', 'future_trunks_ss', 'videl_player', 'kid_buu_player', 'majin_buu_player', 'super_janemba_player', 'tien_player', 'yamcha_player', 'pikkon_player', 'hercule_player'):
         cfg[name]['grow'] = lengths
@@ -1437,7 +1448,8 @@ def add_actors(rom, clean):
     to = {k: one(np.array(v)) for k, v in SSB_HAIR.items()}
     for n, (_, _, _, src, base) in SSB_LOOKS.items():
         under = struct.unpack_from('<H', clean, FORMS + FORM_SIZE * base + 0x0E)[0] - 9 if isinstance(src, int) and isinstance(base, int) else None
-        cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to, sides=n.startswith('goku')), 'high': True}   # (his sideburns)
+        cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to, sides=n.startswith('goku'), eyes=LOOK170,
+                                                   iris=ssb.LOG2_IRIS if src == 'vegeta_armor_ss' else ssb.IRIS), 'high': True}   # (his sideburns)
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
@@ -1471,6 +1483,8 @@ def add_actors(rom, clean):
     # on the school uniform, grey then full, so every other outfit flashed the school uniform before its own (seen in the Nov 10 GIFs).
     # A copy that ends on the white figure instead; the school uniform's own Great Saiyaman (form 14) keeps BF's. After broly_player.
     cfg['saiyaman_outfit'] = {'template': 102, 'reframe': {'11': [0, 1, 2, 3, 4, 5, 5, 5, 5], '19': [0, 1, 2, 3, 4, 5, 5, 5, 5]}}
+    for name in [k for k, a in cfg.items() if isinstance(a, dict) and a.get('last')]:     # actors.json "last": after every other actor, so no
+        cfg[name] = cfg.pop(name)                                                             # id the build had before moves (Teen Gohan, Nov 12)
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
 
@@ -1755,7 +1769,7 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), *(['-DFLASH_SAVE'] if FLASH_SAVE else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DSS2_SKILL=%d' % SS2_SKILL, '-DGOGETA_FLAG=%d' % json.load(open('ultimate/outfits.json'))['characters']['7'][0]['flag'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DTEEN_FORMS=%s' % ','.join(str(fm[n]) for n in TEEN_FORMS), '-DFORM_SAIYAMAN_ARMOR=%d' % fm['saiyaman_from_armor'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), *(['-DFLASH_SAVE'] if FLASH_SAVE else []), *(['-DLOOK170'] if LOOK170 else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DSS2_SKILL=%d' % SS2_SKILL, '-DGOGETA_FLAG=%d' % json.load(open('ultimate/outfits.json'))['characters']['7'][0]['flag'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DTEEN_FORMS=%s' % ','.join(str(fm[n]) for n in TEEN_FORMS), '-DFORM_SAIYAMAN_ARMOR=%d' % fm['saiyaman_from_armor'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -2309,7 +2323,8 @@ def add_eraser(rom, clean, sym, at, art):
         c = pal[v].astype(int); g = int(c.mean())
         return one(np.array((min(255, g + 70), min(255, g + 80), min(255, g + 100))))
     white = bytes(whitened(v) for v in range(256))
-    for who, tint in (('rose', pink), ('ssj4', red), ('ssb', ssb_blue), ('maxp', white)):
+    ssb_aura = bytes(0 if v == 0 else one(np.array(SSB_AURA[tuple(int(c) for c in pal[v])])) if tuple(int(c) for c in pal[v]) in SSB_AURA else v for v in range(256)) if LOOK170 else ssb_blue
+    for who, tint in (('rose', pink), ('ssj4', red), ('ssb', ssb_aura), ('maxp', white)):
         for name, at_, count in ((who + '_aura_field', 0x752D28, 3), (who + '_aura_other', 0x7520D4, 7)):
             out = bytearray(clean[at_:at_ + 12 * count])
             for k in range(0, 12 * count, 12):
@@ -2327,11 +2342,11 @@ def add_eraser(rom, clean, sym, at, art):
     # memory, not 1 KB. Sprite memory's allocator never joins freed blocks: two 1 KB bolts out at once left a 1 KB block cut off the
     # largest free one for good, and at Volcano Summit Broly's first conversation, which needs all but 960 bytes of it, then took Broly's
     # own 4 KB (Nov 11: he wasn't drawn while he spoke to a Super Saiyan 2). The build stops if a bolt no longer fits the piece.
-    for who, (g, c) in (('ss2', ((96, 248, 248), (200, 248, 248))), ('fp', FP_BOLTS)):
+    for who, (g, c) in (('ss2', ((96, 248, 248), (200, 248, 248))), ('fp', FP_BOLTS), ('ssb', SSB_BOLTS)):
         gi, ci = one(np.array(g)), one(np.array(c))
         out = bytearray()
         for b in range(3):
-            frames_ = crackle_frames(31 * b + (7 if who == 'fp' else 3), gi, ci)
+            frames_ = crackle_frames(31 * b + {'fp': 7, 'ssb': 5}.get(who, 3), gi, ci)
             ys, xs = np.where(np.any([f > 0 for f in frames_], axis=0))
             x0, y0 = min(int(xs.min()), 16), min(int(ys.min()), 16)
             if xs.max() >= x0 + BOLT_PIECE or ys.max() >= y0 + BOLT_PIECE: sys.exit('crackle bolt %s %d does not fit a %dx%d piece' % (who, b, BOLT_PIECE, BOLT_PIECE))

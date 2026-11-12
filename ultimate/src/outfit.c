@@ -2627,7 +2627,7 @@ void fp_use(u8 *record, void *sprite) {
    crackle_frames: cyan for Super Saiyan 2, white for Full Power), drawn as the hit sparks are (NewSpark on the actor list, gone after its
    last frame), so one or two are out at a time. Timed by the frame counter (the hook can run more than once a frame) and placed by a hash
    of it, so the game's random numbers are left alone. */
-const u32 bolt_ss2[36] = {1}, bolt_fp[36] = {1};      /* three bolts x four frames x (origin, attributes, tiles): build.py fills them */
+const u32 bolt_ss2[36] = {1}, bolt_fp[36] = {1}, bolt_ssb[36] = {1};      /* three bolts x four frames x (origin, attributes, tiles): build.py fills them */
 #define BOLT_NEXT (*(volatile u32 *)0x0203F26C)
 /* A bolt's sprite memory. NewSpark asks the actor list's allocator (0x0801124C: best fit over the free blocks, in 64-byte units, a chain
    from the list's first byte; block k is 10 bytes at +0x694: +4 its size, +8 the next free one; a block cut off a larger one is never
@@ -2651,10 +2651,15 @@ static void crackle(void) {
     const u32 *set;
     if (!COMBAT_ON || !IN_EWRAM(me) || AURA_MODE > 1) return;
     if (XFORM && is_fp(XFORM - 1)) form = XFORM - 1;
-    if (is_ss2(form)) set = bolt_ss2; else if (is_fp(form)) set = bolt_fp; else return;
+    if (is_ss2(form)) set = bolt_ss2; else if (is_fp(form)) set = bolt_fp;
+#ifdef LOOK170
+    /* Super Saiyan Blue (Nov 11, the owner: "Super Saiyan 2's bolts toned down in Blue's colour"): its own blue bolts, half as often */
+    else if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) set = bolt_ssb;
+#endif
+    else return;
     if ((int)(FRAMES - BOLT_NEXT) < 0 && BOLT_NEXT - FRAMES < 60) return;
     h = bolt_hash();
-    BOLT_NEXT = FRAMES + 7 + h % 7;
+    BOLT_NEXT = FRAMES + (set == bolt_ssb ? 16 + h % 12 : 7 + h % 7);
     SpriteBox(box, me); VecOp(v, box, box + 2);
     dx = 5 + (h >> 8) % 6;
     pos[0] = (v[0] >> 1) + (h >> 12 & 1 ? dx : -dx); pos[1] = (v[1] >> 1) - 10 - (int)((h >> 16) % 10);
