@@ -88,9 +88,11 @@ def bf_for(k):
                     m=int((np.roll(np.roll(bm,dy,0),dx,1)&cm).sum())
                     if best is None or m>best[0]: best=(m,dy,dx,b)
     _bf[k]=np.roll(np.roll(best[3],best[1],0),best[2],1); return _bf[k]
+import armfur
 def fixed(k):
     c=fr(GOKU,*k)
-    return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(c) else fill(c)
+    if k in armfur.FIXES: c=armfur.apply(c,fr(BF,*k),fr(GOKU,0,0,k[2]),armfur.FIXES[k])     # his arms (walk and run) first
+    return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(fr(GOKU,*k)) else fill(c)
 BG=(88,120,88); BOX=(37,72,39,80); H=BOX[1]-BOX[0]; W=BOX[3]-BOX[2]
 F=ImageFont.load_default(size=16); FS=ImageFont.load_default(size=13)
 def cell(c):
@@ -108,6 +110,28 @@ if __name__=='__main__':
   OUT=sys.argv[1]; os.makedirs(OUT,exist_ok=True)
   gif(OUT+'/ssj4_goku_back_plain_walk.gif',[(1,f) for f in range(4)],170)
   gif(OUT+'/ssj4_goku_back_plain_run.gif',[(2,f) for f in range(4)],120)
+  # the walk and the run in all three views, now above fixed
+  VIEWS=((2,'side'),(1,'back'),(0,'front'))
+  def gif3(path,seq,ms,z=5,reps=3):
+    frames=[]; band=20
+    for _ in range(reps):
+      for s_,f_ in seq:
+        img=Image.new('RGB',(3*W*z,2*H*z+2*band),BG); dr=ImageDraw.Draw(img); y=0
+        for what,fn in (('now',lambda k: fr(GOKU,*k)),('fixed',fixed)):
+          dr.rectangle((0,y,3*W*z,y+band),fill=(30,40,30))
+          for i,(d,v) in enumerate(VIEWS): dr.text((i*W*z+6,y+2),'%s, %s'%(what,v),fill=(255,255,255),font=FS)
+          y+=band; img.paste(big(np.concatenate([cell(fn((s_,f_,d))) for d,_ in VIEWS],1),z),(0,y)); y+=H*z
+        frames.append(img)
+    frames[0].save(path,save_all=True,append_images=frames[1:],duration=ms,loop=0)
+  gif3(OUT+'/ssj4_goku_walk_all_views.gif',[(1,f) for f in range(4)],150)
+  gif3(OUT+'/ssj4_goku_run_all_views.gif',[(2,f) for f in range(4)],110)
+  for d,v in VIEWS:
+    keys=[(0,0,d)]+[(1,f,d) for f in range(4)]+[(2,f,d) for f in range(4)]; z=6; band=22
+    img=Image.new('RGB',(9*W*z,2*(H*z+band)),BG); dr=ImageDraw.Draw(img); y=0
+    for what,fn in (('now (in the game)',lambda k: fr(GOKU,*k)),('fixed',fixed)):
+      dr.rectangle((0,y,9*W*z,y+band),fill=(30,40,30)); dr.text((6,y+3),'from the %s, standing, walk 1-4, run 1-4: %s'%(v,what),fill=(255,255,255),font=F); y+=band
+      img.paste(big(np.concatenate([cell(fn(k)) for k in keys],1),z),(0,y)); y+=H*z
+    img.save(OUT+'/ssj4_goku_%s_now_and_fixed.png'%v)
   # a still: standing, walk, run from behind, now above plain, big
   keys=[(0,0,1)]+[(1,f,1) for f in range(4)]+[(2,f,1) for f in range(4)]; z=6; band=22
   img=Image.new('RGB',(9*W*z,2*(H*z+band)),BG); dr=ImageDraw.Draw(img); y=0

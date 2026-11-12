@@ -754,6 +754,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   over every frame: 0 pixels changed on his arms, hands, wristbands or sleeves. The see-through pixel: the sheet's, at the bottom of his
   hair, and not only there: 61 of his 171 pictures (all views) have one boxed in by his hair or outline (Gogeta's sheet has 40). Filled
   with black like the outline round them (`see_through`, `fill`). A preview.
+  07:01, the owner: "I meant the fur on his arms ... which no you DID NOT FIX STILL", "Why ... are you working backwards and fucking
+  shit up we've already fixed multiple times now". My misreading: at 01:43 ("It was fine before") I dropped the arm fixes with the
+  head move and the tail; he had meant the back only. The arm fixes are back (`ssj4_preview/armfur.py`, the 00:06 list without the head
+  move): fur from the shoulder to the wristband in every walk and run frame, all three views, under the plain back and the filled
+  see-through pixels. Next: the same reading of his arms in every other move.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
