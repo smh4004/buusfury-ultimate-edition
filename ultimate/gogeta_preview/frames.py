@@ -1,6 +1,7 @@
 """Super Saiyan 4 Gogeta's frames out of a built ROM, with BF Goku's (the frame each was drawn on) and Super Saiyan 4 Goku's, all on the
 canvas lib4.Rom.frame lays a frame out on (96 x 96, the actor's own place at row 64, column 48), so one pixel is one place in all three.
-  BFU_GOG_ROM: a debug build (its .map.json beside it); default ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba"""
+  BFU_GOG_ROM: a debug build (its .map.json beside it); default ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba. The build sets
+  BFU_GOG_AID and BFU_GOKU_AID instead of reading a map."""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(HERE, '..', 'ssj4_preview'), os.path.join(HERE, '..')]
@@ -9,9 +10,14 @@ import numpy as np
 from lib4 import Rom
 
 ROM = os.environ.get('BFU_GOG_ROM', 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba')
-R = Rom(ROM); forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
-aid = lambda n: struct.unpack_from('<H', R.rom, 0x800000 + 24 * forms[n] + 0x0E)[0] - 9
-GOG, GOKU, BF = aid('gogeta_ssj4'), aid('kid_goku_ssj4'), 106
+R = Rom(ROM)
+if os.environ.get('BFU_GOG_AID'):                # the build (no map yet): the actor ids straight
+    GOG, GOKU = int(os.environ['BFU_GOG_AID']), int(os.environ['BFU_GOKU_AID'])
+else:
+    forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
+    aid = lambda n: struct.unpack_from('<H', R.rom, 0x800000 + 24 * forms[n] + 0x0E)[0] - 9
+    GOG, GOKU = aid('gogeta_ssj4'), aid('kid_goku_ssj4')
+BF = 106
 NS = {a: R.slots(a) for a in (GOG, GOKU, BF)}
 _c = {}
 

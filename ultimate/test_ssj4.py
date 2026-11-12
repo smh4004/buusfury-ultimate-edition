@@ -74,5 +74,49 @@ check('arms raised: fur arms, hands of skin, blue wristbands', n(up[yy.min() + 9
 # the tail is fur in his standing frames (never turned to skin by the hand rules)
 tail = n(fr(0, 0, 0)[:, 63:], FUR)
 check('his tail is fur (out past his hip, standing)', tail >= 12, 'fur %d' % tail)
+
+# --- Super Saiyan 4 Gogeta (the owner, 21:38: "Some weird clipping with Ssj4 Gogeta head and neck on side and back views especially on
+# walk frames mainly"; 22:25: "The back ones still doing it it's by a pixel or two moving slightly to the side"; 22:35: "Okay good lock it
+# for now"). gogeta_preview/fixes.py is what changed; held here to what the owner saw.
+sys.path.insert(0, HERE + '/gogeta_preview')
+import fixes
+GOG = struct.unpack_from('<H', R.rom, 0x800000 + 24 * forms['gogeta_ssj4'] + 0x0E)[0] - 9
+gs = R.slots(GOG)
+def gf(s, f, d): return R.frame(GOG, s, f, d)
+PADS = (64, 109)
+st = gf(0, 0, 1); top = int(np.nonzero(st.any(1))[0].min()); piece = st[top:top + 17]      # his head and his two rows of shoulder pads
+moved = []
+for s in (1, 2):
+    for f in range(4):
+        c = gf(s, f, 1); t = int(np.nonzero(c.any(1))[0].min())
+        if t - top not in (0, 1) or not (c[t:t + 17] == piece).all(): moved.append('%s %d' % (('walk', 'run')[s - 1], f + 1))
+check('Gogeta from behind: head and shoulder pads one piece, never a step sideways, through the walk and the run', not moved and n(piece, PADS) >= 14, '%s' % moved)
+def spots(c):
+    return [(int(y), int(x)) for y, x in np.argwhere(c == 176) if 2 <= y and x + 3 < c.shape[1] and c[y, x + 1] == 2 and c[y, x + 2] == 77
+            and c[y - 2, x + 1] == 0 and c[y - 2, x + 2] == 0 and c[y - 2, x] == 1 and c[y - 2, x + 3] == 1]
+left = ['%d.%d/%d' % (s, f, d) for s in gs for f in range(gs[s]) for d in range(3) if spots(gf(s, f, d))]
+side = gf(0, 0, 2); eye = [(int(y), int(x)) for y, x in np.argwhere(side == 176) if side[y, x + 1] == 2]
+check('Gogeta from the side: no see-through spot over his eye in any frame', not left and eye and side[eye[0][0] - 2, eye[0][1] + 1] == 1 and side[eye[0][0] - 2, eye[0][1] + 2] == 62, '%s' % left[:8])
+bare, nofist = [], []
+for key, entries in fixes.ALL.items():
+    if key[2] == 1: continue                                     # (from behind the head piece moves things; held above)
+    c, b = gf(*key), R.frame(106, *key)
+    for e in entries:
+        if not isinstance(e[0], str) or e[0] not in ('arm', 'bare', 'fist'): continue
+        r0, r1, c0, c1 = e[1]; box = np.zeros(c.shape, bool); box[r0:r1 + 1, c0:c1 + 1] = True
+        bf_skin = box & np.isin(b, SKIN + (205, 206, 207)); skin = int((bf_skin & np.isin(c, SKIN + (205, 206, 207))).sum())
+        if e[0] == 'fist' and not skin: nofist.append('%s %s' % (key, e[1]))
+        if e[0] in ('arm', 'bare') and skin: bare.append('%s %s: %d' % (key, e[1], skin))
+check('Gogeta walking and running: arms fur where they were bare', not bare, '%s' % bare[:6])
+check('Gogeta walking and running: fists skin where they were fur', not nofist, '%s' % nofist[:6])
+# his pads as the owner approved them (before: 0-6 pixels from the front and 0-4 from the side as he walked, 0 from the front as he ran).
+# Running, the arm that swings forward crosses one shoulder from the front, and from the side in the first run frame it is the
+# shoulder itself (BF draws none there): those frames show what is left of a pad.
+pads = []
+for s, d, least in ((1, 0, 6), (1, 2, 5), (2, 0, 2)):
+    for f in range(4):
+        c = gf(s, f, d); t = int(np.nonzero(c.any(1))[0].min())
+        if n(c[t + 14:t + 20], PADS) < least: pads.append('%s %d %s: %d' % (('walk', 'run')[s - 1], f + 1, ('front', '', 'side')[d], n(c[t + 14:t + 20], PADS)))
+check('Gogeta: his shoulder pads in every walk frame, front and side, and the run from the front', not pads, '%s' % pads)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

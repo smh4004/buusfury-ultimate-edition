@@ -2726,6 +2726,31 @@ def ssj4_goku(rom, actors, at):
     return ins.cur, (changed, hits[0])
 
 
+def gogeta_fix(rom, actors, at):
+    """Super Saiyan 4 Gogeta's head, neck and shoulders (the owner, Nov 11 21:38: "Some weird clipping with Ssj4 Gogeta head and neck on
+    side and back views especially on walk frames mainly"; 22:25: "The back ones still doing it it's by a pixel or two moving slightly to
+    the side"; 22:35, of the second preview: "Okay good lock it for now"). gt.py makes him from the owner's sheet as before; here every
+    frame goes through the table gogeta_preview/gogeta_table.py makes from the ROM so far (fixes.py: his idle, walk and run frames; from the
+    side the see-through spot over his eye wherever his head is). After Super Saiyan 4 Goku's touch-up, which reads Gogeta's hair.
+    -> (the end of what was written, (pictures changed, frame records through it))"""
+    sys.path.insert(0, 'ultimate/gogeta_preview')
+    import gogeta_table, ssj4_table
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]; aid = actors['gogeta_ssj4']
+    tmp = tempfile.NamedTemporaryFile(suffix='.gba', delete=False); tmp.write(rom); tmp.close()
+    try: table, changed = gogeta_table.make(tmp.name, aid, actors['kid_goku_ssj4'], OUT + '/gogeta_cache.pkl')
+    finally: os.unlink(tmp.name)
+    ins = sprites.Inserter(rom, (at + 3) & ~3); hits = [0]
+    def fn(img, view):
+        got = table.get(ssj4_table.key(img))
+        if got is None: return img
+        hits[0] += 1
+        return got
+    rec = sprites.composed_actor(ins, rom, u(ACTORS_AT + 4 * aid) - ROM_BASE, fn)
+    struct.pack_into('<I', rom, ACTORS_AT + 4 * aid, ins.put(bytes(rec)))
+    if changed < 60 or hits[0] < changed: sys.exit('Super Saiyan 4 Gogeta: the fixes found only %d pictures to change (%d records)' % (changed, hits[0]))
+    return ins.cur, (changed, hits[0])
+
+
 IDLE_MAX = 20                        # pixels: the game's own idles differ by 3 to 15 between their two frames (a breath in the chest)
 IDLE_WAITS = ()                      # (Super Saiyan 4 Goku waited here for the owner's word on his touch-up; it has his own still idle now)
 
@@ -2863,6 +2888,8 @@ def main():
         size = (actors_end + 0xFFFFF) & ~0xFFFFF
     actors_end, touched = ssj4_goku(rom, actors, actors_end)
     print('Super Saiyan 4 Goku: %d frames touched up, %d frame records through it' % touched)
+    actors_end, touched = gogeta_fix(rom, actors, actors_end)
+    print('Super Saiyan 4 Gogeta: %d pictures fixed, %d frame records through them' % touched)
     still = idle_still(rom, index)
     if still: print('idles made still (their second frame moved the head or changed pose): %s' % ', '.join('%s %s' % (n, '/'.join(v)) for n, v in still))
     import lock                                       # approved figures (locked.json): the build stops if one changed

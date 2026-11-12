@@ -4,9 +4,22 @@ frame in each view, and every form's figure the same way. Run it after any sprit
   python3 ultimate/figure_diff.py OLD.gba NEW.gba        (each with its .map.json beside it)
 A slot printed as 'k:a->b' changed from a frames to b (None: empty or not an animation)."""
 import sys, json, struct, hashlib, os
-sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), d) for d in ('', 'lib')]
-import sprites
+sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), d) for d in ('', 'lib', '../tools/scripts')]
+import numpy as np
+import goku_black
 B = 0x08000000
+def laid_out(rom, fp):
+    """A frame as the game lays it out, every piece of it, on a canvas round the actor's place (Nov 11: Super Saiyan 4 Goku's grown frames
+    have strips and a box larger than their first piece, which sprites.frame_image doesn't read)."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    o = fp - B; c = np.zeros((320, 320), np.uint8)
+    for i in range(u(o)):
+        p = o + 8 + 12 * i; x, y, w, h = struct.unpack_from('<bbBB', rom, p); img = goku_black.tiles(rom, u(p + 8) - B, w, h)
+        a1 = struct.unpack_from('<H', rom, p + 6)[0]
+        if a1 & 0x1000: img = img[:, ::-1]
+        if a1 & 0x2000: img = img[::-1]
+        m = img > 0; c[160 + y:160 + y + h, 160 + x:160 + x + w][m] = img[m]
+    return c
 def record_slots(rom, rec):
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
     out = {}
@@ -17,7 +30,7 @@ def record_slots(rom, rec):
         for k in range(u(ap - B)):
             for v in range(4):
                 fp = u(ap - B + 4 + 16 * k + 4 * v)
-                im = sprites.frame_image(rom, fp) if fp and B < fp < B + len(rom) and u(fp - B) == 1 else None
+                im = laid_out(rom, fp) if fp and B < fp < B + len(rom) and 1 <= u(fp - B) <= 8 else None
                 fr.append(hashlib.md5(im.tobytes()).hexdigest()[:8] if im is not None else hex(fp))
         out[s] = (u(ap - B), tuple(fr))
     return out

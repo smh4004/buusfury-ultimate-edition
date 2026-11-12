@@ -702,6 +702,20 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   down, last row)` in `fixes.py`; one row lower on the two contact frames, BF's own bob); the run's sideways sway is taken out below it
   (`('shift', row, columns)`), so only his arms and legs move under his shoulders. A fist that BF shows poking out beside the shoulder
   on the far arm is hidden behind the pad. From the side and the front his head keeps one column through the walk and the run already.
+  22:35, the owner, of the second preview: "Okay good lock it for now". In the build: `build.py gogeta_fix`, after Super Saiyan 4
+  Goku's touch-up (which reads Gogeta's hair), puts every frame of his figure through `sprites.composed_actor` with the table
+  `gogeta_preview/gogeta_table.py` makes from the ROM so far: each picture -> `fixed.fixed` cut back to its box (nothing grows). A
+  picture his figure uses more than once (slot 11 and 19 reuse his stance; slot 17 shows one lying frame from the front and the side)
+  is one picture, fixed the same everywhere; the build stops if two listed places of one picture disagree. The see-through spot is filled
+  wherever his side head is (45 pictures beyond slots 0-2, each checked to be the spot over his eye), 71 pictures in all. Relocked
+  (`BFU_RELOCK=gogeta_ssj4`). `test_ssj4.py` holds the ROM to it: from behind his head and pads are one piece in all eight walk and run
+  frames, no see-through spot in any frame, the arms fur and fists skin where the fixes put them, his pads in every walk frame from the
+  front and the side and in the run from the front (running, the forward arm crosses a shoulder, and from the side in the first run
+  frame it is the shoulder itself: BF draws none there); each of these fails on the build before. `figure_diff.py` between the two
+  builds: actor 357 (Gogeta) and nothing else; every one of his 294 frames is the approved fix (26 places reuse his standing picture in
+  slots 11, 12 and 19 and take its fix). To preview `fixes.py` again, use a ROM from before the fixes (`BFU_GOG_ROM`).
+  `figure_diff.py` now lays every frame out whole (it stopped on Super Saiyan 4 Goku's grown frames, whose box is larger than their
+  first piece).
   The same reading showed leftovers of the same kind in the locked Super Saiyan 4 Goku's walk and run (from the side, walk frames 2 and
   4: BF's sleeve left as a blue band on his shoulder over a bare upper arm; the run from behind and from the front: part of an arm bare).
   Not touched (the owner, 18:13: "Don't make changes to SSJ4 Goku without verifying first"): to be shown to him as its own preview.

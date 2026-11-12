@@ -1,4 +1,6 @@
-"""A frame of Super Saiyan 4 Gogeta with fixes.py's patches on it."""
+"""A frame of Super Saiyan 4 Gogeta with fixes.py's patches on it. Since Nov 11 22:35 the build does this (build.py gogeta_fix through
+gogeta_table.py), so to look at the fixes again use a ROM from before them (BFU_GOG_ROM; e.g. a build of 978966a): run on a ROM that has
+them, 'shift' and the patches would land a second time."""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(HERE, '..', 'ssj4_preview'), os.path.join(HERE, '..')]
@@ -19,8 +21,7 @@ def hole(c):
 
 def fixed(key):
     """key: (slot, frame, view) -> his frame as it would be"""
-    g = fr(GOG, *key)
-    if key[2] == 2: g = hole(g)
+    g = hole(fr(GOG, *key))           # (wherever his side head is: a frame can be used in more than one view, e.g. lying down)
     return patch.apply(g, fr(BF, *key), fixes.ALL[key]) if key in fixes.ALL else g
 
 
