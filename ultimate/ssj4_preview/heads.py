@@ -4,9 +4,10 @@ front legs missing, hit 2 is base goku still".
   - the spin from the side (16, f, 2): BF Goku's own side frame is his front frame mirrored and moved 16 pixels (every pixel the
     same), so his face shows from the side too. The sheet put a back of the head there. Now: his own front frame (with its face,
     hair and arms as fixed) mirrored and moved the same.
-  - the spin from the front: his legs curl over his head, and the sheet left holes in them where BF has their outline and
-    trousers (most in spin 3: "spin 3 front legs missing"). Now the holes are filled as the sheet colours those legs in spin 1 and
-    2 (BF's outline black, its trousers and boots in the sheet's reds and browns); nothing else in them changes.
+  - the spin from the front: his legs curl over his head; the sheet painted BF's boots and trousers there in his fur's reds and
+    left holes where BF's outline was (spin 3: "spin 3 front legs missing"; 08:10: "shoes shouldnt be red"). Now: his own boots' and
+    trousers' colours, by the colour BF -> him his feet have in every standing frame (BF's boot blue his black and dark grey, BF's
+    sole browns his greys, BF's trousers his yellows), and BF's outline black in the holes. His hair stays in front of them.
   - hit 2 from the side (9, 1, 2): the sheet left BF Goku's hair shape and painted his face in fur. Now: the head Super Saiyan 4
     Gogeta's sheet has in that frame (drawn on the same BF frame), its hair in Goku's black and greys (as his front hair, v2.G_MAP),
     its eye his gold, its eyeliner his red.
@@ -16,7 +17,7 @@ import numpy as np
 from scipy import ndimage
 
 SPIN_DX = 16
-LEG_MAP = {80: 80, 81: 81, 157: 31, 159: 32, 161: 104, 79: 31, 63: 32, 64: 1, 65: 104, 1: 1}      # as the sheet colours them in spin 1 and 2
+LEG_MAP = {80: 116, 81: 118, 157: 1, 159: 111, 161: 111, 79: 24, 63: 25, 64: 26, 65: 27, 1: 1}   # his own boots' and trousers' colours
 LEG_BF = (80, 81, 157, 159, 161, 79, 63, 64, 65)
 HAIR = (1, 111, 112); G_HAIR = (62, 31, 32, 104, 33); G_MAP = {1: 1, 62: 1, 31: 111, 32: 111, 104: 112, 33: 112}
 FACE = {16: 16, 17: 17, 200: 200, 201: 201, 202: 202, 77: 77, 78: 78, 2: 2, 158: 110, 175: 110, 176: 110, 127: 31, 129: 31}
@@ -36,7 +37,8 @@ def spin_legs(c, b):
         if np.nonzero(m.any(1))[0].min() <= top + 3: keep |= m
     near = ndimage.binary_dilation(keep, np.ones((3, 3))) & (b == 1)                 # BF's outline round them
     for y, x in zip(*np.nonzero(keep | near)):
-        if out[y, x] == 0: out[y, x] = LEG_MAP[int(b[y, x])]                            # only the holes: the rest as the sheet has it
+        if int(out[y, x]) in HAIR: continue                                           # his hair is in front of them
+        out[y, x] = LEG_MAP[int(b[y, x])]
     return out
 
 

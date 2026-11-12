@@ -791,6 +791,17 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   (v2.G_MAP), eye gold. The special's last frame (21,10, all views): the sheet left BF's hair and bare crossed arms; now its frame
   before (21,9), drawn in full by the sheet, held. Preview `everyframe.py` -> ssj4_goku_heads_and_legs.png. "Special 11 and 12"
   read as the sheet's two pictures of frame 11 (front; back and side are one picture).
+  08:10, the owner: "shoes shouldnt be red" (and the 07:59 list again; he was likely reading the sheet's top row, the preview before
+  this round). The spin's legs from the front are now his own boots' and trousers' colours (`heads.LEG_MAP`: BF's boot blues his black
+  and dark grey, BF's sole browns his light greys, BF's trousers his yellows), every leg pixel, not only the holes.
+  `ssj4_goku_FIXED_spin_hit_special_flying.png` shows only the fixed pictures (the flying frames from behind were always there).
+  08:11, the owner: "dont even touch the others just send previews of every SSJ4 form". `ssj4_preview/allforms.py` draws every frame
+  of every move in all three views, none left out and none merged (the earlier sheets showed each distinct picture once, which hid
+  repeated frames such as the flying ones from behind): a PDF page per move and a GIF of every move, for Super Saiyan 4 Goku (the
+  preview), Daima (the saved preview), Gogeta and GT Vegeta (as the game has them; the tank-top look's Super Saiyan 4 is the same
+  figure, actor 371). Nothing on Daima, Gogeta or Vegeta changed. Daima was saved on Nov 11 before today's rounds, so he still has
+  what they fixed on Goku: the spin from the side shows the back of his head, hit 2 from the side has BF's hair shape, the special's
+  last frame BF's hair and pose, and the arm fur rounds (`armfur.MOVES`, `MORE`).
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
