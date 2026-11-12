@@ -331,7 +331,7 @@ static void eeprom_write(int offset, const void *src, int len) {
     SoundResume(SOUND_OBJ);
 }
 #else
-/* A 64 KB flash save in place of the 8 KB EEPROM (a trial, Nov 12: build.py BFU_FLASH=1). Its first 8 KB hold what the EEPROM held, at the
+/* A 64 KB flash save in place of the 8 KB EEPROM (Nov 12; build.py builds it unless BFU_EEPROM=1). Its first 8 KB hold what the EEPROM held, at the
    same places and in the byte order of an emulator's EEPROM save file (each 8-byte block back to front), so an old save file is the start
    of the new one. The mirror still holds those 8 KB; a write erases each 4 KB sector it touches and programs it again from the mirror. */
 #define FLASH ((volatile u8 *)0x0E000000)
@@ -363,17 +363,30 @@ static void eeprom_write(int offset, const void *src, int len) {
     SoundResume(SOUND_OBJ);
 }
 /* The game's start-up read (0x0803FB7C): the 8 KB mirror, filled from the flash. Asking the chip its id first makes an emulator take
-   the save for a flash chip before the first read (mGBA decides by the first access). */
+   the save for a flash chip before the first read (mGBA decides by the first access). BF's EEPROM read took 3,104 scanlines in mGBA
+   (13 frames and 140 lines, about 0.22 s); the flash takes a tenth of that. Every route and every frame after
+   start-up was timed with the EEPROM's (the clean game's, the tests', the game's own counters), so the read waits out the same
+   scanlines and the game goes on at the same line of the same frame as before. The EEPROM library's type pointer is set as BF set it. */
+#define VCOUNT (*(volatile u16 *)0x04000006)
+#define EepromType ((int (*)(int))0x080407A1)
+#define BOOT_LINES 3104
+static int lines_since(int last, int *lines) { int v = VCOUNT, d = v - last; if (d < 0) d += 228; *lines += d; return v; }
 void save_init(u32 *present) {
-    int i, wc; u8 *m = Alloc(0x2000);
+    int i, wc, lines = 0, last = VCOUNT; u8 *m;
+    EepromType(0x40);
+    m = Alloc(0x2000);
     MIRROR = m;
     SoundPause(SOUND_OBJ);
     TimersStop();
     IME = 0;
     wc = WAITCNT; WAITCNT = (wc & ~3) | 3;
     flash_cmd(0x90); (void)FLASH[0]; (void)FLASH[1]; flash_cmd(0xF0);
-    for (i = 0; i < 0x2000; i++) m[i] = FLASH[i ^ 7];
+    for (i = 0; i < 0x2000; i++) {
+        m[i] = FLASH[i ^ 7];
+        if (!(i & 63)) last = lines_since(last, &lines);
+    }
     WAITCNT = wc;
+    while (lines < BOOT_LINES) last = lines_since(last, &lines);
     IME = 1;
     TimersStart();
     SoundResume(SOUND_OBJ);

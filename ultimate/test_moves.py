@@ -30,14 +30,14 @@ def setup(skills, form=None, presses=()):
     """Goku with these skills (and form), after the transformation presses (slots into `skills`); the Bomber kept away."""
     L = base + ['poke8 %08X %02X' % (R + 0x0C, len(skills))] + ['poke8 %08X %02X' % (R + 0x0D + i, s) for i, s in enumerate(skills)] + ['run 4']
     if form is not None: L += ['poke8 %08X %02X' % (R + 0x14, form)]
-    for p in presses:
-        L += ['poke8 %08X %02X' % (R + 0x15, p)] + FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in AWAY + ['run 30']]
+    for i, p in enumerate(presses):      # the first press only waits: see tools/harness/enemy_test.txt (it went while the EEPROM was writing)
+        L += ['poke8 %08X %02X' % (R + 0x15, p)] + FULL + (['keys B', 'run 2', 'keys'] if i else ['run 2']) + [v for _ in range(8) for v in AWAY + ['run 30']]
     return L
 
 PLAYER_OBJ = 0x0202CC7C            # the player's object (0x03001C34 points here in this fight): +0x50 its animation, +0x11 the frame a move's code shows
 watched = []
 def fire(name, skills, slot, form=None, presses=(0,), hold=50, after=40, level=None, extra=(), watch=False, health=9000):
-    """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in does nothing (test_build), so one goes first.
+    """Fire skills[slot] at the Bomber 40 px to the left; -> (HP it lost, form, bad jump). The first press after the walk-in only waits (setup; it was eaten while the EEPROM was writing), so one goes first.
     watch: also note (animation, frame shown) every 5 frames of the hold in `watched`.
     health: what the Bomber starts with. A move that takes it all kills him, and his health is then whatever took his place in memory
     (Nov 11: the Super Dragon Fist takes 10,690 of his 9,000, and read as a huge negative number), so such a move gets more."""

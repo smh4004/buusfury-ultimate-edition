@@ -40,9 +40,11 @@ def check(name, ok, note=''):
 def s32(v): return v - (1 << 32) if v >> 31 else v
 
 
-def fire(rom, dx, dy, player_dy, frames=70):
+def fire(rom, dx, dy, player_dy, frames=70, keep=False):
     """Put the rig's enemy dx, dy from the player and wait for its beam. -> [per frame {count, frame, facing, e, beam, params, hp}],
-    bad jump seen, the player's full health."""
+    bad jump seen, the player's full health. keep: hold the enemy at that place until the beam starts (Kid Buu: since the flash save (Nov 12)
+    the rig's enemy is up and chasing when the route ends, where the EEPROM's save kept him still until after it, and from close by he
+    fights hand to hand instead: tools/harness/enemy_test.txt)."""
     base = [l for l in open('tools/harness/enemy_test.txt').read().split('\n') if l and not l.startswith('#') and not l.startswith('mem ')
             and not l.startswith('shot ') and l not in ('tap B 20', 'run 200')]
     env = dict(os.environ); env.pop('HARNESS_SAV', None)
@@ -68,6 +70,7 @@ def fire(rom, dx, dy, player_dy, frames=70):
     full = mem(R + 0x18)[0] & 0xFFFF; beam = None; log = []
     for _ in range(1800):
         if beam is None: send('poke8 %08X %02X' % (R + 0x16, full & 255), 'poke8 %08X %02X' % (R + 0x17, full >> 8))    # (unhurt until it starts)
+        if beam is None and keep: send('poke %08X %x' % (e + 0x1A0, (px + (dx << 8)) & 0xFFFFFFFF), 'poke %08X %x' % (e + 0x1A4, (py + (dy << 8)) & 0xFFFFFFFF))
         send('run 1')
         if beam is None:
             cnt = mem(0x03001C50)[0]
@@ -137,7 +140,7 @@ t0, t1 = [struct.unpack_from('<I', rom, ball + 12 * k + 8)[0] - B for k in (0, 1
 check('nothing shows on his finger while he winds up, then a glint', not any(rom[t0:t0 + 64]) and any(rom[t1:t1 + 256]) and not set(rom[t1:t1 + 256]) & BLUES)
 
 # --- any other enemy with this beam: the game's ---------------------------------------------------------------------------------
-log, bad, full = fire(KIDBUU + NAME, 80, 0, 0)
+log, bad, full = fire(KIDBUU + NAME, 80, 0, 0, keep=True)
 out = [r for r in log if r['beam'] and r['count'] >= 10]
 check('Kid Buu: he fires', len(out) >= 10 and not bad, 'frames with it %d' % len(out))
 if out:

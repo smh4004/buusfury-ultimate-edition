@@ -871,7 +871,40 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     Delta (and VBA-M's desktop builds) read an 8 KB file as EEPROM, so the flash build sees no save there; the same file padded to 64 KB
     with 0xFF loads, a save Delta made with the EEPROM build too (it is in mGBA's layout: 12 bytes of play time, generation and checksums
     differ). Real cartridges not tested.
-  - Room: 56 KB past the first 8 KB. Not in use yet; the owner decides whether to switch.
+  - Room: 56 KB past the first 8 KB. Not in use yet.
+- Nov 12, 11:34, the owner, sending his save: "Test this save or convert if needed and lmk and then switch the game to flash save and
+  send new builds after so I can test loading a save. After that we'll implement teen Gohan".
+  - His save: 128 KB (likely Manic EMU's: gpSP's libretro core keeps 128 KB), Game 1 (Kid Buu Saga, West City, 40:00) in its first 8 KB
+    in the usual layout, the rest blank. No conversion: the flash builds read it as it is in mGBA, VBA-M's libretro core, Delta's core
+    (a 128 KB file is a 128 KB flash there, bank 0 is the game's) and gpSP, and save from it ("Game Saved") and load again.
+  - Every build is the flash save now (`build.py FLASH_SAVE`; `BFU_EEPROM=1` builds the EEPROM, which `test_flash.py` compares with).
+    `test_build.py` expects a 64 KB save; `test_slots.py`'s old 8 KB save grows to 64 KB of blank when the new build loads it.
+  - Start-up timing. The first suite on the flash builds (alltests43) failed 100 checks in 15 of its 38 tests: every route that starts a new game from the
+    title desynced. BF's EEPROM read at start-up took 3,104 scanlines in mGBA (13 frames and 140 lines, measured with the harness's `bp`
+    at 0x0803FB7C and its return 0x0803D7F0 and VCOUNT at each); the flash read took 269, so the game ran about 11 frames ahead of
+    every route, of the clean game and of the tests' recorded states. `save_init` now waits out the same scanlines (VCOUNT counted
+    through the read and after it) and sets the EEPROM library's type pointer (0x030052F8) as BF's start-up did, so the game goes on at
+    the same line of the same frame. Saving itself stays fast: BF's EEPROM writes took about 2 s per save in mGBA (the chip's busy time)
+    and none in VBA-M, so waiting them out would add a freeze in Delta that it never had.
+  - The second suite (alltests44, start-up timed) failed 43 checks in 8 tests, all in the Bomber fight of `tools/harness/enemy_test.txt`
+    (and the Wrath of the Gods rigs, which play the same route). There the third A confirms Switch Character, which saves. With the
+    EEPROM the player had no control and the Bomber stood still for 168 frames after that A (114 of them writing); with the flash
+    they come back after 54. So the route's walk (DOWN 12, LEFT 30) and each test's first press had never happened, and the tests
+    had been written around that ("the first press after the walk-in does nothing"). Checked by building the same code with
+    `BFU_EEPROM=1` and running the tests on both with the route made to wait out the save: the EEPROM build then failed the same
+    checks, so these were the tests' assumptions and not the game. Now:
+    - the route leaves the walk out and waits the same 42 frames;
+    - the first press in `test_moves.setup`, `test_build`'s `dmg`, `test_ki` and `test_tiers` only waits, where it used to be eaten;
+    - `test_loadout` takes four SELECTs round the book, since the record's sync now sees skill 14 before the test's six go in;
+    - `test_kaioken` holds the bar to half his full health, which is what `kk_start` sets (it read his health, the same while he
+      was unhurt; the Bomber can now catch him once first);
+    - `test_guests` allows a critical hit (1.5x) on either of Roshi's two Kamehamehas;
+    - `test_wrath` holds Kid Buu's figure at his place until his beam starts (up and chasing, he fought hand to hand instead);
+    - `test_flash` makes the first saves in mGBA only (the other cores play the intro on other frames) and has Delta's core load
+      and save a save it wrote itself.
+    - `test_build`'s Super Saiyan damage readings: at some waits one of the Bomber's bombs (he is up 114 frames sooner) catches Goku
+      just as he presses, and the press does nothing; such a reading is dropped and the next wait tried (`samples`), three readings
+      in the form each time, as before.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

@@ -47,7 +47,7 @@ check('debug: no bad jumps through picker and save', 'bad pc' not in o)
 a = open(d + '/a.bin', 'rb').read()
 check('debug: Broly chosen (current character 8)', a[0] == 8)
 check('debug: guest slot on form %d' % broly, a[0x4F8 + 8 * REC + FORM] == broly)
-check('debug: 8 KB save written', os.path.exists(sav) and os.path.getsize(sav) == 8192)
+check('debug: 64 KB flash save written', os.path.exists(sav) and os.path.getsize(sav) == 0x10000)
 two = ['guardon 0x09000000', 'run 600', 'tap START 60', 'tap START 60', 'tap A 90', 'tap A 120', 'shot slots', 'tap A 200', 'tap A 200', 'run 200', 'shot loaded',
        'dump b 03001068 8a8', 'keys RIGHT', 'run 30', 'keys', 'tap A 8', 'shot attack', 'hash']
 o = run(rom, two, d, sav)
@@ -274,13 +274,13 @@ print('enemy HP readings', hp)
 check('charged: no bad jumps', 'bad pc' not in o)
 check('charged: release hurts the enemy', hp[2] < hp[1])
 check('charged: stronger than the normal hit before it', hp[1] - hp[2] > hp[0] - hp[1] > 0)
-# Super Saiyan 2 hits 1.5x as hard as Super Saiyan, punches and ki. The Bomber waits out of reach during the transformations (it blows itself up near the player). The first press after the walk-in does nothing in this scene.
+# Super Saiyan 2 hits 1.5x as hard as Super Saiyan, punches and ki. The Bomber waits out of reach during the transformations (it blows itself up near the player). The first press after the walk-in only waits (it was eaten while the EEPROM was writing: tools/harness/enemy_test.txt).
 def dmg(presses, blast, wait, form=None, swap=None):
     R_ = 0x03001560; away = ['poke %s %x' % (ENEMY_X, x + (120 << 8)), 'poke %s %x' % (ENEMY_Y, y)]
     L = base + ['poke8 %08X 05' % (R_ + 0x0C)] + ['poke8 %08X %02X' % (R_ + 0x0D + i_, v_) for i_, v_ in enumerate((7, 20, 22, 35, 36))] + ['run %d' % wait]     # slots: 1 SS, 2 SS3, 3 SS2, 4 SS4
     if form is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, form)]           # another look of Goku's (GT Kid Goku) before the presses
-    for p_ in presses:
-        L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 03' % (R_ + 0x1B), 'keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in away + ['run 30']]
+    for i_, p_ in enumerate(presses):    # the first press only waits: see tools/harness/enemy_test.txt (it went while the EEPROM was writing)
+        L += ['poke8 %08X %02X' % (R_ + 0x15, p_), 'poke8 %08X FF' % (R_ + 0x1A), 'poke8 %08X 03' % (R_ + 0x1B)] + (['keys B', 'run 2', 'keys'] if i_ else ['run 2']) + [v for _ in range(8) for v in away + ['run 30']]
     if swap is not None: L += ['poke8 %08X %02X' % (R_ + 0x14, swap)]           # the form the damage scale reads, on the actor the presses loaded
     o_ = run(erom, L + ['mem %s 2' % PX], d); m_ = re.findall(r'mem %s: ([0-9a-f]+) ([0-9a-f]+)' % PX, o_)[-1]
     px, py = int(m_[0], 16), int(m_[1], 16); near = ['poke %s %x' % (ENEMY_X, px - ((40 if blast else 18) << 8)), 'poke %s %x' % (ENEMY_Y, py)]
@@ -290,16 +290,26 @@ def dmg(presses, blast, wait, form=None, swap=None):
     L += (['poke8 %08X 00' % (R_ + 0x15), 'poke8 %08X FF' % (R_ + 0x1A), 'keys B', 'run 2', 'keys'] + [v for _ in range(6) for v in near + ['run 6']] if blast else ['keys A'] + [v for _ in range(5) for v in near + ['run 2']] + ['keys'] + near + ['run 12'])
     o_ = run(erom, L + ['mem %s 1' % ENEMY_HP, 'mem %08X 1' % (R_ + 0x14)], d)
     return 9000 - int(re.findall(r'mem %s: ([0-9a-f]+)' % ENEMY_HP, o_)[-1], 16) / 1024, int(re.findall(r'mem %08x: ([0-9a-f]+)' % (R_ + 0x14), o_)[-1], 16) & 255
+def samples(presses, blast, want, form=None):
+    """Three readings at different waits, each one where the presses reached the form `want`. Since the flash save (Nov 12) the Bomber is up
+    some 110 frames sooner (tools/harness/enemy_test.txt), and at some waits one of his bombs catches Goku just as he presses, so the press
+    does nothing: such a reading is dropped and the next wait tried. A form never reached leaves readings of (0, -1), which fail."""
+    got = []
+    for w_ in (1, 4, 7, 10, 13, 16, 19):
+        v_ = dmg(presses, blast, w_, form)
+        if v_[1] == want: got.append(v_)
+        if len(got) == 3: break
+    return got + [(0, -1)] * (3 - len(got))
 for kind, blast_ in (('punch', 0), ('ki blast', 1)):
-    a_ = [dmg([1, 1], blast_, w_) for w_ in (1, 4, 7)]; b_ = [dmg([1, 1, 3], blast_, w_) for w_ in (1, 4, 7)]
+    a_ = samples([1, 1], blast_, 4); b_ = samples([1, 1, 3], blast_, forms['goku_ss2_b'])
     print(kind, 'Super Saiyan', a_, 'Super Saiyan 2', b_)
-    c_ = [dmg([1, 1, 3, 2], blast_, w_) for w_ in (1, 4, 7)]
+    c_ = samples([1, 1, 3, 2], blast_, 6)
     print(kind, 'Super Saiyan 3', c_)
     lo, hi, top = min(v for v, _ in a_), min(v for v, _ in b_), min(v for v, _ in c_)
     check('Super Saiyan 2 %s is about 1.5x Super Saiyan' % kind, all(f_ == 4 for _, f_ in a_) and all(f_ == forms['goku_ss2_b'] for _, f_ in b_) and lo > 0 and 1.3 < hi / lo < 1.7)
     check('Super Saiyan 3 %s is about 1.75x Super Saiyan' % kind, all(f_ == 6 for _, f_ in c_) and lo > 0 and (1.55 < top / lo < 1.95 or 1.55 < top / lo / 1.5 < 1.95))   # a critical hit is 1.5x again
     # GT Kid Goku: Super Saiyan, then Super Saiyan 3 pressed twice is Super Saiyan 4, 2.5x Super Saiyan's damage
-    k1 = [dmg([1, 1], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]; k4 = [dmg([1, 1, 2, 4], blast_, w_, forms['kid_goku']) for w_ in (1, 4, 7)]
+    k1 = samples([1, 1], blast_, forms['kid_goku_ssj'], forms['kid_goku']); k4 = samples([1, 1, 2, 4], blast_, forms['kid_goku_ssj4'], forms['kid_goku'])
     print(kind, 'Kid Super Saiyan', k1, 'Kid Super Saiyan 4', k4)
     lo_, s4 = min(v for v, _ in k1), min(v for v, _ in k4)
     check('Kid Goku Super Saiyan 4 %s is about 2.5x his Super Saiyan' % kind, all(f_ == forms['kid_goku_ssj'] for _, f_ in k1) and all(f_ == forms['kid_goku_ssj4'] for _, f_ in k4) and lo_ > 0 and (2.25 < s4 / lo_ < 2.75 or 2.25 < s4 / lo_ / 1.5 < 2.75))

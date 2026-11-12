@@ -29,7 +29,7 @@ def play(name, skills, form, presses, wait=240):
     """presses: skills (ids) pressed in turn, each followed by `wait` frames with the Bomber kept away. -> [(form, hp, maxhp)] after each press."""
     L = base + ['guardon 0x09000000', 'poke8 %08X %02X' % (R + 0x0C, len(skills))] + ['poke8 %08X %02X' % (R + 0x0D + i, s) for i, s in enumerate(skills)]
     L += ['run 4', 'poke8 %08X %02X' % (R + 0x14, form)]
-    L += ['poke8 %08X 00' % (R + 0x15)] + FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(6) for v in AWAY + ['run 20']]   # the first press after the walk-in does nothing
+    L += ['poke8 %08X 00' % (R + 0x15)] + FULL + ['run 2'] + [v for _ in range(6) for v in AWAY + ['run 20']]   # where the first press went while the EEPROM was writing: tools/harness/enemy_test.txt
     for k, p in enumerate(presses):
         L += ['poke8 %08X %02X' % (R + 0x15, skills.index(p))] + FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(wait // 20) for v in AWAY + ['run 20']]
         L += ['shot %s_%d' % (name, k), 'mem %08X 10' % R]

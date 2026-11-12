@@ -100,11 +100,12 @@ shot s18_walk_RIGHT
 tap A 60
 tap A 60
 tap A 60
-keys DOWN
-run 12
-keys LEFT
-run 30
-keys
+# The third A confirms Switch Character, which saves. With Buu's Fury's 8 KB EEPROM the player had no control, and the Bomber stood
+# still, for 168 frames after that A (114 of them writing, in mGBA), so the walk that stood here (DOWN 12, LEFT 30) and the first press
+# of whatever a test did next never happened: every test after this route was made with the player standing by King Kai. With the
+# 64 KB flash save (BFU, Nov 12) both come back 54 frames after the A. So the walk is left out, the route waits the same 42 frames,
+# and a test's first press after it only waits (test_moves.setup and the rest).
+run 42
 mem 0x0202e558 1
 tap B 20
 mem 0x0202e558 1

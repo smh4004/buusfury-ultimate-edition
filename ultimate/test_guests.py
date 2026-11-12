@@ -59,7 +59,8 @@ if 'roshi' in forms:
     k1, f1, b1 = T.fire('roshi_kame_max', [7, 8, 15, 45], 2, forms['roshi'], (0, 3))
     print('   Roshi: Kamehameha %.1f (form %d), in Max Power %.1f (form %d)' % (k0, f0, k1, f1))
     check('Roshi fires the Kamehameha', k0 > 0 and f0 == forms['roshi'] and not b0)
-    check('Max Power: his form goes up and the Kamehameha hits harder (Super Saiyan\'s stat boost, then 1.5x)', f1 == forms['roshi_max'] and 1.6 < k1 / k0 < 2.2 and not b1)
+    r = k1 / k0 if k0 else 0          # either hit may be a critical one (1.5x): the ratio is taken with one, the other or neither
+    check('Max Power: his form goes up and the Kamehameha hits harder (Super Saiyan\'s stat boost, then 1.5x)', f1 == forms['roshi_max'] and any(1.6 < r * c < 2.2 for c in (1, 1.5, 1 / 1.5)) and not b1)
     # his figure from the start: the form set during the intro, before the field loads the player's actor
     k = [i for i, l in enumerate(T.base) if l == 'tap A 100'][20]
     T.base[k:k] = ['poke8 %08X %02X' % (R + 0x14, forms['roshi'])]

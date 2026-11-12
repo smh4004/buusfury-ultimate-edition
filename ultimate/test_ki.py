@@ -26,8 +26,8 @@ def play(name, form, presses, after):
     """presses: skill slots pressed in turn (1 = Super Saiyan, 2 = Super Saiyan 3, 3 = Super Saiyan 4); after: script lines once they're done."""
     L = base + ['guardon 0x09000000', 'poke8 %08X 04' % (R + 0x0C), 'poke8 %08X 07' % (R + 0x0D), 'poke8 %08X 14' % (R + 0x0E), 'poke8 %08X 16' % (R + 0x0F), 'poke8 %08X 24' % (R + 0x10), 'run 4']
     L += ['poke8 %08X %02X' % (R + 0x14, form)]
-    for k, p in enumerate(presses):
-        L += ['poke8 %08X %02X' % (R + 0x15, p), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 240']
+    for k, p in enumerate(presses):      # the first press only waits: see tools/harness/enemy_test.txt (it went while the EEPROM was writing)
+        L += ['poke8 %08X %02X' % (R + 0x15, p), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B)] + (['keys B', 'run 2', 'keys'] if k else ['run 2']) + ['run 240']
     L += after
     open(D + '/%s.txt' % name, 'w').write('\n'.join(L) + '\n')
     out = subprocess.run(['tools/harness/harness', ROM, D + '/%s.txt' % name, D], capture_output=True, text=True, timeout=900).stdout
@@ -74,7 +74,7 @@ if up:
     check('the orange he had left shows past the purple as it drains', pb > 0 and ob > 0 and max(cb(PURPLE)) < max(cb(ORANGE)))
     check('then the bar is orange, with no purple', pa == 0 and oa > 20)
 check('Super Saiyan 4 powers down once the orange is gone too', fs[-1] == forms['kid_goku'] and bar('k29')[0] == 0)
-# GT Vegeta: Super Saiyan, then Super Saiyan 4 (the first press goes while the new look loads, as in test_build)
+# GT Vegeta: Super Saiyan, then Super Saiyan 4 (the first press only waits, as in test_build)
 seq, bad = play('vegeta', forms['vegeta_gt'], [1, 1], step(1, 'v_ss') + ['poke8 %08X 03' % (R + 0x15), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'keys B', 'run 2', 'keys', 'run 260'] + step(1, 'v_ss4'))
 print('   GT Vegeta (form, pool):', seq)
 p, o, y, _ = bar('v_ss')

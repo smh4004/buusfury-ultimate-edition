@@ -32,7 +32,7 @@ def words(out, addr):
 def kaioken(name, skills, presses, slot, frames, extra=(), near=False, watch_figure=False, after=()):
     """Press skills[slot] (after `presses`), then `frames` with the Bomber kept away (or left beside Goku to fight); every 30 frames read the
     record, the bar and Goku's position (and during the power-up his figure)."""
-    L = T.setup(skills, None, presses) + list(extra) + T.AWAY + ['run 2', 'poke8 %08X %02X' % (R + 0x15, slot)] + T.FULL + ['keys B', 'run 2', 'keys']
+    L = T.setup(skills, None, presses) + list(extra) + T.AWAY + ['run 2', 'poke8 %08X %02X' % (R + 0x15, slot)] + T.FULL + ['mem %08X 4' % (R + 0x14), 'keys B', 'run 2', 'keys']      # (the first reading: as the press goes in)
     if watch_figure: L += [v for _ in range(8) for v in T.AWAY + ['run 4', 'mem %08X 1' % (OBJ + 0x58)]]
     L += [v for _ in range(240 // 30) for v in T.AWAY + ['run 30']] + list(after)        # the power-up (Kaioken's takes about 160 frames)
     if near:
@@ -45,6 +45,7 @@ def kaioken(name, skills, presses, slot, frames, extra=(), near=False, watch_fig
     L += ['shot %s_end' % name]
     o = T.run(L, name)
     rec, guard, px = words(o, R + 0x14), words(o, GUARD), words(o, int(T.PX, 16))
+    kaioken.health, kaioken.max, rec = rec[0][0] >> 16, rec[0][1] & 0xFFFF, rec[1:]      # his health and full health as the press goes in
     states = [(r[0] & 255, r[0] >> 16, g[0] & 0xFFFF, g[0] >> 16 & 255, p[0] >> 8) for r, g, p in zip(rec, guard, px)]     # (form, health, bar, bar on, x)
     figs = [w[0] for w in words(o, OBJ + 0x58)] if watch_figure else []
     return states, figs, 'bad pc' in o
@@ -65,7 +66,10 @@ for who, base, ss_form, sk in (('Goku', None, None, [7, SS, KK]), ('Kid Goku', f
 s, _, bad = kaioken('kk_bar', [7, SS, KK], (0,), 2, 450, MASTERED)
 print('   mastered Kaioken, kept clear of the Bomber: (form, health, bar, on, x) %s ... %s' % (s[0], s[-1]))
 check('mastered Kaioken costs no health', s[0][0] == forms['goku_halo_kaioken'] and s[-1][1] == s[0][1] and not bad)
-check('its bar starts at half the health and pays the cost as it goes', s[0][3] == 1 and abs(s[0][2] - s[0][1] // 2) <= 3 and s[-1][2] < s[0][2])
+# (half his full health, as kk_start sets it from the record's +0x18. Until the flash save (Nov 12) he always pressed it unhurt, so the
+# check read his health; now the Bomber, up some 110 frames sooner, can catch him once before he is kept clear: enemy_test.txt)
+print('   health as Kaioken was pressed: %d of %d' % (kaioken.health, kaioken.max))
+check('its bar starts at half the health and pays the cost as it goes', s[0][3] == 1 and abs(s[0][2] - kaioken.max // 2) <= 3 and s[-1][2] < s[0][2])
 u0, _, _ = kaioken('kk_unmastered', [7, SS, KK], (0,), 2, 450)
 check('unmastered Kaioken still costs health, with no bar', u0[0][0] == forms['goku_halo_kaioken'] and u0[-1][1] < u0[0][1] and u0[0][3] == 0)
 s, _, bad = kaioken('kk_runs_out', [7, SS, KK], (0,), 2, 300, MASTERED, after=['poke %08X 00010003' % GUARD])     # bar 3, on

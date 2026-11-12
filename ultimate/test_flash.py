@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""The 64 KB flash save (a trial, Nov 12; build.py BFU_FLASH=1) across emulators: mGBA (tools/harness), VBA-M's libretro core with a
+"""The 64 KB flash save (Nov 12; every build unless BFU_EEPROM=1) across emulators: mGBA (tools/harness), VBA-M's libretro core with a
 frontend's save memory (RetroArch; likely Manic EMU's VBA-M core), Delta's VBA-M (GBADeltaCore pins VBA-M 453fa0d, Nov 2018:
 utilGBAFindSave, CPUReadBatteryFile / CPUWriteBatteryFile) and gpSP's libretro core, through tools/harness/lr_harness.py.
-  BFU_FLASH=1 BFU_SLOT_TEST=1 BFU_OUT=<flash dir> python3 ultimate/build.py --debug --zone       (and the same without BFU_FLASH: <eeprom dir>)
+  BFU_SLOT_TEST=1 BFU_OUT=<flash dir> python3 ultimate/build.py --debug --zone       (and with BFU_EEPROM=1: <eeprom dir>)
   BFU_VBAM_CORE=<vbam_libretro.so> BFU_DELTA_CORE=<.so> BFU_GPSP_CORE=<gpsp_libretro.so> python3 ultimate/test_flash.py <flash dir> <eeprom dir> [work dir]
 Cores: VBA-M's libretro core (cmake -DBUILD_LIBRETRO / ENABLE_LIBRETRO); Delta's: VBA-M 453fa0d `make -C src/libretro`, linked again
 without link.T so CPUReadBatteryFile and the rest are exported; gpSP: libretro/gpsp `make`. Needs BFU_PROTO (zone 26's maps).
-Routes are test_slots.py's: a new game, a guest swap that saves, and a reload where the bench brings the first guest back. VBA-M's
-newer core and gpSP play the new game's intro on other frames, so their saves are made from mGBA's (load, swap, save)."""
+Routes are test_slots.py's: a new game, a guest swap that saves, and a reload where the bench brings the first guest back. The other
+cores play the new game's intro on other frames (the flash build's start-up waits out mGBA's EEPROM time, which VBA-M never took),
+so their saves are made from mGBA's (load, swap, save), and Delta's core plays the new game with the EEPROM build only."""
 import json, os, shutil, struct, subprocess, sys, tempfile
 FDIR, EDIR = sys.argv[1], sys.argv[2]
 d = sys.argv[3] if len(sys.argv) > 3 else tempfile.mkdtemp(prefix='flash'); os.makedirs(d, exist_ok=True)
@@ -82,7 +83,7 @@ def saved_ok(emu, sav):
     return len(f) == SIZE[emu] and struct.unpack_from('<I', unblock(f[:0x2000]), BENCH_OFFSET)[0] == 0x32484342 and set(f[0x2000:]) == {0xFF}
 
 made = {}
-for emu in ('mgba', 'delta'):
+for emu in ('mgba',):
     sav, b, out = swap_save(emu)
     f = open(sav, 'rb').read(); raw = unblock(f)
     head = struct.unpack_from('<III', raw, BENCH_OFFSET)
@@ -99,9 +100,9 @@ for emu in ('mgba', 'vbam', 'delta', 'gpsp'):
     if emu != 'mgba':
         sav2, ok, r, i = reload('mgba', sav, '%s_back_to_mgba' % emu, 'broly', DOWN(3), 'piccolo')
         check('and that %s save in mGBA: Broly out, Piccolo back from the bench' % emu, ok)
-for emu in ('mgba', 'delta'):
-    sav, ok, r, i = reload(emu, made['delta'], 'delta_to_%s' % emu)
-    check('Delta save in %s: loads, Broly back from the bench' % emu, ok and saved_ok(emu, sav))
+for emu in ('delta',):                 # a save Delta's core wrote, back in it
+    sav, ok, r, i = reload(emu, d + '/re_mgba_to_delta.sav', 'delta_to_%s' % emu, 'broly', DOWN(3), 'piccolo')
+    check('Delta save in %s: loads (Broly out), Piccolo back from the bench' % emu, ok and saved_ok(emu, sav))
 # an old 8 KB EEPROM save (the EEPROM build, mGBA)
 old, b, out = swap_save('mgba', EE, '_eeprom')
 check('EEPROM build: an 8 KB save', len(open(old, 'rb').read()) == 0x2000 and b['form'] == forms['piccolo'])

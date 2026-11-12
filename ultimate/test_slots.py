@@ -89,7 +89,8 @@ run(two, old_sav, OLD); la = open(d + '/l.bin', 'rb').read()
 keep = d + '/k.sav'; shutil.copy(old_sav, keep)
 out = run(two, keep, newdebug); lb = open(d + '/l.bin', 'rb').read()
 check('an old save loads into the new build unchanged (the skill book apart)', 'bad pc' not in out and strip(la) == strip(lb) and lb[0] == 8)
-check('loading writes nothing', open(keep, 'rb').read() == sa)
+k = open(keep, 'rb').read()      # the new build's save is a 64 KB flash chip (Nov 12): mGBA grows an 8 KB file to 64 KB, the rest blank
+check('loading writes nothing', k[:len(sa)] == sa and set(k[len(sa):]) <= {255})
 
 # 2. Fresh variables, whatever the save held: the memory that used to overlap the save mirror.
 fresh = d + '/fresh.sav'

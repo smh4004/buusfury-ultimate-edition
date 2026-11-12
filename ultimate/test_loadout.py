@@ -21,7 +21,9 @@ L = T.setup(SIX, None, (0,)) + ['run 140', 'mem %08X 3' % (R + 0x0C)]
 o = T.run(L, 'full'); before, _ = skills(o)
 print('   six held:', before)
 check('a full fighter keeps his six; Kaioken waits in the book', before == SIX)
-M = L + ['tap START 80', 'shot pause', 'tap A 60', 'tap DOWN 60', 'shot skills'] + [v for k in range(3) for v in ['tap SELECT 40'] + (['shot swapped'] if k == 0 else []) + ['mem %08X 3' % (R + 0x0C)]]
+# Four SELECTs: since the flash save (Nov 12) the book also knows skill 14, which his record held before this test's six went in (the
+# record's sync now runs first: tools/harness/enemy_test.txt), so the way round to the ki blast is one SELECT longer.
+M = L + ['tap START 80', 'shot pause', 'tap A 60', 'tap DOWN 60', 'shot skills'] + [v for k in range(4) for v in ['tap SELECT 40'] + (['shot swapped'] if k == 0 else []) + ['mem %08X 3' % (R + 0x0C)]]
 o = T.run(M, 'swap')
 w = [l for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x0C))]
 held = [skills('\n'.join(w[:k + 1]))[0] for k in range(len(w))]          # w[0]: before the menu, then after each SELECT
@@ -29,7 +31,7 @@ print('   after each SELECT:', held[1:])
 # the book's order for Goku (build.py SKILL_BOOK): 7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, ...: the next known one not held comes in
 book = (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21)
 firsts = [h[0] for h in held[1:]]
-check('SELECT on the Skills tab swaps the highlighted skill for one from the book (Kaioken among them)', len(held) == 4 and firsts[0] not in SIX and firsts[0] in book and all(h[1:] == SIX[1:] for h in held[1:]) and 37 in firsts and 'bad pc' not in o)
+check('SELECT on the Skills tab swaps the highlighted skill for one from the book (Kaioken among them)', len(held) == 5 and firsts[0] not in SIX and firsts[0] in book and all(h[1:] == SIX[1:] for h in held[1:]) and 37 in firsts and 'bad pc' not in o)
 check('round the book and back to the ki blast', 7 in firsts)
 # The quick wheel: hold L, press a direction
 Q = T.setup([7, 15, 20, 22, 14, 19], None, (0,)) + ['run 4']
