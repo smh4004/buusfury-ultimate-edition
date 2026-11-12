@@ -6,6 +6,7 @@ Nothing here changes a figure; it only draws them.
   daima   Daima Super Saiyan 4 Goku, the preview (daimafix.fixed: the saved one with every fix Goku's preview has; in no build)
                                                     BFU_GOG_ROM=<debug build> BFU_SSJ4_ROM=<a build from before the touch-up>
   daima_saved   Daima as saved on Nov 11 (v4.frame(..., 'daima_pic'))   BFU_SSJ4_ROM=<a build from before the touch-up>
+  goku_game  Super Saiyan 4 Goku as the game has him                    BFU_GOG_ROM=<debug build>
   gogeta  Super Saiyan 4 Gogeta as the game has him                    BFU_GOG_ROM=<debug build>
   vegeta  GT Vegeta's Super Saiyan 4 as the game has him (the tank-top look's Super Saiyan 4 uses the same figure)
                                                                        BFU_GOG_ROM=<debug build>
@@ -49,6 +50,10 @@ def source(which):
         late = 'as the game has it: still BF Goku\'s own frames (not done yet)'
         return ('Super Saiyan 4 Goku', 'the preview with every fix so far (not in the game yet)', R, R.slots(a), frame,
                 {22: late, 23: late})
+    if which == 'goku_game':
+        a = aid('kid_goku_ssj4')
+        return ('Super Saiyan 4 Goku', 'as the game has him now (every fix in the build)', R, R.slots(a),
+                lambda s, f, d: R.frame(a, s, f, d), {22: "still BF Goku's own frames (not done yet)", 23: "still BF Goku's own frames (not done yet)"})
     if which == 'gogeta':
         a = aid('gogeta_ssj4')
         return ('Super Saiyan 4 Gogeta', 'as the game has him now: nothing changed', R, R.slots(a),
