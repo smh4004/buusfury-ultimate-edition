@@ -6,8 +6,10 @@ hair (moved for the frame's motion), and his own face on top. No pixel inside th
 import sys, math
 sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
 from lib4 import *
-# a built ROM with him in it (actor ids as in the Nov 11 ROMs: Super Saiyan 4 Goku 356, Super Saiyan 4 Gogeta 357)
-R=Rom(__import__('os').environ.get('BFU_SSJ4_ROM', 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba')); AID, GOG = 356, 357
+# a ROM with him in it as gt.py makes him, and the actors he and Super Saiyan 4 Gogeta are in it (the build sets these: ssj4_table.make;
+# by hand the defaults are the Nov 11 ROMs' ids. A ROM built since his touch-up went in already has it: the tool wants one from before)
+R=Rom(__import__('os').environ.get('BFU_SSJ4_ROM', 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba'))
+AID, GOG = int(__import__('os').environ.get('BFU_SSJ4_AID', 356)), int(__import__('os').environ.get('BFU_SSJ4_GOG', 357))
 HAIR=(1,111,112); G_HAIR=(62,31,32,104,33)
 ROWS, FULL_ROWS = 15, 18
 def stance_head(aid, v, rows, width=None):

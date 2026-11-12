@@ -1,13 +1,13 @@
 {
- "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose).",
+ "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose). Nov 11 21:01: Super Saiyan 4 Goku after his touch-up (\"Lock that Goku for now\").",
  "forms": {
   "vegeta_gt": "f5e8460b5199f3127d36c931f379b38d7946c04f",
   "vegeta_gt_tank": "ddf2ed9ce3795f6ceb6ddd8a92f472b50f43679d",
   "vegeta_gt_mustache": "321c60e6eea981eac7dfa9c8b0be9b13c90ac301",
   "vegeta_gt_ssj": "821380851155894aaa2c40cdb467c2a4aa5af70c",
   "vegeta_gt_tank_ssj": "d6cadb7cfd6cf7a0e40dc62f94981431292f9aea",
-  "vegeta_gt_ssj4": "8a69b77fc0ba0e7a3248ceb767d8677aa7ef9f39",
-  "vegeta_gt_tank_ssj4": "8a69b77fc0ba0e7a3248ceb767d8677aa7ef9f39",
+  "vegeta_gt_ssj4": "318323c780d71784515889228804737a6c7b60b5",
+  "vegeta_gt_tank_ssj4": "318323c780d71784515889228804737a6c7b60b5",
   "broly_fp": "27ed2f0c81780d6259df2591b890035d181f1504",
   "vegeta_armor": "a1c591ba443882f7a71cf6591fb8955a6060dfb0",
   "vegeta_armor_ss": "c8f1fdfd5cd183132654528a11c3fb9b7dba2445",
@@ -21,6 +21,7 @@
   "vegeta_ssb_b": "fe3e63e74548c0a74de2fce0df17436e53afe6ab",
   "gogeta_ssb": "c90fd69d9ec829e0a7406a89550a067142db4979",
   "roshi": "4fd970a3d0414b355b914c8f3acc599293dd19cc",
-  "roshi_max": "4fd970a3d0414b355b914c8f3acc599293dd19cc"
+  "roshi_max": "4fd970a3d0414b355b914c8f3acc599293dd19cc",
+  "kid_goku_ssj4": "f93155ce7b917b0b3297fc41f9d57894d44ddd34"
  }
 }

@@ -18,10 +18,10 @@ def cell(c,flip=False):
     im=R.rgb(c[BOX[0]:BOX[1],BOX[2]:BOX[3]]); return im[:,::-1] if flip else im
 def big(im,z): return Image.fromarray(im).resize((im.shape[1]*z,im.shape[0]*z),Image.NEAREST)
 n=R.slots(AID); CH=BOX[1]-BOX[0]; CW=BOX[3]-BOX[2]
-NAMES=(('now','as he is now'),('mix','new'),('daima','Daima A (reds)'),('daima_pic','Daima B (plum)'))
+NAMES=(('now','as he is now'),('mix','new'),('daima_pic','Daima'))      # (the owner, Nov 11 20:53: "use B plum for daima")
 Z=6; rows=[]; texts=[]
 for k,(kind,name) in enumerate(NAMES):
-    cells=[cell(fr(0,0,d,kind)) for d in (0,2,1)]+[cell(fr(18,3,0,kind)),cell(fr(2,1,0,kind)),cell(fr(2,1,2,kind))]
+    cells=[cell(fr(0,0,d,kind)) for d in (0,2,1)]+[cell(fr(18,3,0,kind)),cell(fr(13,1,0,kind)),cell(fr(2,1,2,kind))]
     rows.append(np.concatenate(cells,1)); texts.append((6,k*CH*Z+4,name))
 img=big(np.concatenate(rows,0),Z); dr=ImageDraw.Draw(img)
 for x,y,t in texts: dr.text((x,y),t,fill=(255,255,255),font=F)
@@ -73,14 +73,16 @@ walkrun=[(1,f) for f in range(n[1])]*2+[(2,f) for f in range(n[2])]*2
 blast=[(0,0)]*2+[(3,f) for f in range(n[3])]+[(3,n[3]-1)]*2+[(0,0)]*2+[(18,f) for f in range(n[18])]+[(18,n[18]-2),(18,n[18]-1)]*2+[(0,0)]*2
 combo=[(0,0)]+[(s,f) for s in (4,5,6) for f in range(n[s])]+[(0,0)]
 kame=[(0,0)]*2+[(18,f) for f in range(n[18])]+[(18,n[18]-2),(18,n[18]-1)]*3+[(0,0)]*2
-gif('ssj4_goku_kamehameha_front_now_and_new.gif',[[('now',0,False),('mix',0,False),('daima',0,False)]],kame,ms=150,z=6,labels=[((2,1),'now'),((CW+2,1),'new'),((2*CW+2,1),'Daima A')])
+gif('ssj4_goku_kamehameha_front_now_and_new.gif',[[('now',0,False),('mix',0,False),('daima_pic',0,False)]],kame,ms=150,z=6,labels=[((2,1),'now'),((CW+2,1),'new'),((2*CW+2,1),'Daima')])
+power=[(0,0)]*2+[(13,0)]*3+[(13,1)]*4+[(13,0)]*2+[(0,0)]*2
+gif('ssj4_goku_arms_raised_now_new_and_daima.gif',[[('now',0,False),('mix',0,False),('daima_pic',0,False)]],power,ms=160,z=6,labels=[((2,1),'now'),((CW+2,1),'new'),((2*CW+2,1),'Daima')])
 gif('ssj4_goku_new_walk_and_run.gif',[three('mix')],walkrun,labels=FSB)
 gif('ssj4_goku_new_ki_blast_and_kamehameha.gif',[three('mix')],blast,ms=140,labels=FSB)
 gif('ssj4_goku_new_combo.gif',[three('mix')],combo,ms=140,labels=FSB)
-DL=[((2,1),'Daima A'),((2,CH+1),'Daima B')]
-gif('ssj4_goku_daima_walk_and_run.gif',[three('daima'),three('daima_pic')],walkrun,z=4,labels=DL)
-gif('ssj4_goku_daima_ki_blast_and_kamehameha.gif',[three('daima'),three('daima_pic')],blast,ms=140,z=4,labels=DL)
-gif('ssj4_goku_daima_combo.gif',[three('daima'),three('daima_pic')],combo,ms=140,z=4,labels=DL)
+DL=FSB
+gif('ssj4_goku_daima_walk_and_run.gif',[three('daima_pic')],walkrun,labels=DL)
+gif('ssj4_goku_daima_ki_blast_and_kamehameha.gif',[three('daima_pic')],blast,ms=140,labels=DL)
+gif('ssj4_goku_daima_combo.gif',[three('daima_pic')],combo,ms=140,labels=DL)
 def strip(kind,d,name,z=3,per=11):
     lines=[]; cur=[]
     for s,k in n.items():
@@ -93,6 +95,6 @@ def strip(kind,d,name,z=3,per=11):
     w=max(len(x) for x in lines); blank=np.zeros_like(lines[0][0]); blank[:]=BG
     im=np.concatenate([np.concatenate(x+[blank]*(w-len(x)),1) for x in lines],0)
     big(im,z).save(out+'/'+name)
-for kind,nm in (('mix','new'),('daima','daima_a'),('daima_pic','daima_b')):
+for kind,nm in (('mix','new'),('daima_pic','daima')):
     for d,v in ((0,'front'),(2,'side'),(1,'back')): strip(kind,d,'ssj4_goku_%s_every_%s_frame.png'%(nm,v))
 print(sorted(os.listdir(out)))

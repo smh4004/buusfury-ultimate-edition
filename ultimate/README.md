@@ -623,16 +623,15 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   the ROM), its tiles hold the light yellows and none of the blues, the pose is held, it hits the player in line, no bad jump; and
   Kid Buu's figure on the same row fires the game's beam from the game's place with the game's frames. Before/after GIFs of all
   four facings went to the owner at 20:40; his word on the look is awaited.
-- Nov 11, evening: Super Saiyan 4 Goku's touch-up, previews only (the owner, 18:13: "Don't make changes to SSJ4 Goku without
-  verifying first"). `ultimate/ssj4_preview/preview.py OUTDIR` makes the pictures of the fourth look from a built ROM (the figure is
-  `v4.frame(slot, frame, view, kind)`); nothing of it is in `gt.py` or a ROM yet. What it holds, with the words that asked for it:
+- Nov 11, evening: Super Saiyan 4 Goku's touch-up, as previews first (the owner, 18:13: "Don't make changes to SSJ4 Goku without
+  verifying first"; approved at 21:01, see below). `ultimate/ssj4_preview/preview.py OUTDIR` makes the pictures of the fourth look from
+  a ROM built before it (the figure is `v4.frame(slot, frame, view, kind)`). What it holds, with the words that asked for it:
   - 18:44 "use the new Gogeta hair for the front view of SSJ4 Goku only, and leave the side and back views as the original";
     20:10-20:12 "I don't want that gray strands in the front just the same colors as current"; "just the Gogeta front view hair for
     both appropriately colored". The front head's hair is Super Saiyan 4 Gogeta's shape (rows 0-13, then strands: `v4.front_hair`),
     in black and the one dark grey his hair has now. A hand raised beside his head stays in front of the wider hair (`v4.uncovered`).
   - 19:17 "Stop with this head bob on the idle stuff": his second idle frame was the first with its top 16 rows a pixel to the left
-    (the sheet's); the two are one frame. The same is true of `trunks_gt`, `trunks_gt_ssj` and `majuub` in the build (still to fix,
-    with a test).
+    (the sheet's); the two are one frame. (Every other figure's idle: see "the idles" below.)
   - 19:17, 19:29, 19:31, 19:33: "you managed to mess up the fur on the hands and arms"; "make sure the fur is always on his full
     arms in every frame and only his hands without it"; "Do this check for both SSJ4 Goku and Daima SSJ4"; "Don't take fur off the
     tail either". The sheet was drawn on BF Goku's frames, so BF Goku's own frame says what is what: sleeve, arm, wristband, hand.
@@ -650,8 +649,36 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     eyes the color to match the hair and eyebrows and then fix his boots color so they actually look right with the blue and the
     red stripe in all frames"): two colourings, A (reds) and B (his picture's plum), his choice awaited; boots are BF Goku's own
     where the frames agree and the sheet's own boot elsewhere (`v4.boots`), blue with a red lace in every frame.
-  - Asked of the owner and open: Daima A or B; whether the GT form's leg, painted boot-black from the thigh down in about ten frames
-    (the sheet's), should be trousers as on Daima.
+  - Asked of the owner and open: whether the GT form's leg, painted boot-black from the thigh down in about ten frames (the sheet's),
+    should be trousers as on Daima. (Daima: B, the plum, 20:53.)
+- Nov 11, 20:53-21:02, the owner on the fourth look: "Fix the arms raised pose for Goku ssj4 on both where his base form hair is on the
+  sides while his ssj4 is in the center. Also use B plum for daima"; "The rest of Goku frames look good on pass"; then "Lock that Goku
+  for now and show me ssj4 Gogeta again after"; "Daima ssj4 can be a post game unlock for now just save it".
+  - The arms-raised pose (the power-up's second frame, slot 13 frame 1; BF's faces the camera in all three views): the sheet had kept
+    BF Goku's whole head (black spikes out past both arms, his shouting face) and furred three columns of four on each arm.
+    `v4.arms_up`: BF's head comes off, Super Saiyan 4's front head goes on where BF's eyes are (two rows higher than standing), its hair
+    behind the raised arms and fists, the arms fur all the way.
+  - In the build since then. `gt.py` makes him from the sheet as before; `build.py ssj4_goku` then puts every frame of that figure
+    through `sprites.composed_actor` with the table `ssj4_preview/ssj4_table.py` makes from the ROM so far (the frame's pixels on its
+    own box -> `v4.frame(slot, frame, view, 'mix')`): 146 frames change, 39 outgrow their 32x32 piece by up to 3 rows or 2 columns
+    (the wider, taller hair) and get strips, as Beerus's taller frames do. A frame the figure has twice is touched up as its first
+    place in the figure, slot by slot (the special's frames 4 and 5 are the change's 6 and 7: `armhand.py` lists them under both).
+    Slots 22 and up (the charged punch, still BF Goku's own frames: to fix next) are left. The preview tool reads a ROM from before
+    the touch-up (`BFU_SSJ4_ROM`; the Nov 11 night delivery is one).
+  - `kid_goku_ssj4` is in `locked.json`. `test_ssj4.py ROM` (14 checks, no emulator) holds a built ROM to it: his idle still, the
+    front hair's shape and its two colours, gold eyes, no stray pixel behind, every listed hand skin and every listed arm fur, no
+    sleeve left blue, the Kamehameha from the front, the arms-raised pose, his tail fur. `test_frames.py` reads frames of several
+    pieces whole now (`whole`), since his have strips.
+  - Daima's Super Saiyan 4 (plum, his choice of the two) is kept in `ssj4_preview` (`v4.frame(..., 'daima_pic')`, with its boots)
+    for a post-game unlock later; it is in no build.
+- Nov 11, the idles (the owner, 19:17, of Super Saiyan 4 Goku: "Stop with this head bob on the idle stuff how are we doing this
+  again"). The game's own figures breathe: their two idle frames differ by 3 to 15 pixels of the chest. Seven more figures moved
+  their head or changed pose (GT Trunks and his Super Saiyan, Majuub, Gohan in armor's Super Saiyan 2: the head a pixel to one side;
+  GT Vegeta's Super Saiyan 4 from the side; DBS Gogeta and his Super Saiyan: a second frame with his eyes closed, and a walk frame
+  from behind). A rule so it cannot come back with the next figure: `build.py idle_still` makes any playable form's new actor whose
+  two idle frames differ by more than 20 pixels in a view show its first frame for both (a pointer, nothing redrawn), and
+  `test_frames.py` check 16 fails a ROM where any form's do. The owner was shown all seven now and still (`idle_now_and_still.gif`,
+  20:50) with the plan; `vegeta_gt_ssj4` and `vegeta_gt_tank_ssj4` were relocked for it.
 - Nov 11, noted for after this (the owner, 19:26 and 19:49): Super Saiyan God Goku's eyes match his red hair; Super Saiyan Blue Goku,
   Vegeta and Gogeta: eyebrows and pupils match their hair, a light cyan glowing aura and Super Saiyan 2's bolts toned down in Blue's
   colour; and, after everything, test all postgame content: every enemy must fight and be a challenge, never wait to be hit.

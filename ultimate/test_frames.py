@@ -9,7 +9,7 @@
    and boot soles left a green tuft and grey specks there). No dark purple specks (Goten's sleeve flicker) in either.
 3-5. Feet on the ground, no shadow under either Broly, Super Garlic Jr. 6. GT Vegeta's change and Final Flash frames. 7. Super Saiyan Blue's hair.
 8. Super Saiyan 4 Kid Goku's hands on the 10x Kamehameha. 9. Super Saiyan 4 Vegeta's Final Shine wind-up. (7 also: Blue Goku's and Blue
-Vegeta's faces stay Super Saiyan's.) 15. Super Saiyan 3 Goku's Dragon Fist Explosion pose."""
+Vegeta's faces stay Super Saiyan's.) 15. Super Saiyan 3 Goku's Dragon Fist Explosion pose. 16. No idle moves its head."""
 import json, struct, sys, os
 import numpy as np
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')]
@@ -33,6 +33,21 @@ def anim(actor, slot):
     return [[u(a + 4 + 16 * i + 4 * d) for d in range(3)] for i in range(n)]
 def image(fp):
     return sprites.frame_image(rom, fp) if fp and u(fp - BASE) == 1 else None
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import goku_black
+def canvas(fp):
+    """A frame as the game lays it out, all its pieces, on a canvas round the actor's origin."""
+    o = fp - BASE; c = np.zeros((128, 128), np.uint8)
+    for i in range(u(o)):
+        p = o + 8 + 12 * i; x, y, w, h = struct.unpack_from('<bbBB', rom, p); img = goku_black.tiles(rom, u(p + 8) - BASE, w, h)
+        a1 = struct.unpack_from('<H', rom, p + 6)[0]
+        if a1 & 0x1000: img = img[:, ::-1]
+        if a1 & 0x2000: img = img[::-1]
+        m = img > 0; c[64 + y:64 + y + h, 64 + x:64 + x + w][m] = img[m]
+    return c
+def whole(fp):
+    """A frame's pixels whatever its pieces: its one piece, or all of them laid out (Super Saiyan 4 Goku's taller frames have strips)."""
+    return sprites.frame_image(rom, fp) if u(fp - BASE) == 1 else canvas(fp)
 
 # 1. slot 18 of every added actor: per view, new frames in order, then only the last one repeated (never back to an earlier frame)
 n_actors, bad = 0, []
@@ -414,7 +429,7 @@ outfits1 = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)
 costume = []
 for o in outfits1:
     f = o['form'] if isinstance(o['form'], int) else forms[o['form']]; a = actor_of(f); sl = slots_of(a)
-    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None    # by its pixels: a copy is the same pose
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(whole(fp)) if fp else None    # by its pixels: a copy is the same pose
     moves = {look(fr[2]) for m in (3, 4, 5, 18, 31) if m in sl for fr in all_views(a, m)}
     if 19 not in sl or {look(fr[2]) for fr in all_views(a, 19)} & moves: costume.append(o['form'])
 check('every Gohan outfit changes into Great Saiyaman with a costume change, not a move%s' % ((': %s' % costume) if costume else ''), not costume)
@@ -429,10 +444,10 @@ for n in S19:
     if n not in forms: continue
     a = actor_of(forms[n]); sl = slots_of(a)
     if 19 not in sl: still.append(n); continue
-    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(whole(fp)) if fp else None
     rest = {look(fr[2]) for m in (0, 1) if m in sl for fr in all_views(a, m)}
     v19 = [look(fr[2]) for fr in all_views(a, 19)]; held = v19[2:4]
-    vanish = any(fr[2] and sprites.frame_image(rom, fr[2]) is not None and (sprites.frame_image(rom, fr[2]) > 0).sum() < 60 for fr in all_views(a, 19)[:4])
+    vanish = any(fr[2] and whole(fr[2]) is not None and (whole(fr[2]) > 0).sum() < 60 for fr in all_views(a, 19)[:4])
     spread = held[0] == v19[0] and n not in ('super13', 'super_janemba')   # frame 2 the same as 0: spread out (those two on purpose)
     if len(held) < 2 or any(h in rest for h in held) or spread or vanish: still.append(n)
 
@@ -456,7 +471,7 @@ check('Kid Buu and Majin Buu fire the Kamehameha from their ki blast\'s pose%s' 
 guards, loops = [], []
 for n, f in playable:
     a = actor_of(f); sl = slots_of(a)
-    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(whole(fp)) if fp else None
     def looks(slot): return {tuple(look(v) for v in fr[:3]) for fr in all_views(a, slot)} if (slot in sl or (slot in (29, 31) and anim(a, slot))) else set()
     guard = looks(7) - looks(0) - looks(3) - looks(4)
     if guard and any(looks(m) & guard for m in (3, 18, 19, 29, 31)): guards.append(n)
@@ -474,7 +489,7 @@ for n, f in sorted(forms.items(), key=lambda x: x[1]):
     row = rom[0x800000 + 24 * f:0x800000 + 24 * f + 24]; up = row[0x16]
     if not (row[0] & 1) or up == 255 or not inv.get(up, '').endswith(('_ss2', '_ss2_b')) or n == 'gohan_armor_ss': continue
     a = actor_of(f); sl = slots_of(a); ch = 30 if anim(a, 30) else 10           # (slots_of leaves out 25-30)
-    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+    look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(whole(fp)) if fp else None
     if (ch == 10 and 10 not in sl) or 13 not in sl: again.append(n); continue
     if look(all_views(a, ch)[0][0]) != look(all_views(a, 13)[0][0]): again.append(n)
 check('Super Saiyan into 2 is a power-up, not the change from base again%s' % ((': %s' % again) if again else ''), not again)
@@ -506,13 +521,31 @@ for f in range(0, 160):
     p29 = anim(a, 29)
     if f in ss3:
         ki, st = all_views(a, 3), all_views(a, 0); p = all_views(a, 29) if p29 else []
-        look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(sprites.frame_image(rom, fp)) if fp else None
+        look = lambda fp: (lambda im: im.tobytes() if im is not None else fp)(whole(fp)) if fp else None
         guard = {look(v) for fr in all_views(a, 7) for v in fr[:3]} - {look(v) for m in (0, 3, 4) for fr in all_views(a, m) for v in fr[:3]}
         if len(p) != 4 or p[0] != st[0] or p[1] != ki[0] or p[2] != ki[2] or p[3] != ki[2]: fist.append('form %d: pose' % f)
         elif any(look(v) in guard for fr in p for v in fr[:3]): fist.append('form %d: a guard frame' % f)
-        elif any(v and sprites.frame_image(rom, v) is not None and (sprites.frame_image(rom, v) > 0).sum() < 60 for fr in p for v in fr[:3]): fist.append('form %d: vanishes' % f)
+        elif any(v and whole(v) is not None and (whole(v) > 0).sum() < 60 for fr in p for v in fr[:3]): fist.append('form %d: vanishes' % f)
     elif p29 and row[0x0C] == 0: fist.append('form %d has the pose' % f)
 check('Super Saiyan 3 Goku\'s Dragon Fist Explosion has its own pose (stance, wind-up, the arm held out), no other Goku%s' % ((': %s' % fist) if fist else ''), not fist and len(ss3) >= 4)
+
+# 16. Idles (Nov 11, the owner: "Stop with this head bob on the idle stuff how are we doing this again"). The game's own figures breathe:
+# their two idle frames differ by 3 to 15 pixels of the chest. No playable form's two idle frames may differ by more than that in any
+# view (a head a pixel to one side, another pose): build.py idle_still makes such an idle show its first frame for both (Super Saiyan 4
+# Goku's is still by his touch-up, ssj4_preview).
+IDLE_MAX = 20
+named = {v: k for k, v in forms.items()}; bob = []; breathe = 0; looked = 0
+for f in range(max(forms.values()) + 1):
+    who = actor_of(f)
+    if not 0 <= who < 2000 or not BASE < u(LIST + 4 * who) < BASE + len(rom): continue      # (a form number with no figure)
+    a = anim(who, 0)
+    if not a or len(a) < 2: continue
+    looked += 1
+    for v in range(3):
+        if a[0][v] and a[1][v] and a[0][v] != a[1][v]:
+            d = int((canvas(a[0][v]) != canvas(a[1][v])).sum()); breathe = max(breathe, d if d <= IDLE_MAX else 0)
+            if d > IDLE_MAX: bob.append('%s %s: %d pixels' % (named.get(f, 'form %d' % f), ('front', 'back', 'side')[v], d))
+check('no idle moves its head or changes pose between its two frames (%d forms; the most any differs is %d pixels)%s' % (looked, breathe, (': %s' % bob[:8]) if bob else ''), not bob and looked >= 100)
 
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

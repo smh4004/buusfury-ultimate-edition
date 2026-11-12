@@ -2703,6 +2703,74 @@ def patch_slot_read(rom, sym):
         rom[i:i + 4] = thumb_bl(i, VENEER)
 
 
+def ssj4_goku(rom, actors, at):
+    """Super Saiyan 4 Goku's touch-up (the owner, Nov 11 21:01, on its fourth look: "Lock that Goku for now"): Gogeta's hair shape on his
+    front head in his own hair colours, hands of skin and arms of fur in every frame, his idle still, the arms-raised pose with his own
+    head, gold eyes. gt.py makes him from the sheet as before; here every frame of that figure goes through the table that
+    ssj4_preview/ssj4_table.py makes from the ROM so far (README, Nov 11 evening). -> (the end of what was written, (frames, records))"""
+    sys.path.insert(0, 'ultimate/ssj4_preview')
+    import ssj4_table
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]; aid = actors['kid_goku_ssj4']
+    tmp = tempfile.NamedTemporaryFile(suffix='.gba', delete=False); tmp.write(rom); tmp.close()
+    try: table, changed = ssj4_table.make(tmp.name, aid, actors['gogeta_ssj4'], OUT + '/ssj4_cache.pkl')
+    finally: os.unlink(tmp.name)
+    ins = sprites.Inserter(rom, (at + 3) & ~3); hits = [0]
+    def fn(img, view):
+        got = table.get(ssj4_table.key(img))
+        if got is None: return img
+        hits[0] += 1
+        return got
+    rec = sprites.composed_actor(ins, rom, u(ACTORS_AT + 4 * aid) - ROM_BASE, fn)
+    struct.pack_into('<I', rom, ACTORS_AT + 4 * aid, ins.put(bytes(rec)))
+    if changed < 100 or not hits[0]: sys.exit('Super Saiyan 4 Goku: the touch-up found only %d frames to change (%d records)' % (changed, hits[0]))
+    return ins.cur, (changed, hits[0])
+
+
+IDLE_MAX = 20                        # pixels: the game's own idles differ by 3 to 15 between their two frames (a breath in the chest)
+IDLE_WAITS = ()                      # (Super Saiyan 4 Goku waited here for the owner's word on his touch-up; it has his own still idle now)
+
+
+def frame_canvas(rom, fp, size=128, origin=64):
+    """A frame as the game lays it out, on a canvas round the actor's origin."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    o = fp - ROM_BASE; c = np.zeros((size, size), np.uint8)
+    for i in range(u(o)):
+        p = o + 8 + 12 * i; x, y, w, h = struct.unpack_from('<bbBB', rom, p); img = goku_black.tiles(rom, u(p + 8) - ROM_BASE, w, h)
+        a1 = struct.unpack_from('<H', rom, p + 6)[0]
+        if a1 & 0x1000: img = img[:, ::-1]
+        if a1 & 0x2000: img = img[::-1]
+        m = img > 0; c[origin + y:origin + y + h, origin + x:origin + x + w][m] = img[m]
+    return c
+
+
+def idle_still(rom, index):
+    """The owner, Nov 11 19:17: "Stop with this head bob on the idle stuff how are we doing this again". The game's own figures breathe:
+    their two idle frames differ by a few pixels of the chest. Some of the sheets' figures have a second idle frame with the head a pixel
+    to one side, or another pose altogether (Gogeta's: eyes closed, and a walk frame from behind), which reads as a twitch. A rule, so
+    it cannot come back with the next figure: any playable form's new actor whose two idle frames differ by more than IDLE_MAX pixels
+    in a view shows its first idle frame for both in that view (the second frame's pointer becomes the first's; nothing is redrawn).
+    -> [(form, [views])]. test_frames.py holds every form to it."""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    names = {f: n for n, f in index.items()}; seen = set(); done = []
+    for f in range(max(index.values()) + 1):
+        actor = struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] - 9
+        if actor < ACTOR_BASE or actor in seen or names.get(f) in IDLE_WAITS: continue
+        seen.add(actor)
+        ptr = u(ACTORS_AT + 4 * actor)
+        if not ROM_BASE < ptr < ROM_BASE + len(rom): continue
+        rec = ptr - ROM_BASE; ap = u(rec + 0x54)
+        if not ap or u(ap - ROM_BASE) < 2: continue
+        a = ap - ROM_BASE; views = []
+        if a < SPACE: continue                                    # (an animation of the game's own, shared with its actor)
+        for v in range(4):
+            f0, f1 = u(a + 4 + 4 * v), u(a + 4 + 16 + 4 * v)
+            if not f0 or not f1 or f0 == f1: continue
+            if int((frame_canvas(rom, f0) != frame_canvas(rom, f1)).sum()) > IDLE_MAX:
+                struct.pack_into('<I', rom, a + 4 + 16 + 4 * v, f0); views.append(('front', 'back', 'left', 'right')[v])
+        if views: done.append((names.get(f, 'form %d' % f), views))
+    return done
+
+
 def main():
     debug = '--debug' in sys.argv
     clean = open('baserom.gba', 'rb').read()
@@ -2793,6 +2861,10 @@ def main():
         size = rom32.SIZE
     else:
         size = (actors_end + 0xFFFFF) & ~0xFFFFF
+    actors_end, touched = ssj4_goku(rom, actors, actors_end)
+    print('Super Saiyan 4 Goku: %d frames touched up, %d frame records through it' % touched)
+    still = idle_still(rom, index)
+    if still: print('idles made still (their second frame moved the head or changed pose): %s' % ', '.join('%s %s' % (n, '/'.join(v)) for n, v in still))
     import lock                                       # approved figures (locked.json): the build stops if one changed
     lock.check(rom, index, lambda f: struct.unpack_from('<I', rom, ACTORS_AT + 4 * (struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] - 9))[0] - ROM_BASE)
     out = bytes(rom[:size])

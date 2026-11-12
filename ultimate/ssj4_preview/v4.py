@@ -155,15 +155,56 @@ def uncovered(out, c0, loc):
     return res
 
 
+ARMS_UP = (13, 1)            # the power-up's second frame: his arms raised, fists beside his head
+def arms_up():
+    """The owner, Nov 11 20:53: "Fix the arms raised pose for Goku ssj4 on both where his base form hair is on the sides while his ssj4
+    is in the center". The sheet kept BF Goku's whole head there (his black spikes out past both arms, his shouting face) and gave
+    his arms fur on three columns of four. BF's frame faces the camera in all three views, and so does this.
+    BF's head (his hair, and his face between the arms) comes off; Super Saiyan 4's front head goes on where BF's eyes are (two rows
+    higher than standing), its hair behind the raised arms and fists; the arms' leftover skin columns turn to fur, the wristband's
+    one skin pixel to its blue. -> (frame, where the head is, which pixels are the new hair)"""
+    c = R.frame(AID, *ARMS_UP, 0).copy(); b = R.frame(106, *ARMS_UP, 0); H, W = c.shape
+    stand = v2.locate(R.frame(AID, 0, 0, 0)); eyes = lambda a: np.nonzero((a == 2).any(1))[0].min()
+    x, y = int(stand[1]), int(stand[2]) + int(eyes(b)) - int(eyes(R.frame(106, 0, 0, 0)))
+    t = FULL[0]; hair = v2.NEW[0]; dx, dy = v2.G_OFF[0]
+    face = (t > 0) & ~OLD[0]; face[ROWS:] = False
+    face[ROWS:, 7:16] = t[ROWS:, 7:16] > 0                           # his chin and neck; not the template's shoulders (his arms are up)
+    gone = np.zeros(c.shape, bool); gone[:y + 18] = b[:y + 18] == 1   # BF's hair, eyebrows and pupils
+    wx = np.nonzero((b == 2).any(0))[0]; f0, f1 = int(wx.min()) - 1, int(wx.max()) + 1          # BF's face: between his arms, by the whites of his eyes
+    gone[y + 8:y + 17, f0:f1] |= b[y + 8:y + 17, f0:f1] > 0
+    gone &= ~np.isin(b, list(gt.BF_BAND))
+    arm = np.zeros(c.shape, bool)                                    # his arms from the wristbands down to his shoulders: BF's skin outside his face
+    arm[y + 8:y + 17] = np.isin(b[y + 8:y + 17], list(gt.BF_SKIN)) & ~gone[y + 8:y + 17]
+    out = c.copy(); out[gone] = 0
+    for yy, xx in zip(*np.nonzero(hair)):
+        Y, X = y + dy + yy, x + dx + xx
+        if 0 <= Y < H and 0 <= X < W and out[Y, X] == 0: out[Y, X] = hair[yy, xx]
+    for yy, xx in zip(*np.nonzero(face)):
+        Y, X = y + yy, x + xx
+        if gone[Y, X] or c[Y, X] == 0 or (yy >= ROWS and not arm[Y, X]): out[Y, X] = t[yy, xx]
+    for Y, X in zip(*np.nonzero(arm)):
+        if int(out[Y, X]) in armhand.TO_FUR and out[Y, X] == c[Y, X]: out[Y, X] = armhand.TO_FUR[int(out[Y, X])]
+    band = np.isin(b, list(gt.BF_BAND)) & np.isin(out, (16, 17, 200, 201, 202, 203)); band[y + 9:] = False
+    for Y, X in zip(*np.nonzero(band)): out[Y, X] = gt.BF_BAND[int(b[Y, X])]
+    mine = np.zeros(c.shape, bool)
+    for yy, xx in zip(*np.nonzero(hair)):
+        Y, X = y + dy + yy, x + dx + xx
+        if 0 <= Y < H and 0 <= X < W and out[Y, X] == hair[yy, xx] and (gone[Y, X] or c[Y, X] == 0): mine[Y, X] = True
+    return out, (1.0, x, y, 0), mine
+
+
 def frame(slot, f, d, kind):
     """kind: 'now'; 'mix' (GT: the new front hair; side and back as they are); 'daima', 'daima_pic'"""
     if kind == 'now': return R.frame(AID, slot, f, d)
     if slot == 0: f = 0                                              # the idle's frames are one frame: no head bob
     c0 = R.frame(AID, slot, f, d)
-    out, loc = shaped(slot, f, d, views=(0,))
-    out = uncovered(out, c0, loc)
-    out = kame_hands(out, slot, d, loc)
-    if (slot, d) != (18, 0): out, _ = armhand.everything(out, bf_for(c0, slot, d), loc, (slot, f, d), c0)   # (that view is kame_hands')
+    hair_is = None
+    if (slot, f) == ARMS_UP: out, loc, hair_is = arms_up(); c0 = out
+    else:
+        out, loc = shaped(slot, f, d, views=(0,))
+        out = uncovered(out, c0, loc)
+        out = kame_hands(out, slot, d, loc)
+    if (slot, d) != (18, 0) and (slot, f) != ARMS_UP: out, _ = armhand.everything(out, bf_for(c0, slot, d), loc, (slot, f, d), c0)   # (that view is kame_hands')
     if loc is not None:
         sc, x, y, v = loc
         for yy, xx, col, to in STRAY.get(v, ()):
@@ -179,6 +220,7 @@ def frame(slot, f, d, kind):
         if loc is not None: at(v3.IRIS.get(loc[3], ()), (25,), GOLD)
         return res
     look = v3.LOOKS[kind]; p = v3.parts(out, loc)
+    if hair_is is not None: p['hair'] = hair_is                      # (his arms cut the hair in pieces there: it is known exactly)
     for k, to in look['body'].items(): res[out == k] = to
     for k, to in look['hair'].items(): res[p['hair'] & (out == k)] = to
     for k, to in ((69, 24), (157, 24), (158, 25), (159, 25), (160, 26), (161, 26)): res[p['sash'] & (out == k)] = look['body'][to]
