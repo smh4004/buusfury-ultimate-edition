@@ -802,6 +802,16 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   figure, actor 371). Nothing on Daima, Gogeta or Vegeta changed. Daima was saved on Nov 11 before today's rounds, so he still has
   what they fixed on Goku: the spin from the side shows the back of his head, hit 2 from the side has BF's hair shape, the special's
   last frame BF's hair and pose, and the arm fur rounds (`armfur.MOVES`, `MORE`).
+  08:47, the owner: "Apply the back shape removal and the arm fur fixes to daima goku ONLY everyone else is good".
+  `ssj4_preview/daimafix.py`: Daima is the same sheet as Super Saiyan 4 Goku recoloured place for place (`v4.frame` 'mix' and
+  'daima_pic' recolour one shaped frame), so Goku's arm fixes (`armfur.FIXES`) and plain back (`plainback.plain_back`, from behind,
+  with its see-through pixel at the bottom of the hair) carry over by place, in Daima's colours (fur 127/39/40, the sash across his
+  back in his sash's colours, skin and wristbands as they are). Also the few arm pixels where the build's Goku (each picture touched
+  up at its first place) differs from v4's frame for that place, so the two match class for class. Not carried: heads.py (spin
+  sides, hit 2, the special's last frame), the see-through fill in the other views, slot 11's frames 5-8 (a head a pixel over).
+  165 of his 327 frames change, 1,723 pixels; checked: in every frame Daima has skin, fur and wristband where Goku's fixed frame
+  has them, and no hair pixel changed. Previews: `daimafix.py` -> `ssj4_daima_arms_back_before_fixed.pdf`, `allforms.py daima`
+  (now the fixed one; `daima_saved` for the Nov 11 one). In no build.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
