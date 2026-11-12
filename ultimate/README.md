@@ -764,6 +764,15 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   fur; and a brown dot in its fur (walk 3, run 2-4): BF Goku's darker skin shades 205 and 206, which the sheet left and the arm fixes
   did not map. `armfur.py` maps them to fur too (op 'gap' for the see-through pixel), which also takes four such dots out of the arms
   in the walk and run from the side (inside the same arm boxes; no hand pixel changed). A preview.
+  Then his arms in every other move (`armfur.MOVES`, preview `ssj4_preview/armmoves.py`): every picture of slots 0 and 3-21 in all
+  three views read pixel by pixel (text grids of his frame beside BF Goku's, then each doubtful one at 14x): BF's wristband
+  separates hand from arm, BF's undershirt sleeve marks the shoulder, and where the sheet drew its own pose its own bands do. 44
+  pictures change, 340 pixels: bare forearms and upper arms to fur by shade (ki blast and combo wind-ups, the raised back forearm
+  in combo 1, combo 2 and the finisher, the hit frames' upper arms, the guard's elbows from behind, charging, jumping, flying,
+  spin, getting up, powering up), BF's sleeve blue at the shoulder to fur, two skin pixels in his run sash to blue, one fur pixel
+  in his right hand back to skin (finisher frame 4), the white motion streak back across his punching arm in combo 2 (it was
+  see-through), and two see-through pixels in the flying frame filled. Left as the sheet has them where arm and hand could not be
+  told apart: a few hit, special and charging frames (9,1,2; 21,8-9; 8,3/6/9) and the skin beside his hands in 3,0,1.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
