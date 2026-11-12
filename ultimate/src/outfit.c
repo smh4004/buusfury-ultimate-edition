@@ -318,6 +318,7 @@ static void bench_settle(int was) {
 #define EepromWrite8 ((void (*)(int, const void *))0x08040B5D)
 #define IME (*(volatile u16 *)0x04000208)
 #define SOUND_OBJ (**(u32 **)0x0803FCA8)
+#ifndef FLASH_SAVE
 static void eeprom_write(int offset, const void *src, int len) {
     int i;
     Copy(MIRROR + offset, src, len);
@@ -329,6 +330,56 @@ static void eeprom_write(int offset, const void *src, int len) {
     TimersStart();
     SoundResume(SOUND_OBJ);
 }
+#else
+/* A 64 KB flash save in place of the 8 KB EEPROM (a trial, Nov 12: build.py BFU_FLASH=1). Its first 8 KB hold what the EEPROM held, at the
+   same places and in the byte order of an emulator's EEPROM save file (each 8-byte block back to front), so an old save file is the start
+   of the new one. The mirror still holds those 8 KB; a write erases each 4 KB sector it touches and programs it again from the mirror. */
+#define FLASH ((volatile u8 *)0x0E000000)
+#define WAITCNT (*(volatile u16 *)0x04000204)
+#define Alloc ((u8 *(*)(int))0x0803D5B9)
+static void flash_cmd(int c) { FLASH[0x5555] = 0xAA; FLASH[0x2AAA] = 0x55; FLASH[0x5555] = c; }
+static void flash_wait(int a, int want) { int t = 0x40000; while (FLASH[a] != want && --t) ; }
+static void flash_sector(int s) {
+    int a = s << 12, i, v;
+    flash_cmd(0x80); FLASH[0x5555] = 0xAA; FLASH[0x2AAA] = 0x55; FLASH[a] = 0x30;
+    flash_wait(a, 0xFF);
+    for (i = 0; i < 0x1000; i++) {
+        v = MIRROR[(a + i) ^ 7];
+        if (FLASH[a + i] == v) continue;                   /* erased bytes read 0xFF (0x00 in older VBA-M, Delta's core: those get written) */
+        flash_cmd(0xA0); FLASH[a + i] = v; flash_wait(a + i, v);
+    }
+}
+static void eeprom_write(int offset, const void *src, int len) {
+    int s, wc;
+    Copy(MIRROR + offset, src, len);
+    SoundPause(SOUND_OBJ);
+    TimersStop();
+    IME = 0;
+    wc = WAITCNT; WAITCNT = (wc & ~3) | 3;                 /* the flash chip wants 8 waits */
+    for (s = offset >> 12; s <= (offset + len - 1) >> 12; s++) flash_sector(s);
+    WAITCNT = wc;
+    IME = 1;
+    TimersStart();
+    SoundResume(SOUND_OBJ);
+}
+/* The game's start-up read (0x0803FB7C): the 8 KB mirror, filled from the flash. Asking the chip its id first makes an emulator take
+   the save for a flash chip before the first read (mGBA decides by the first access). */
+void save_init(u32 *present) {
+    int i, wc; u8 *m = Alloc(0x2000);
+    MIRROR = m;
+    SoundPause(SOUND_OBJ);
+    TimersStop();
+    IME = 0;
+    wc = WAITCNT; WAITCNT = (wc & ~3) | 3;
+    flash_cmd(0x90); (void)FLASH[0]; (void)FLASH[1]; flash_cmd(0xF0);
+    for (i = 0; i < 0x2000; i++) m[i] = FLASH[i ^ 7];
+    WAITCNT = wc;
+    IME = 1;
+    TimersStart();
+    SoundResume(SOUND_OBJ);
+    *present = 1;
+}
+#endif
 void save_write(int *save, int offset, const u8 *src, int len) {
     int slot;
     u32 gen;

@@ -848,6 +848,30 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - `test_ssj4.py`: no see-through pixel in any frame; armfur, run again on every frame it lists, and the plain back, run again on
     every frame from behind, change nothing; the spin from the side is the front mirrored and moved 16 pixels; the spin's legs as
     heads.py makes them; hit 2 from the side has his head (gold eye, black hair); the special's last frame is the one before it.
+- Nov 12, 10:07-11:04, the full suite on 87d4c2a (Super Saiyan 4 Goku's fixes in the build): all 37 tests, 1,317 checks, no failure.
+- Nov 12, a 64 KB flash save, tried and tested, not switched on. The owner (after Teen Gohan needed a 21st guest group and the save had
+  no room: "Can you work out a way to increase it to 30-40 maybe", "Does 64kb flash work for 44vba/delta/manic emu/mgba"), 10:37: "Test
+  what you need to see if flash works first and stand by on other stuff". The 8 KB EEPROM is full: three game blocks of 0x8B0 bytes at
+  0x10, then three benches of 496 bytes at 0x1A20 (20 guest groups).
+  - `BFU_FLASH=1` builds it (default builds unchanged): `outfit.c` `FLASH_SAVE` writes a 64 KB flash chip. Its first 8 KB hold what the
+    EEPROM held, at the same places and in the byte order of an emulator's EEPROM file (each 8-byte block back to front), so an old
+    `.sav` is the start of the new one. The game still keeps its 8 KB mirror in memory; a write erases each 4 KB sector it touches and
+    programs it again from the mirror; the start-up read (0x0803FB7C, now `save_init`) asks the chip its id (mGBA takes the save type from
+    the first access) and fills the mirror from the chip. `build.py flash_header`: the ROM's tag `EEPROM_V124` becomes `FLASH_V126`
+    (VBA-M and gpSP read the type from it), the game code BG3E becomes BFUE (VBA-M's list of known games holds BG3E to the 8 KB EEPROM),
+    the header's check byte follows.
+  - Delta's core (GBADeltaCore pins VBA-M 453fa0d, Nov 2018) erases a sector to 0x00, not 0xFF. The first trial skipped bytes meant to
+    be 0xFF after an erase, so Delta's saves lost them and would not load; a byte is now written whenever the chip doesn't already read
+    back what it should be.
+  - Tested on the flash slot-test build: `test_slots.py` all 48 checks (swaps, reloads, a damaged bench, a version 1 bench from an old
+    EEPROM build carried over). `test_flash.py` (new; `tools/harness/lr_harness.py` runs the harness's scripts on a libretro core):
+    all 32 checks. mGBA, VBA-M's libretro core with a frontend's save memory (RetroArch; likely Manic EMU's VBA-M), Delta's VBA-M (its save-type
+    detection and its `.sav` reading and writing) and gpSP's libretro core each save a 64 KB file (gpSP 128 KB, its save memory), and
+    each loads the others' saves with the bench intact. An old 8 KB EEPROM save loads as it is in mGBA, VBA-M's libretro core and gpSP.
+    Delta (and VBA-M's desktop builds) read an 8 KB file as EEPROM, so the flash build sees no save there; the same file padded to 64 KB
+    with 0xFF loads, a save Delta made with the EEPROM build too (it is in mGBA's layout: 12 bytes of play time, generation and checksums
+    differ). Real cartridges not tested.
+  - Room: 56 KB past the first 8 KB. Not in use yet; the owner decides whether to switch.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
