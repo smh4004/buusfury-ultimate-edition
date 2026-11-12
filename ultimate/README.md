@@ -748,6 +748,12 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   at the bottom. `ssj4_preview/plainback.py`: his back plain, nothing else: where BF Goku has his gi's back above the belt, his fur in
   BF's own shading (dark orange 79 -> 31, 63/64 -> 32, light 65 -> 104), where BF has his belt, the sash's blue across; his hair, arms,
   legs and the tail at the bottom as they are; frames that show his back only (27 of his 61 pictures from behind). A preview.
+  06:33, the owner: "Now you fucked the arms up again and there's a transparent pixel on his back at the bottom of his hair in back
+  view". The belt rule had taken BF's wristbands for belt where they touch it (walk 1, run 1) and turned his left wristband and arm to
+  sash blue. Now the belt is cut to his waist (the columns of BF's gi in the row above it) and only the sheet's fur is repainted; checked
+  over every frame: 0 pixels changed on his arms, hands, wristbands or sleeves. The see-through pixel: the sheet's, at the bottom of his
+  hair, and not only there: 61 of his 171 pictures (all views) have one boxed in by his hair or outline (Gogeta's sheet has 40). Filled
+  with black like the outline round them (`see_through`, `fill`). A preview.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

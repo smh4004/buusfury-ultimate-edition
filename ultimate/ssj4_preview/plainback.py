@@ -11,31 +11,55 @@ GI_FUR={79:31, 63:32, 64:32, 65:104}
 BELT={157:69, 159:158, 161:160}
 FURS=(31,32,33,104,105); BLUES=(69,158,160)
 def belt_rows(b):
-    """BF's belt from behind: rows with a run of 5 or more navy pixels -> {row: (first, last)}"""
-    out={}
-    for y in range(54,66):
-        run=best=None; s=None
-        for x in range(30,80):
-            if b[y,x] in BELT:
-                s=x if s is None else s
-                if best is None or x-s>best[1]-best[0]: best=(s,x)
-            else: s=None
-        if best and best[1]-best[0]>=4: out[y]=best
-    # the belt is the top one or two of those rows (the rest are boots)
-    ys=sorted(out)
+    """BF's belt from behind -> {row: (first, last column)}: the top one or two rows with a run of 5 or more navy pixels, cut to his
+    waist (the columns of BF's gi in the row above it), so the wristbands at his sides are never taken for it"""
+    found = {}
+    for y in range(54, 66):
+        best = None; st = None
+        for x in range(30, 80):
+            if b[y, x] in BELT:
+                st = x if st is None else st
+                if best is None or x - st > best[1] - best[0]: best = (st, x)
+            else: st = None
+        if best and best[1] - best[0] >= 4: found[y] = best
+    ys = sorted(found)
     if not ys: return {}
-    keep=[ys[0]]+([ys[1]] if len(ys)>1 and ys[1]==ys[0]+1 else [])
-    return {y:out[y] for y in keep}
+    keep = [ys[0]] + ([ys[1]] if len(ys) > 1 and ys[1] == ys[0] + 1 else [])
+    gi = np.nonzero(np.isin(b[keep[0] - 1], list(GI_FUR)))[0]
+    if not len(gi): return {}
+    lo, hi = int(gi.min()), int(gi.max())
+    return {y: (max(found[y][0], lo), min(found[y][1], hi)) for y in keep}
+
+
+def see_through(c):
+    """see-through pixels inside his figure boxed in by his hair or outline (3 or 4 of the pixels beside one are black or the hair's
+    greys): the sheet's, in 61 of his pictures, mostly where his hair ends (the owner, Nov 12: "there's a transparent pixel on his back
+    at the bottom of his hair in back view") -> [(row, column)]"""
+    from scipy import ndimage
+    lab, n = ndimage.label(c == 0); edge = set(lab[0]) | set(lab[-1]) | set(lab[:, 0]) | set(lab[:, -1])
+    return [(int(y), int(x)) for y, x in np.argwhere((lab > 0) & ~np.isin(lab, list(edge)))
+            if sum(int(c[y + dy, x + dx]) in (1, 111, 112) for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))) >= 3]
+
+
+def fill(c):
+    out = c.copy()
+    for y, x in see_through(c): out[y, x] = 1
+    return out
+
+
 def plain_back(c, b):
-    out=c.copy(); belt=belt_rows(b)
+    """his back from behind plain: only where BF has his gi's back above the belt (his fur, in BF's shading) and BF's belt across his
+    waist (the sash's blue), and only over the sheet's fur there; his arms, hands, wristbands, hair and legs untouched; the
+    see-through pixel at the bottom of his hair filled (black, as the hair's outline round it)"""
+    out = fill(c); belt = belt_rows(b)
     if not belt: return out
-    top=min(belt)
-    for y in range(40,top):
-        for x in range(30,80):
-            if int(b[y,x]) in GI_FUR and int(c[y,x]) in FURS+BLUES: out[y,x]=GI_FUR[int(b[y,x])]
-    for y,(x0,x1) in belt.items():
-        for x in range(x0,x1+1):
-            if int(c[y,x]) in FURS+BLUES: out[y,x]=BELT[int(b[y,x])]
+    top = min(belt)
+    for y in range(40, top):
+        for x in range(30, 80):
+            if int(b[y, x]) in GI_FUR and int(c[y, x]) in FURS: out[y, x] = GI_FUR[int(b[y, x])]
+    for y, (x0, x1) in belt.items():
+        for x in range(x0, x1 + 1):
+            if int(b[y, x]) in BELT and int(c[y, x]) in FURS: out[y, x] = BELT[int(b[y, x])]
     return out
 
 # --- the preview: BFU_GOG_ROM=<debug build> python3 ultimate/ssj4_preview/plainback.py <out dir> ---
@@ -66,7 +90,7 @@ def bf_for(k):
     _bf[k]=np.roll(np.roll(best[3],best[1],0),best[2],1); return _bf[k]
 def fixed(k):
     c=fr(GOKU,*k)
-    return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(c) else c
+    return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(c) else fill(c)
 BG=(88,120,88); BOX=(37,72,39,80); H=BOX[1]-BOX[0]; W=BOX[3]-BOX[2]
 F=ImageFont.load_default(size=16); FS=ImageFont.load_default(size=13)
 def cell(c):
@@ -109,3 +133,34 @@ if __name__=='__main__':
   changed=sum(int((fixed(k)!=fr(GOKU,*k)).any()) for k in keep)
   big(np.concatenate(rows,0),3).save(OUT+'/ssj4_goku_back_plain_every_frame.png')
   print(len(keep),'pictures from behind,',changed,'changed')
+  # every see-through pixel filled, in any view: his head and shoulders close, now above filled, on magenta so they show
+  todo=[]; seen=set()
+  for s in sorted(NS[GOKU]):
+    for f in range(NS[GOKU][s]):
+      for d in range(3):
+        c=fr(GOKU,s,f,d)
+        if not c.any() or c.tobytes() in seen: continue
+        seen.add(c.tobytes())
+        if see_through(c): todo.append((s,f,d))
+  hb=(38,62,40,72); per=8; rows=[]
+  def mag(c):
+    c=c[hb[0]:hb[1],hb[2]:hb[3]]; rgb=R.rgb(c).copy(); rgb[c==0]=(255,0,255); return np.pad(rgb,((0,1),(0,1),(0,0)),constant_values=255)
+  for i in range(0,len(todo),per):
+    chunk=todo[i:i+per]
+    for fn in (lambda k: fr(GOKU,*k), fixed):
+      cells=[mag(fn(k)) for k in chunk]; cells+=[np.full_like(cells[0],255)]*(per-len(cells)); rows.append(np.concatenate(cells,1))
+    rows.append(np.full((4,rows[-1].shape[1],3),40,np.uint8))
+  big(np.concatenate(rows,0),4).save(OUT+'/ssj4_goku_see_through_pixels_filled.png')
+  # what changed, checked: nothing on his arms, hands, wristbands or sleeves (BF's skin, or BF's navy off the belt), only the
+  # see-through pixels and, from behind, his back and sash
+  SK=(200,201,202,203,16,17); arm=0; total=0
+  for s in sorted(NS[GOKU]):
+    for f in range(NS[GOKU][s]):
+      for d in range(3):
+        k=(s,f,d); c=fr(GOKU,*k)
+        if not c.any(): continue
+        x=fixed(k); diff=np.argwhere(x!=c); total+=len(diff)
+        if d==1 and from_behind(c):
+          b=bf_for(k); belt=belt_rows(b); holes=set(see_through(c))
+          arm+=sum(1 for y,xx in diff if (int(y),int(xx)) not in holes and (int(b[y,xx]) in SK or (int(b[y,xx]) in BELT and int(y) not in belt)))
+  print(len(todo),'pictures with see-through pixels;',total,'pixels changed in all; on his arms:',arm)
