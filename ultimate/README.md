@@ -759,6 +759,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   head move and the tail; he had meant the back only. The arm fixes are back (`ssj4_preview/armfur.py`, the 00:06 list without the head
   move): fur from the shoulder to the wristband in every walk and run frame, all three views, under the plain back and the filled
   see-through pixels. Next: the same reading of his arms in every other move.
+  07:14, the owner: "Fix the messed up pixel on his right arm in back view". From behind his right arm had two kinds: a see-through
+  pixel between his sash and his right wristband (standing, walk 1, 2 and 4, run 2 and 4; his left side has fur there), now his dark
+  fur; and a brown dot in its fur (walk 3, run 2-4): BF Goku's darker skin shades 205 and 206, which the sheet left and the arm fixes
+  did not map. `armfur.py` maps them to fur too (op 'gap' for the see-through pixel), which also takes four such dots out of the arms
+  in the walk and run from the side (inside the same arm boxes; no hand pixel changed). A preview.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
