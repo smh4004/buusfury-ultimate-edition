@@ -7,13 +7,14 @@ hits 1.75x as hard, drains at half Super Saiyan's rate, and pressed again goes b
 import os, re, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'), 'tools/scripts']
 import zone26
 R, forms = T.R, T.forms
 G = 0x03001068
-MASTERY = 0x0203F000 + 20 + 20 * 22
-FLAGS2 = 0x0203F000 + 20 + 21 * 22                 # outfit.c struct bench: more flags 32-63
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+MASTERY = BN.MASTERY
+FLAGS2 = BN.FLAGS2                                   # outfit.c struct bench: more flags 32-63
+BENCH_ON = BN.ON
 POST = ['poke8 %08X %02X' % (G + 0x55 + 149 // 8, 1 << 149 % 8)]
 SS_MASTERED = BENCH_ON + ['poke8 %08X FA' % MASTERY]
 f = zone26.MORE_BOG_DONE - 32

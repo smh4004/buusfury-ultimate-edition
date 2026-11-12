@@ -8,11 +8,12 @@ Saiyan Blue, and his Kamehameha at level 3 with SUPER_KAME_USES uses the Super K
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 R = T.R; G = 0x03001068; forms = T.forms
-MASTERY = 0x0203F000 + 20 + 20 * 22
+MASTERY = BN.MASTERY
 # a bench of this game's own (magic, generation, and the generation in the game at +0x4F1), so the mastery bytes poked here stay: a fresh
 # game has none until something is saved there (outfit.c bench_mine)
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+BENCH_ON = BN.ON
 fails = []
 def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)

@@ -1643,13 +1643,14 @@ def patch_forms(rom, clean, cfg, actors):
     return index, SPACE + len(rows)
 
 
-FLASH_SAVE = not os.environ.get('BFU_EEPROM')    # the 64 KB flash save (the owner, Nov 12 11:34: "switch the game to flash save"); BFU_EEPROM=1 builds BF's 8 KB EEPROM
+FLASH_SAVE = True                # the 64 KB flash save (the owner, Nov 12 11:34: "switch the game to flash save"); the guest bench needs it since version 3
+if os.environ.get('BFU_EEPROM'): sys.exit('BFU_EEPROM: no EEPROM builds since the guest bench moved into the flash (Nov 12)')
 FLASH_INIT_WAS = 'f8b5041c402000f0'  # BF's start-up EEPROM read (0x0803FB7C): push, mov r4, r0, movs r0, #0x40, bl...
 FLASH_CODE = b'BFUE'                 # the game code a flash build carries: VBA-M's list of known games holds BG3E to the 8 KB EEPROM
 
 
 def flash_header(rom):
-    """The flash save (every build since Nov 12; BFU_EEPROM=1 for the EEPROM): VBA-M (its libretro core, its desktop builds, Delta's core) and gpSP read the save type from
+    """The flash save (every build since Nov 12): VBA-M (its libretro core, its desktop builds, Delta's core) and gpSP read the save type from
     the save library's tag in the ROM (mGBA decides by the first access), and VBA-M's list of known games (libretro, desktop) holds Buu's
     Fury (BG3E) to the 8 KB EEPROM, so the tag names a 64 KB flash chip and the game code is the Ultimate Edition's own; the header's
     check byte follows. The tag must be the only one: VBA-M takes EEPROM_ or SRAM_ anywhere in the ROM over FLASH."""
@@ -1671,7 +1672,7 @@ def symbol(name):
 
 
 BENCH_OLD = ('broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'android17', 'android18', 'krillin', 'videl', 'majin_buu', 'super_janemba', 'kid_buu', 'tien', 'yamcha', 'pikkon', 'hercule')
-BENCH_GROUPS = 21                # outfit.c's GROUPS: fighters the save can keep progress for
+BENCH_GROUPS = 48                # outfit.c's GROUPS: fighters the save can keep progress for (bench version 3, Nov 12: the flash save)
 
 
 def bench_groups(guests):
@@ -1684,8 +1685,8 @@ def bench_groups(guests):
         key = o.get('bench', o['form'])
         if key not in shared: shared[key] = max(out) + 1
         out.append(shared[key])
-    if max(out) >= BENCH_GROUPS - 1:          # the last group holds the transformations' mastery (outfit.c MASTERY)
-        sys.exit('more guests than the save has room for (%d)' % (BENCH_GROUPS - 1))
+    if max(out) >= BENCH_GROUPS:
+        sys.exit('more guests than the save has room for (%d)' % BENCH_GROUPS)
     src = open('ultimate/src/outfit.c').read(); body = src[src.index('static void guest_sync'):]; body = body[:body.index('u8 *r =')]
     for name, count in re.findall(r'(\w+)\[\] = \{(\d+),', body):
         if int(count) > 5:

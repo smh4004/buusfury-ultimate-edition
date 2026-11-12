@@ -4,6 +4,7 @@ then the Super 13 fight and its reward, and the West City resident who starts th
 import json, os, re, struct, subprocess, sys, tempfile
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
+import bench as BN                                   # the guest bench (lib/bench.py)
 H, ROM = 'tools/harness/harness', 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 PROTO = os.environ['BFU_PROTO']; P = open(PROTO, 'rb').read()
 cfg = json.load(open('ultimate/zone26.json'))
@@ -172,7 +173,7 @@ check('beating the last one brings you back to the board', at(out) == HUB)
 done = talk_at(rush + ['poke8 %08X %02X' % (0x03001068 + 0x55 + 888 // 8, 1 << 888 % 8)], *zone26.HUB_AT) + ['shot rushtalk', 'tap A 60', 'tap A 60', 'tap A 60', 'tap A 60', 'run 60', 'shot rushdone', 'dump g 03001068 8a8']
 out = run(done); g = open(d + '/g.bin', 'rb').read()
 check('the board pays the reward', flag(887) == 1 and 'bad pc' not in out)
-out = run(done + ['mem 0203F00C 1']); more = int([l for l in out.splitlines() if l.startswith('mem 0203f00c')][-1].split()[-1], 16)
+out = run(done + ['mem %08X 1' % BN.FLAGS]); more = int([l for l in out.splitlines() if l.startswith('mem %08x' % BN.FLAGS)][-1].split()[-1], 16)
 check('the Boss Rush earns a rank, and its message is over', more >> 8 & 7 in (1, 2, 3, 4) and not more >> 7 & 1)
 again = talk_at(done, *zone26.HUB_AT) + ['shot rushagain', 'run 150', 'tap A 150', 'tap A 200', 'tap A 200', 'run 120', 'mem %s 1' % AT]
 out = run(again); check('after the reward the board still offers the Boss Rush', at(out) == (zone26.RUSH_FIRST << 8 | 26))
@@ -286,9 +287,9 @@ for k, t in enumerate(zone26.TRIALS):
         if 'bad pc' in out or at(out) != room: break
     print('   trial %d took %d tries' % (k + 1, attempt + 1))
     check('winning trial %d brings you back to the board' % (k + 1), at(out) == HUB and 'bad pc' not in out)
-    trial = talk_at(trial + ['mem 0300155C 1'], *zone26.HUB_AT) + ['shot trialpay%d' % k, 'run 150', 'tap A 120', 'run 30', 'mem 0300155C 1', 'dump g 03001068 8a8'] + (['shot tien', 'tap A 120', 'run 30', 'mem 0203F00C 1'] if k == 0 else [])
+    trial = talk_at(trial + ['mem 0300155C 1'], *zone26.HUB_AT) + ['shot trialpay%d' % k, 'run 150', 'tap A 120', 'run 30', 'mem 0300155C 1', 'dump g 03001068 8a8'] + (['shot tien', 'tap A 120', 'run 30', 'mem %08X 1' % BN.FLAGS] if k == 0 else [])
     out = run(trial); g = open(d + '/g.bin', 'rb').read()
-    if k == 0: check('the first trial won brings Tien', int([l for l in out.splitlines() if l.startswith('mem 0203f00c')][-1].split()[-1], 16) >> zone26.MORE_TIEN & 1 == 1)
+    if k == 0: check('the first trial won brings Tien', int([l for l in out.splitlines() if l.startswith('mem %08x' % BN.FLAGS)][-1].split()[-1], 16) >> zone26.MORE_TIEN & 1 == 1)
     z = [int(l.split()[-1], 16) for l in out.splitlines() if l.startswith('mem 0300155c')]
     check('trial %d pays 30,000 Zenie at the board' % (k + 1), flag(zone26.TRIAL_PAID + k) == 1 and z[-1] - z[-2] == zone26.TRIAL_PRIZE)
     gear = struct.unpack_from('<%dI' % struct.unpack_from('<I', g, 0xE4)[0], g, 0xE8)

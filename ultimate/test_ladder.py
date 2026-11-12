@@ -4,10 +4,11 @@
 import json, os, subprocess, sys
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26, floorcheck, barcheck
+import bench as BN                                   # the guest bench (lib/bench.py)
 D = sys.argv[1]; os.makedirs(D, exist_ok=True)
 ROM = 'ultimate/out/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
-G, AT, PLAYER, ENEMIES, REC0, ZENIE, BENCH_FLAGS = 0x03001068, 0x0300197C, 0x03001C34, 0x03001BB4, 0x03001560, 0x0300155C, 0x0203F00C
+G, AT, PLAYER, ENEMIES, REC0, ZENIE, BENCH_FLAGS = 0x03001068, 0x0300197C, 0x03001C34, 0x03001BB4, 0x03001560, 0x0300155C, BN.FLAGS
 HUB = 1 << 8 | 3
 fails = []
 def check(name, ok):
@@ -30,7 +31,7 @@ BAR = barcheck.Bar(open(ROM, 'rb').read(), mem)      # the boss bar (outfit.c bo
 def barsay(name):
     ok, seen = barcheck.expect(BAR, send, name, full=True); check('the boss is %s and his bar is full: %s' % (name, seen), ok)
 flag_on = lambda n: 'poke8 %08X %02X' % (G + 0x55 + n // 8, (mem(G + 0x55 + n // 8)[0] & 255) | 1 << n % 8)
-FLAGS2 = 0x0203F1E2                                    # more flags 32-63: after the bench's 21 entries (outfit.c struct bench)
+FLAGS2 = BN.FLAGS2                                     # more flags 32-63 (outfit.c struct bench)
 more_at = lambda n: BENCH_FLAGS + n // 8 if n < 32 else FLAGS2 + (n - 32) // 8
 more = lambda n: mem(more_at(n) & ~3)[0] >> (8 * (more_at(n) & 3) + n % 8) & 1
 def more_poke(n, v):

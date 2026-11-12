@@ -96,7 +96,8 @@ for c, (cat, people) in enumerate(zone26.SPAR):
         room += 1
 print(exp)
 # Waves: a group's four in a row with no rest; the first clear gives stat points, a later one Zenie.
-FLAGS2 = 0x0203F1E2
+import bench as BN
+FLAGS2 = BN.FLAGS2
 def more(n): a = FLAGS2 + (n - 32) // 8; return mem(a & ~3)[0] >> (8 * (a & 3) + n % 8) & 1
 for c, (cat, people) in enumerate(list(zone26.SPAR) + [zone26.SPAR[0]]):
     c %= len(zone26.SPAR); again = more(zone26.MORE_WAVE + c)

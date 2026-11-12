@@ -13,6 +13,7 @@
 import os, sys, re, struct, subprocess, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 from PIL import Image
 import numpy as np
 R = T.R; G = 0x03001068
@@ -29,8 +30,8 @@ print('   frame counter steps over %d frames: %s' % (len(d), {k: d.count(k) for 
 check('no frame dropped in a fight (the counter goes up by one every frame)', len(d) > 600 and set(d) == {1})
 
 # 2-4. Super Saiyan, then 2 through Super Saiyan's skill: the pool (+0x1E) every second, mastery, the HUD's icon
-MASTERY = 0x0203F000 + 20 + 20 * 22
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+MASTERY = BN.MASTERY
+BENCH_ON = BN.ON
 L = T.setup([7, 20, 35, 22], None, (0,)) + BENCH_ON + ['poke8 %08X 00' % MASTERY, 'poke8 %08X 00' % (MASTERY + 1)]
 def press(): return ['poke8 %08X 01' % (R + 0x15)] + T.FULL + ['keys B', 'run 2', 'keys'] + [v for _ in range(8) for v in T.AWAY + ['run 25']]
 def watch(tag, n): return [v for _ in range(n) for v in T.AWAY + ['run 60', 'mem %08X 1' % (R + 0x14), 'mem %08X 1' % (R + 0x1C)]] + ['shot hud_%s' % tag]

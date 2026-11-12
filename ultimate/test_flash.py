@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The 64 KB flash save (Nov 12; every build unless BFU_EEPROM=1) across emulators: mGBA (tools/harness), VBA-M's libretro core with a
+"""The 64 KB flash save (Nov 12) across emulators: mGBA (tools/harness), VBA-M's libretro core with a
 frontend's save memory (RetroArch; likely Manic EMU's VBA-M core), Delta's VBA-M (GBADeltaCore pins VBA-M 453fa0d, Nov 2018:
 utilGBAFindSave, CPUReadBatteryFile / CPUWriteBatteryFile) and gpSP's libretro core, through tools/harness/lr_harness.py.
-  BFU_SLOT_TEST=1 BFU_OUT=<flash dir> python3 ultimate/build.py --debug --zone       (and with BFU_EEPROM=1: <eeprom dir>)
+  BFU_SLOT_TEST=1 BFU_OUT=<flash dir> python3 ultimate/build.py --debug --zone       (<eeprom dir>: such a build from before the flash, kept)
   BFU_VBAM_CORE=<vbam_libretro.so> BFU_DELTA_CORE=<.so> BFU_GPSP_CORE=<gpsp_libretro.so> python3 ultimate/test_flash.py <flash dir> <eeprom dir> [work dir]
 Cores: VBA-M's libretro core (cmake -DBUILD_LIBRETRO / ENABLE_LIBRETRO); Delta's: VBA-M 453fa0d `make -C src/libretro`, linked again
 without link.T so CPUReadBatteryFile and the rest are exported; gpSP: libretro/gpsp `make`. Needs BFU_PROTO (zone 26's maps).
@@ -14,6 +14,7 @@ FDIR, EDIR = sys.argv[1], sys.argv[2]
 d = sys.argv[3] if len(sys.argv) > 3 else tempfile.mkdtemp(prefix='flash'); os.makedirs(d, exist_ok=True)
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
+import bench as BN                                   # the guest bench (lib/bench.py)
 FL = FDIR + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'; EE = EDIR + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 forms = json.load(open(FDIR + '/BFU_debug_zone.map.json'))['forms']
 LR = ['python3', 'tools/harness/lr_harness.py']
@@ -80,18 +81,18 @@ def reload(emu, src, tag, was='piccolo', move=UP(3), now='broly'):
 
 def saved_ok(emu, sav):
     f = open(sav, 'rb').read()
-    return len(f) == SIZE[emu] and struct.unpack_from('<I', unblock(f[:0x2000]), BENCH_OFFSET)[0] == 0x32484342 and set(f[0x2000:]) == {0xFF}
+    return len(f) == SIZE[emu] and struct.unpack_from('<I', f, BN.sector(0))[0] == BN.MAGIC and set(f[BN.sector(0) + BN.SIZE:]) == {0xFF} and set(f[0x2000:BN.sector(0)]) <= {0xFF}
 
 made = {}
 for emu in ('mgba',):
     sav, b, out = swap_save(emu)
     f = open(sav, 'rb').read(); raw = unblock(f)
-    head = struct.unpack_from('<III', raw, BENCH_OFFSET)
+    head = struct.unpack_from('<III', f, BN.sector(0))
     print(emu, 'save', len(f), 'bytes; state', b)
     check('%s: new game, swap to Piccolo' % emu, b['form'] == forms['piccolo'] and b['exp'] == 111111 and b['gen'] != 0)
     check('%s: a 64 KB flash save' % emu, len(f) == 0x10000)
-    check('%s: game and bench in the first 8 KB, in the EEPROM file\'s layout' % emu, head[0] == 0x32484342 and head[1] == b['gen'] and raw[0x10:0x18] != b'\xff' * 8)
-    check('%s: nothing past the first 8 KB' % emu, set(f[0x2000:]) == {0xFF})
+    check('%s: the game in the first 8 KB, in the EEPROM file\'s layout, and the bench in its own sector' % emu, head[0] == BN.MAGIC and head[1] == b['gen'] and raw[0x10:0x18] != b'\xff' * 8)
+    check('%s: nothing else past the first 8 KB' % emu, set(f[0x2000:BN.sector(0)]) <= {0xFF} and set(f[BN.sector(0) + BN.SIZE:]) == {0xFF})
     made[emu] = sav
 for emu in ('mgba', 'vbam', 'delta', 'gpsp'):
     sav, ok, r, i = reload(emu, made['mgba'], 'mgba_to_%s' % emu)

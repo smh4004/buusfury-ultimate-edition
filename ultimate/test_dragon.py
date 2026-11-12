@@ -7,6 +7,7 @@ src = open('ultimate/test_story.py').read().split("land = e + move(p3, 1250, 120
 exec(src)
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
+import bench as BN                                         # the guest bench (lib/bench.py)
 from PIL import Image
 ITEMS = 0x03001068 + 2 + zone26.BALL_ITEM            # the inventory's byte array
 LAND = {5: (2888, 1684), 7: (2024, 2120), 8: (864, 1796), 11: (1576, 1064), 13: (792, 876), 15: (2196, 892), 14: (2192, 1212)}
@@ -36,9 +37,9 @@ for k, (world, area, x, y) in enumerate(zone26.BALLS):
 W.save(d + '/balls.png')
 # Master Roshi on his island (land 5) joins once the story is over: his question, the join, then his line for later.
 l = fly(*LAND[5]) + ['mem 0300197C 1']; pl = ptr(l)
-talk = l + move(pl, 392, 398) + ['run 40', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 60', 'run 60', 'shot roshi_ask', 'tap A 40', 'run 60', 'shot roshi_joined', 'tap A 40', 'run 60', 'mem 0203F00C 1', 'tap A 40', 'run 60', 'shot roshi_ready', 'tap A 40', 'run 60', 'dump g 03001068 8a8']
+talk = l + move(pl, 392, 398) + ['run 40', 'keys UP', 'run 6', 'keys', 'run 4', 'tap A 60', 'run 60', 'shot roshi_ask', 'tap A 40', 'run 60', 'shot roshi_joined', 'tap A 40', 'run 60', 'mem %08X 1' % BN.FLAGS, 'tap A 40', 'run 60', 'shot roshi_ready', 'tap A 40', 'run 60', 'dump g 03001068 8a8']
 out = run(talk); g = open(d + '/g.bin', 'rb').read()
-bench = [int(x.split(':')[1].split()[0], 16) for x in out.splitlines() if x.startswith('mem 0203f00c')]
+bench = [int(x.split(':')[1].split()[0], 16) for x in out.splitlines() if x.startswith('mem %08x' % BN.FLAGS)]
 check('Master Roshi joins at Kame House after the ending', bench and bench[-1] >> 31 & 1 and 'bad pc' not in out)
 check('and gives his Turtle Shell', 165 in [struct.unpack_from('<I', g, 0xE8 + 4 * i)[0] & 0xFFFFFFF for i in range(min(g[0xE4], 250))])
 # Summon: hold all seven, land at the Lookout, talk to Mr. Popo.
@@ -52,7 +53,7 @@ page = lambda downs: ['tap DOWN 12'] * downs + ['tap A 20', 'run 180']          
 MORE = page(3)
 WISHES = {'power': page(0), 'rich': page(1), 'fighters': page(2), 'ss2': MORE + page(0), 'potential': MORE + page(2),
           'potara': MORE + page(1) + ['shot treasure'] + page(0), 'pouch': MORE + page(1) + page(3)}      # Nov 9: a second page, and four treasures
-MASTERY = 0x0203F000 + 20 + 20 * 22
+MASTERY = BN.MASTERY
 for name, keys in WISHES.items():
     t = start_ + keys[:-2] + ['tap A 20', 'run 180', 'shot done_' + name, 'mem %08X 6' % MASTERY, 'tap A 20', 'run 400', 'mem 0300197C 1', 'mem %08X 2' % (ITEMS & ~3), 'mem 0300155C 1', 'shot after_' + name, 'dump g 03001068 8a8']
     out = run(t); g = open(d + '/g.bin', 'rb').read()
@@ -70,7 +71,7 @@ for name, keys in WISHES.items():
     if name == 'ss2': check('Super Saiyan 2 opens', g[0x55 + 864 // 8] & 255 == 255 and g[0x55 + 872 // 8] & 1)
 # New Game+: the third page's wish to turn back time. The story starts over (the ending's flag 149 clear), the round counts (more flag 47,
 # the bench's flags2), Goku keeps his experience and plays the opening on Snake Way.
-NG_BYTE = 0x0203F000 + 482 + (47 - 32) // 8
+NG_BYTE = BN.FLAGS2 + (47 - 32) // 8
 t = start_ + MORE + page(3) + page(0) + ['shot time_say', 'tap A 20', 'run 200', 'dump g 03001068 8a8']
 before = run(start_ + ['dump g 03001068 8a8']); g0 = open(d + '/g.bin', 'rb').read()
 t += [v for k in range(14) for v in ['run 100', 'tap A 30'] + (['shot opening'] if k == 4 else [])] + ['run 200', 'shot ng_after', 'mem 0300197C 1', 'mem %08X 1' % NG_BYTE, 'dump g 03001068 8a8']

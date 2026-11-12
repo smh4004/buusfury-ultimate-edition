@@ -8,11 +8,12 @@ object's figure (+0x58) during the power-up is the new form's."""
 import os, re, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 from PIL import Image
 import numpy as np
 R, forms = T.R, T.forms
-MASTERY = 0x0203F000 + 20 + 20 * 22
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+MASTERY = BN.MASTERY
+BENCH_ON = BN.ON
 MASTERED = BENCH_ON + ['poke8 %08X FA' % (MASTERY + 5)]
 GUARD, OBJ = 0x0203F250, T.PLAYER_OBJ
 SS, KK, BLUE = 20, 37, 44

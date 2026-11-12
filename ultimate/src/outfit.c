@@ -78,17 +78,26 @@ static void guest_sync(void) {
 #define GEN_AT 0x4F1                         /* padding after the byte at 0x4F0: generation (2 bytes), then who is out, plus one */
 #define OUT_FIGHTER (G_BYTES[GEN_AT + 2])
 #define MIRROR (*(u8 **)0x03004A64)
-#define BENCH_OFFSET 0x1A20                  /* the three game blocks end here; EEPROM ends at 0x2000 */
+#define BENCH_OFFSET 0x1A20                  /* the three game blocks end here, in the first 8 KB: where benches versions 1 and 2 were saved */
 #define SAVE_BLOCK 0x8B0
-/* Version 2 of the bench: every fighter gets the same 22 bytes, so 21 fit where version 1 held 15. What it leaves out comes back by itself:
-   health and ki (a benched fighter returns rested) and skill levels past the fifth (no guest has more than five moves; build.py checks).
-   A level is 0-3, so each skill's two bytes go in two nibbles. */
-#define BENCH_MAGIC 0x32484342
-#define GROUPS 21
+/* Every fighter's entry, the same 22 bytes (since version 2). What it leaves out comes back by itself: health and ki (a benched fighter returns
+   rested) and skill levels past the fifth (no guest has more than five moves; build.py checks). A level is 0-3: each skill's two bytes go in
+   two nibbles. */
 struct entry { u8 gear[4], maxhp[2], maxki[2], exp[4], stats[4], unspent, levels[5]; };
-struct bench { u32 magic, gen, sum; u8 flags[4], used[4]; struct entry e[GROUPS]; u8 flags2[4], spare[10]; };   /* flags2: more flags 32-63 (older saves: zero) */
-#define BENCH (*(struct bench *)0x0203F000)
-typedef char bench_size_ok[sizeof(struct bench) == 496 && sizeof(struct entry) == 22 ? 1 : -1];
+/* Version 3 (Nov 12, with the 64 KB flash save): 48 fighters, and the transformations' mastery bytes a field of their own (version 2 kept them
+   in its last group). It no longer fits in the first 8 KB, so each game slot's bench has a 4 KB sector of the flash to itself (sectors 2-4),
+   read and written there as it is. Versions 2 and 1 are converted the first time a game reads its bench. */
+#define BENCH_MAGIC 0x33484342
+#define GROUPS 48
+struct bench { u32 magic, gen, sum; u8 flags[4], used[8], flags2[4], mastery[22], spare[14]; struct entry e[GROUPS]; };   /* flags2: more flags 32-63 */
+#define BENCH (*(struct bench *)0x0203F400)
+typedef char bench_size_ok[sizeof(struct bench) == 1120 && sizeof(struct entry) == 22 ? 1 : -1];
+#define BENCH_SECTOR(slot) ((2 + (slot)) << 12)
+/* Version 2, as the builds of Nov 9-12 saved it at BENCH_OFFSET: 21 groups, the last one holding the mastery bytes. */
+#define V2_MAGIC 0x32484342
+#define V2_GROUPS 21
+struct v2_bench { u32 magic, gen, sum; u8 flags[4], used[4]; struct entry e[V2_GROUPS]; u8 flags2[4], spare[10]; };
+typedef char v2_size_ok[sizeof(struct v2_bench) == 496 ? 1 : -1];
 /* Version 1, as earlier builds saved it: read once and converted. 11 full entries, then 4 small ones running through the tail and on into more[]. */
 #define V1_MAGIC 0x31484342
 #define V1_FULL 11
@@ -118,9 +127,9 @@ static void bytes_copy(u8 *to, const u8 *from, int n) { while (n-- > 0) *to++ = 
 static void bytes_zero(u8 *to, int n) { while (n-- > 0) *to++ = 0; }
 static u32 gen_of(const u8 *game) { return game[GEN_AT] | game[GEN_AT + 1] << 8; }
 static u32 sum_bytes(u32 sum, const u8 *p, int n) { while (n-- > 0) sum = sum * 31 + *p++; return sum; }
-static u32 bench_sum(const struct bench *b) {
-    u32 sum = sum_bytes(b->gen ^ 0x5A5B, b->flags, sizeof b->flags + sizeof b->used + sizeof b->e + sizeof b->flags2 + sizeof b->spare);
-    return sum;
+static u32 bench_sum(const struct bench *b) { return sum_bytes(b->gen ^ 0x5A5C, b->flags, sizeof(struct bench) - 12); }
+static u32 v2_sum(const struct v2_bench *b) {
+    return sum_bytes(b->gen ^ 0x5A5B, b->flags, sizeof b->flags + sizeof b->used + sizeof b->e + sizeof b->flags2 + sizeof b->spare);
 }
 static u32 v1_sum(const struct v1_bench *b) {
     const u8 *p = (const u8 *)b->e; u32 sum = b->gen ^ 0x5A5A, i;
@@ -129,9 +138,9 @@ static u32 v1_sum(const struct v1_bench *b) {
     for (i = 0; i < sizeof b->flags + sizeof b->more; i++) if (p[i]) sum = sum * 31 + p[i] + i;
     return sum;
 }
-static const u8 *saved_at(int slot) { return MIRROR + BENCH_OFFSET + slot * sizeof(struct bench); }
-static const struct bench *saved_bench(int slot) { return (const struct bench *)saved_at(slot); }
+static const u8 *saved_at(int slot) { return MIRROR + BENCH_OFFSET + slot * sizeof(struct v2_bench); }
 static int bench_valid(const struct bench *b, u32 gen) { return b->magic == BENCH_MAGIC && b->gen == gen && b->sum == bench_sum(b); }
+static int v2_valid(const struct v2_bench *b, u32 gen) { return b->magic == V2_MAGIC && b->gen == gen && b->sum == v2_sum(b); }
 static int v1_valid(const struct v1_bench *b, u32 gen) { return b->magic == V1_MAGIC && b->gen == gen && b->sum == v1_sum(b); }
 
 static void put_le(u8 *to, u32 v, int n) { while (n-- > 0) { *to++ = v; v >>= 8; } }
@@ -162,15 +171,36 @@ static void v1_convert(const struct v1_bench *o) {
     }
 }
 
-/* Make the bench in memory the one that goes with this game. */
+/* Version 2's 20 fighters keep their groups; its last group, the mastery bytes, goes to the field of its own. */
+static void v2_convert(const struct v2_bench *o) {
+    int g;
+    bytes_zero((u8 *)&BENCH, sizeof BENCH);
+    BENCH.magic = BENCH_MAGIC; BENCH.gen = o->gen;
+    bytes_copy(BENCH.flags, o->flags, 4); bytes_copy(BENCH.flags2, o->flags2, 4);
+    for (g = 0; g < V2_GROUPS - 1; g++) {
+        bytes_copy((u8 *)&BENCH.e[g], (const u8 *)&o->e[g], sizeof(struct entry));
+        if (o->used[g >> 3] >> (g & 7) & 1) mark_used(g);
+    }
+    bytes_copy(BENCH.mastery, o->e[V2_GROUPS - 1].gear, sizeof BENCH.mastery);
+}
+
+static void flash_read(int a, u8 *to, int n);
+/* Make the bench in memory the one that goes with this game: its own sector of the flash, else a version 2 or 1 bench in the first 8 KB,
+   else an empty one. (A game that never swapped a guest has generation 0, and its bench stays empty until something changes it.) */
 static void bench_ready(void) {
     u32 gen = gen_of(G_BYTES); int s;
-    if (gen && BENCH.magic == BENCH_MAGIC && BENCH.gen == gen) return;
-    if (gen && MIRROR) {
-        for (s = 0; s < 3; s++)
-            if (bench_valid(saved_bench(s), gen)) { bytes_copy((u8 *)&BENCH, saved_at(s), sizeof(struct bench)); return; }
-        for (s = 0; s < 3; s++)
-            if (v1_valid((const struct v1_bench *)saved_at(s), gen)) { v1_convert((const struct v1_bench *)saved_at(s)); return; }
+    if (BENCH.magic == BENCH_MAGIC && BENCH.gen == gen) return;
+    if (gen) {
+        for (s = 0; s < 3; s++) {
+            flash_read(BENCH_SECTOR(s), (u8 *)&BENCH, sizeof BENCH);
+            if (bench_valid(&BENCH, gen)) return;
+        }
+        if (MIRROR) {
+            for (s = 0; s < 3; s++)
+                if (v2_valid((const struct v2_bench *)saved_at(s), gen)) { v2_convert((const struct v2_bench *)saved_at(s)); return; }
+            for (s = 0; s < 3; s++)
+                if (v1_valid((const struct v1_bench *)saved_at(s), gen)) { v1_convert((const struct v1_bench *)saved_at(s)); return; }
+        }
     }
     bytes_zero((u8 *)&BENCH, sizeof BENCH);
     BENCH.magic = BENCH_MAGIC; BENCH.gen = gen;
@@ -309,65 +339,65 @@ static void bench_settle(int was) {
     *(u16 *)(r + 0x1A) = *(u16 *)(r + 0x1C);
 }
 
-/* The game's EEPROM write, whole, with the bench written after a game block when that slot doesn't already hold it. Same steps as the original at 0x0803FBDE. */
+/* The game's save write (0x0803FBDE), whole, with the bench written to its sector after a game block when that sector doesn't already hold it. */
 #define Copy ((void (*)(void *, const void *, int))0x08049145)
 #define SoundPause ((void (*)(u32))0x0803F279)
 #define SoundResume ((void (*)(u32))0x0803F28F)
 #define TimersStop ((void (*)(void))0x080401DB)
 #define TimersStart ((void (*)(void))0x080401F5)
-#define EepromWrite8 ((void (*)(int, const void *))0x08040B5D)
 #define IME (*(volatile u16 *)0x04000208)
 #define SOUND_OBJ (**(u32 **)0x0803FCA8)
-#ifndef FLASH_SAVE
-static void eeprom_write(int offset, const void *src, int len) {
-    int i;
-    Copy(MIRROR + offset, src, len);
-    SoundPause(SOUND_OBJ);
-    TimersStop();
-    IME = 0;
-    for (i = 0; i < len; i += 8) EepromWrite8((offset + i) >> 3 & 0xFFFF, (const u8 *)src + i);
-    IME = 1;
-    TimersStart();
-    SoundResume(SOUND_OBJ);
-}
-#else
-/* A 64 KB flash save in place of the 8 KB EEPROM (Nov 12; build.py builds it unless BFU_EEPROM=1). Its first 8 KB hold what the EEPROM held, at the
-   same places and in the byte order of an emulator's EEPROM save file (each 8-byte block back to front), so an old save file is the start
-   of the new one. The mirror still holds those 8 KB; a write erases each 4 KB sector it touches and programs it again from the mirror. */
+/* A 64 KB flash save in place of the 8 KB EEPROM (Nov 12). Its first 8 KB hold what the EEPROM held, at the same places and in the byte order of
+   an emulator's EEPROM save file (each 8-byte block back to front), so an old save file is the start of the new one. The mirror still holds those
+   8 KB; a write there erases each 4 KB sector it touches and programs it again from the mirror. Each game's bench has a sector of its own. */
 #define FLASH ((volatile u8 *)0x0E000000)
 #define WAITCNT (*(volatile u16 *)0x04000204)
 #define Alloc ((u8 *(*)(int))0x0803D5B9)
 static void flash_cmd(int c) { FLASH[0x5555] = 0xAA; FLASH[0x2AAA] = 0x55; FLASH[0x5555] = c; }
 static void flash_wait(int a, int want) { int t = 0x40000; while (FLASH[a] != want && --t) ; }
-static void flash_sector(int s) {
-    int a = s << 12, i, v;
+/* Erase the sector at a and program it with n bytes of src (src[i ^ swap]: 7 for the mirror's order), the rest left blank. */
+static void flash_program(int a, const u8 *src, int n, int swap) {
+    int i, v;
     flash_cmd(0x80); FLASH[0x5555] = 0xAA; FLASH[0x2AAA] = 0x55; FLASH[a] = 0x30;
     flash_wait(a, 0xFF);
     for (i = 0; i < 0x1000; i++) {
-        v = MIRROR[(a + i) ^ 7];
+        v = i < n ? src[i ^ swap] : 0xFF;
         if (FLASH[a + i] == v) continue;                   /* erased bytes read 0xFF (0x00 in older VBA-M, Delta's core: those get written) */
         flash_cmd(0xA0); FLASH[a + i] = v; flash_wait(a + i, v);
     }
 }
-static void eeprom_write(int offset, const void *src, int len) {
-    int s, wc;
-    Copy(MIRROR + offset, src, len);
+static int flash_begin(void) {
+    int wc = WAITCNT;
     SoundPause(SOUND_OBJ);
     TimersStop();
     IME = 0;
-    wc = WAITCNT; WAITCNT = (wc & ~3) | 3;                 /* the flash chip wants 8 waits */
-    for (s = offset >> 12; s <= (offset + len - 1) >> 12; s++) flash_sector(s);
+    WAITCNT = (wc & ~3) | 3;                               /* the flash chip wants 8 waits */
+    return wc;
+}
+static void flash_end(int wc) {
     WAITCNT = wc;
     IME = 1;
     TimersStart();
     SoundResume(SOUND_OBJ);
+}
+static void flash_read(int a, u8 *to, int n) {
+    int wc = WAITCNT;
+    WAITCNT = (wc & ~3) | 3;
+    while (n-- > 0) *to++ = FLASH[a++];
+    WAITCNT = wc;
+}
+static void eeprom_write(int offset, const void *src, int len) {
+    int s, wc;
+    Copy(MIRROR + offset, src, len);
+    wc = flash_begin();
+    for (s = offset >> 12; s <= (offset + len - 1) >> 12; s++) flash_program(s << 12, MIRROR + (s << 12), 0x1000, 7);
+    flash_end(wc);
 }
 /* The game's start-up read (0x0803FB7C): the 8 KB mirror, filled from the flash. Asking the chip its id first makes an emulator take
    the save for a flash chip before the first read (mGBA decides by the first access). BF's EEPROM read took 3,104 scanlines in mGBA
    (13 frames and 140 lines, about 0.22 s); the flash takes a tenth of that. Every route and every frame after
    start-up was timed with the EEPROM's (the clean game's, the tests', the game's own counters), so the read waits out the same
    scanlines and the game goes on at the same line of the same frame as before. The EEPROM library's type pointer is set as BF set it. */
-#define VCOUNT (*(volatile u16 *)0x04000006)
 #define EepromType ((int (*)(int))0x080407A1)
 #define BOOT_LINES 3104
 static int lines_since(int last, int *lines) { int v = VCOUNT, d = v - last; if (d < 0) d += 228; *lines += d; return v; }
@@ -376,10 +406,7 @@ void save_init(u32 *present) {
     EepromType(0x40);
     m = Alloc(0x2000);
     MIRROR = m;
-    SoundPause(SOUND_OBJ);
-    TimersStop();
-    IME = 0;
-    wc = WAITCNT; WAITCNT = (wc & ~3) | 3;
+    wc = flash_begin();
     flash_cmd(0x90); (void)FLASH[0]; (void)FLASH[1]; flash_cmd(0xF0);
     for (i = 0; i < 0x2000; i++) {
         m[i] = FLASH[i ^ 7];
@@ -387,15 +414,12 @@ void save_init(u32 *present) {
     }
     WAITCNT = wc;
     while (lines < BOOT_LINES) last = lines_since(last, &lines);
-    IME = 1;
-    TimersStart();
-    SoundResume(SOUND_OBJ);
+    flash_end(wc);
     *present = 1;
 }
-#endif
 void save_write(int *save, int offset, const u8 *src, int len) {
-    int slot;
-    u32 gen;
+    int slot, wc;
+    u32 gen, head[3];
     if (!*save) return;
     eeprom_write(offset, src, len);
     if (len != SAVE_BLOCK || offset < 0x10) return;
@@ -405,8 +429,11 @@ void save_write(int *save, int offset, const u8 *src, int len) {
     if (!gen || gen != gen_of(G_BYTES)) return;              /* nothing swapped, or a deleted game */
     bench_ready();
     BENCH.sum = bench_sum(&BENCH);
-    if (saved_bench(slot)->magic == BENCH_MAGIC && saved_bench(slot)->gen == gen && saved_bench(slot)->sum == BENCH.sum) return;
-    eeprom_write(BENCH_OFFSET + slot * sizeof(struct bench), &BENCH, sizeof(struct bench));
+    flash_read(BENCH_SECTOR(slot), (u8 *)head, sizeof head);
+    if (head[0] == BENCH_MAGIC && head[1] == gen && head[2] == BENCH.sum) return;
+    wc = flash_begin();
+    flash_program(BENCH_SECTOR(slot), (const u8 *)&BENCH, sizeof BENCH, 0);
+    flash_end(wc);
 }
 
 struct clash { u8 *p, *e; u32 p_at, e_at, cool, surge; int active, push, start, near_p, near_e, tick; u16 energy[3]; u16 shadow[6]; };
@@ -1707,7 +1734,7 @@ void superkame_start(u32 *self, void *player) { kv_begin(self, player, kv_params
 void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]); }
 /* Goku's Kamehameha counts its uses at its top level towards the Super Kamehameha (skills_sync) */
 static int derived_level(int c, int skill);
-#define MASTERY_BYTES ((u8 *)BENCH.e[GROUPS - 1].gear)
+#define MASTERY_BYTES (BENCH.mastery)
 /* Master Roshi's Kamehameha: his own pose (slot BEAM_POSE, build.py roshi_pose), and the beam from his hands. The Kamehameha's update (0x0801BE40)
    places the beam on its 24th frame at the fighter's place plus a step per facing (0x0871E128), set for Goku's reach; Roshi's arms are
    shorter, so it started a few pixels past his hands. His behaviour gets kame_vt (build.py: the Kamehameha's, with this update), which then
@@ -2172,7 +2199,7 @@ static int ss2_open(const u8 *record, int owner);
 #define MAX_HELD 6         /* skills a record holds: +0x0D..+0x12. +0x13 is the equipment's flags byte (Recalculate, 0x08013C67, rewrites it), not a seventh skill */
 #define GetLevel ((int (*)(u8 *))0x080135D3)
 #define G_FLAGS ((void *)0x03001068)
-#define MASTERY ((u8 *)BENCH.e[GROUPS - 1].gear)           /* 22 bytes: one per (character, tier) in mastery_slot order, then Goku's Kamehameha count */
+#define MASTERY (BENCH.mastery)           /* 22 bytes: one per (character, tier) in mastery_slot order, then Goku's Kamehameha count */
 static u8 *rec_of(int c) { return RECORDS + c * RECORD_SIZE; }
 static int book_at(int c, int skill) {
     int i;

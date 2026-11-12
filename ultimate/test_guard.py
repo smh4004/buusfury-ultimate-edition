@@ -10,6 +10,7 @@ OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(pr
 ROM = OUT + '/BFU_debug_enemy_PERSONAL_USE_ONLY.gba'
 sys.argv = [sys.argv[0], ROM, D]
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 R = T.R; PLAYER = 0x03001C34; BLAST_VTS = (0x0804B454, 0x08049F0C)      # an enemy's ki blast; a gunman's shot
 fails = []
 def check(name, ok):
@@ -70,8 +71,8 @@ print('   the Gunman lost %d health to his own shots (a shot only ever hits the 
 # Fully mastered Kaioken (Nov 9): its bar (0x0203F250) takes the Gunman's shots, health stays, and he isn't staggered: his animation never turns
 # to the hit (slot 9) one. Without mastery the shots hurt and stagger him.
 import struct
-MASTERY = 0x0203F000 + 20 + 20 * 22
-MASTERED = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12', 'poke8 %08X FA' % (MASTERY + 5)]
+MASTERY = BN.MASTERY
+MASTERED = BN.ON + ['poke8 %08X FA' % (MASTERY + 5)]
 GUARD = 0x0203F250
 rom = open(ROM, 'rb').read()
 def slot_anim(form, slot):

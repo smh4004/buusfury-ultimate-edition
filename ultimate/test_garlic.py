@@ -19,7 +19,8 @@ ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 ACTORS = json.load(open(OUT + '/BFU_debug_zone.map.json'))['actors']
 FLOOR = floorcheck.Floor(ROM)
 G = 0x03001068; PLAYER = 0x03001C34; AT = 0x0300197C; REC0 = 0x03001560; ZENIE = 0x0300155C; ENEMIES = 0x03001BB4; COUNT = 0x03001BB0
-FLAGS2 = 0x0203F000 + 20 + 21 * 22
+import bench as BN
+FLAGS2 = BN.FLAGS2
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
 WALK_IN = 150
 AREA = lambda wa: wa[1] << 8 | wa[0]

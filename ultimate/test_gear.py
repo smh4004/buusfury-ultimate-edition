@@ -8,12 +8,13 @@ costs half the health. Senzu Pouch: health comes back during a fight. The gear i
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_moves as T
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import bench as BN    # the guest bench (lib/bench.py)
 R = T.R; forms = T.forms
 POTARA, GRAVITY, SHADES, SHELL, POUCH = 162, 163, 164, 165, 166
-MASTERY = 0x0203F000 + 20 + 20 * 22            # outfit.c MASTERY: the bench's last group
+MASTERY = BN.MASTERY                        # outfit.c MASTERY
 # a bench of this game's own (magic, generation, and the generation in the game at +0x4F1), so the mastery bytes poked here stay: a fresh
 # game has none until something is saved there (outfit.c bench_mine)
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+BENCH_ON = BN.ON
 fails = []
 def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)

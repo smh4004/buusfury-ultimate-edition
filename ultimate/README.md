@@ -905,6 +905,23 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     - `test_build`'s Super Saiyan damage readings: at some waits one of the Bomber's bombs (he is up 114 frames sooner) catches Goku
       just as he presses, and the press does nothing; such a reading is dropped and the next wait tried (`samples`), three readings
       in the form each time, as before.
+- Nov 12, 16:11, the owner: "What else was next on the list after Gohan. Start with Gohan and the guest bench though". The guest bench,
+  version 3: room for 48 guest groups (it had 20, all taken; Teen Gohan is the 21st).
+  - `outfit.c`: `struct bench { magic, gen, sum; flags[4], used[8], flags2[4], mastery[22], spare[14]; struct entry e[48]; }`, 1,120
+    bytes at 0x0203F400 in memory (in the free top of outfit.c's 4 KB; version 2 was 496 bytes at 0x0203F000). Each game slot's bench has
+    a 4 KB sector of the flash to itself (0x2000, 0x3000, 0x4000), as it is in memory: the game's own 8 KB stays as it was, in the
+    EEPROM file's order. A save writes the bench's sector only when its contents changed (checked against the chip).
+  - The transformations' mastery bytes have their own field (version 2 kept them in its last group's entry), so no group is set aside.
+  - Older benches carry over the first time a game reads its bench: version 2 (magic `CBH2`, at 0x1A20 + slot * 496 in the first 8 KB:
+    20 groups, the mastery, the flags) and version 1, both read from the 8 KB mirror. Version 2's mastery group isn't marked used. The
+    old area is left as it was; the raid's more flags 64-67 (see the Great Ape) aren't carried over.
+  - `BFU_EEPROM` builds are gone (the bench needs the flash); `test_flash.py` compares with the EEPROM build kept from earlier.
+    `build.py BENCH_GROUPS` (48) stops the build if outfits.json asks for more.
+  - `lib/bench.py`: where the tests find the bench (memory and file). Every test that pokes or reads it uses it now (bog, chamber,
+    dragon, garlic, gear, guard, kaioken, ladder, mastery, nov10, ssg, zone26, slots, flash).
+  - `test_slots.py` (on a slot-test build of this code): all 57 checks, with a new section 9: a version 2 bench saved by the Nov 12
+    slot-test build (Broly, Piccolo, Goku Black, Roshi, and mastery bytes poked in) carries over, every fighter's progress and the
+    mastery with it, and version 2's mastery group is no fighter's.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
@@ -955,7 +972,8 @@ branch `shelf/great-ape` (commit aeac6a6). Its ids stay taken so a save from the
 are empty rows and forms 159-161 copies of the GT looks they changed from (`build.py` `SHELVED_SKILLS`, `SHELVED_FORMS`), and
 `outfit.c shelved_fix` puts such a fighter back in his own look, takes those skills out of his slots (the selection stays on the skill it
 was on) and clears book bits with no book entry (`test_shelved.py`). Such a save may also hold the raid's more flags 64-67 in the bench's
-first four spare bytes: clear them before giving those bytes another use.
+first four spare bytes: clear them before giving those bytes another use. (Bench version 3, Nov 12, doesn't carry them over: its spare
+bytes start clear.)
 
 ## Beerus (Nov 9, for the Battle of Gods post-game)
 Buu's Fury has no Beerus, so `lib/beerus.py` makes every frame from BF Kid Buu's (actor 38): the same 15 x 31 build as the owner's front sprite

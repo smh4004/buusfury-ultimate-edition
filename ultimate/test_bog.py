@@ -14,8 +14,8 @@ OUT = sys.argv[1]; D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(pr
 ROM = OUT + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 FLOOR = floorcheck.Floor(ROM)        # a talk's teleport onto a wall stops the test (lib/floorcheck.py)
 G = 0x03001068; PLAYER = 0x03001C34; AT = 0x0300197C; REC0 = 0x03001560
-MASTERY = 0x0203F000 + 20 + 20 * 22; FLAGS2 = 0x0203F000 + 20 + 21 * 22
-BENCH_ON = ['poke 0203F000 32484342', 'poke 0203F004 00001234', 'poke8 03001559 34', 'poke8 0300155A 12']
+import bench as BN
+MASTERY, FLAGS2, BENCH_ON = BN.MASTERY, BN.FLAGS2, BN.ON
 start = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'keys DOWN', 'run 30', 'keys', 'run 200']
 WALK_IN = 150    # frames after the zone 26 door until Goku's walk into West City is over (about 117; 110 left two frames, Nov 9)
 AREA = lambda wa: wa[1] << 8 | wa[0]
