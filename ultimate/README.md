@@ -733,6 +733,9 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   Goku's leg under it back in his own leg colours, his tail Super Saiyan 4 Vegeta's from behind (the owner's approved figure: a curl out
   to the side at his waist). From the side the sheet's tail sticks straight out of his upper back at chest height; as an option, a tail
   from his waist taken from Gogeta's (both drawn on the same BF frames) in his reds.
+  00:49, the owner: "You made the tail worse and also I meant his back itself but now both are broken wtf". The tail change is out of
+  the preview (the sheet's tail stays). Nothing of this was ever in the build. Asked the owner what is broken on his back, with a
+  picture of his back as it is in the game.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

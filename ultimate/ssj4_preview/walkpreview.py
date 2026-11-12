@@ -34,7 +34,7 @@ def bf_for(k):
                     m = int((np.roll(np.roll(bm, dy, 0), dx, 1) & cm).sum())
                     if best is None or m > best[0]: best = (m, dy, dx, b)
     _bf[k] = np.roll(np.roll(best[3], best[1], 0), best[2], 1); return _bf[k]
-def fixed(k): return walkfix.apply(fr(GOKU, *k), bf_for(k), walkfix.FIXES.get(k, []), fr(GOKU, 0, 0, k[2]), VEGETA, k[2])
+def fixed(k): return walkfix.apply(fr(GOKU, *k), bf_for(k), walkfix.FIXES.get(k, []), fr(GOKU, 0, 0, k[2]))
 def cell(c):
     c = c[BOX[0]:BOX[1], BOX[2]:BOX[3]]; rgb = R.rgb(c).copy(); rgb[c == 0] = BG; return rgb
 now = lambda k: cell(fr(GOKU, *k)); new = lambda k: cell(fixed(k))
