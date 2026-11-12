@@ -819,6 +819,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   head) and the eye his hair's colour, the special's last frame its frame before held. Checked: in every frame but costume out 5-8
   his shape is Goku's preview's exactly (so no see-through pixel Goku hasn't) and his skin and fur are where Goku's are; the spin
   sides are his fronts mirrored. Preview `ssj4_daima_heads_legs_holes_before_fixed.pdf` (57 pictures). In no build.
+  09:28, the owner: "fix the tail on some of those back combo frames where it looks disconnected then it'll be good". From behind his
+  tail hangs from his crotch to the floor in front of his legs (the sheet's, as on Goku); `v4.boots` had painted BF Goku's boots over
+  it, so in combo 2's first frame only its tip was left at the floor and in combo 1's first a gap cut it in two (fewer pixels in the
+  walk, run, ki blast, hit, victory, jump and flying from behind). `daimafix.tail`: below his belt (row 62 where BF's arms hide the
+  belt), Goku's fur over Daima's boot is his fur again, 87 pixels in 29 frames. In the finisher's first frame (his right leg kicked out
+  sideways) the tail's top hangs in the air two rows under his hip, Goku's too: two pixels join it (`BRIDGE`). Preview
+  `ssj4_daima_tail_before_fixed.pdf` (his hips to his feet, the combos first). In no build.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

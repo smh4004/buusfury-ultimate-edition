@@ -145,19 +145,40 @@ def gogeta_head(out, mt, g):
     return out
 
 
+def tail(out, mt, k):
+    """from behind, his tail where Goku's is: the tail hangs from his crotch to the floor in front of his legs; v4.boots painted BF
+    Goku's boots over it in some frames (a combo's from behind most: combo 2's first frame kept only its tip), so it looked cut
+    off from him. The owner, Nov 12 09:28: "fix the tail on some of those back combo frames where it looks disconnected". Below his
+    belt, Goku's fur over Daima's boot -> his fur again"""
+    belt = P.belt_rows(P.bf_for(k))
+    out = out.copy(); top = max(belt) + 1 if belt else 62                # (BF's belt hidden by his arms: below row 61, his hips)
+    m = np.zeros(out.shape, bool); m[top:] = np.isin(mt[top:], list(FUR)) & ~np.isin(out[top:], list(set(FUR.values())))
+    for y, x in zip(*np.nonzero(m)): out[y, x] = FUR[int(mt[y, x])]
+    for (y, x), v in BRIDGE.get(k, {}).items():
+        assert out[y, x] == 0; out[y, x] = FUR[v]
+    return out
+
+
+# the one tail from behind whose top hangs in the air (the sheet's, Goku's too): the finisher's first frame, his right leg kicked out
+# sideways; the tail starts two rows below his hip's fur, beside the leg he stands on. Two pixels join it to the hip (GT colours).
+BRIDGE = {(6, 0, 1): {(64, 58): 104, (65, 58): 32}}
+
+
 _f = {}
-def fixed(k):
-    """Daima with every fix Super Saiyan 4 Goku's preview has (plainback.fixed: arms, plain back, see-through pixels, heads.py)"""
-    if k in _f: return _f[k]
+def fixed(k, with_tail=True):
+    """Daima with every fix Super Saiyan 4 Goku's preview has (plainback.fixed: arms, plain back, see-through pixels, heads.py), and
+    (09:28) his tail joined from behind (tail); with_tail=False: the preview before that"""
+    if (k, with_tail) in _f: return _f[k, with_tail]
     s, f, d = k
     if s >= 22: r = daima(k)
-    elif s == 21 and f == 10: r = fixed((21, 9, 0))                    # the special's last frame: the one before it, held
-    elif s == 16 and d == 2: r = H.spin_side(fixed((16, f, 0)))        # the spin from the side: his front, mirrored and moved
+    elif s == 21 and f == 10: r = fixed((21, 9, 0), with_tail)          # the special's last frame: the one before it, held
+    elif s == 16 and d == 2: r = H.spin_side(fixed((16, f, 0), with_tail))   # the spin from the side: his front, mirrored and moved
     else:
         r, mt = body(k)
         if s == 16 and d == 0: r = spin_legs(r, mt, fr(BF, *k))
         if k == (9, 1, 2): r = gogeta_head(r, mt, fr(GOG, *k))
-    _f[k] = r; return r
+        if d == 1 and with_tail: r = tail(r, mt, k)
+    _f[k, with_tail] = r; return r
 
 
 def keys():
@@ -185,7 +206,9 @@ if __name__ == '__main__':
     shape = []; cls = []
     for k in ks:
         dm = fixed(k); g = P.fixed(k)
-        if k not in HEAD_OVER and ((dm != 0) != (g != 0)).any(): shape.append((k, int(((dm != 0) != (g != 0)).sum())))
+        diff = (dm != 0) != (g != 0)
+        for (y, x) in BRIDGE.get(k, {}): diff[y, x] = False                 # (the two pixels that join the finisher's tail)
+        if k not in HEAD_OVER and diff.any(): shape.append((k, int(diff.sum())))
         own = np.isin(v4.frame(*k, 'mix'), (1, 111, 112)) if k[0] != 16 and k[:2] != (21, 10) and k != (9, 1, 2) else np.zeros(g.shape, bool)
         n = int(((np.isin(g, A.FURS) & np.isin(dm, SKIN)) | (np.isin(g, SKIN) & np.isin(dm, (127, 39, 40))))[~own].sum())
         if n and k not in HEAD_OVER: cls.append((k, n))
@@ -223,5 +246,25 @@ if __name__ == '__main__':
         pages[0].save(path, save_all=True, append_images=pages[1:], resolution=96)
         print(path, len(uniq), 'pictures,', len(pages), 'pages')
     sheet(daima, armback, OUT + '/ssj4_daima_arms_back_before_fixed.pdf', 'Daima SSJ4 Goku: arms and back. In each pair: BEFORE left, FIXED right')
-    sheet(armback, fixed, OUT + '/ssj4_daima_heads_legs_holes_before_fixed.pdf',
+    sheet(armback, lambda k: fixed(k, False), OUT + '/ssj4_daima_heads_legs_holes_before_fixed.pdf',
           'Daima SSJ4 Goku: heads, spin legs, see-through pixels. Each pair: BEFORE left (the last preview), FIXED right')
+    # the tail from behind (09:28): his legs close up, the combos first
+    tk = [k for k in ks if k[2] == 1 and (fixed(k) != fixed(k, False)).any()]
+    tk = [k for k in tk if k[0] in (4, 5, 6)] + [k for k in tk if k[0] not in (4, 5, 6)]
+    cb = (50, 74, 36, 70); ch_, cw_ = cb[1] - cb[0], cb[3] - cb[2]; zz = 9; cols = 3; lab = 40; gap = 24
+    def crop(c):
+        c = c[cb[0]:cb[1], cb[2]:cb[3]]; im = v4.R.rgb(c).copy(); im[c == 0] = BG
+        return Image.fromarray(im).resize((cw_ * zz, ch_ * zz), Image.NEAREST)
+    pages = []; per = 9; pw = cols * (2 * cw_ * zz + 10 + gap)
+    for p in range(0, len(tk), per):
+        part = tk[p:p + per]; rows = (len(part) + cols - 1) // cols
+        img = Image.new('RGB', (pw, 34 + rows * (ch_ * zz + lab + 12)), (30, 40, 30)); d = ImageDraw.Draw(img)
+        d.text((8, 7), 'Daima SSJ4 Goku from behind, hips to feet: his tail. Each pair: BEFORE left, FIXED right', fill=(255, 255, 255), font=FB)
+        for j, k in enumerate(part):
+            x = (j % cols) * (2 * cw_ * zz + 10 + gap); y = 34 + (j // cols) * (ch_ * zz + lab + 12)
+            d.text((x + 6, y + 2), '%s %d, back' % (NAME.get(k[0], k[0]), k[1] + 1), fill=(255, 255, 255), font=F)
+            d.text((x + 6, y + 20), 'BEFORE', fill=(255, 200, 120), font=F); d.text((x + cw_ * zz + 16, y + 20), 'FIXED', fill=(140, 255, 140), font=F)
+            img.paste(crop(fixed(k, False)), (x, y + lab)); img.paste(crop(fixed(k)), (x + cw_ * zz + 10, y + lab))
+        pages.append(img)
+    pages[0].save(OUT + '/ssj4_daima_tail_before_fixed.pdf', save_all=True, append_images=pages[1:], resolution=96)
+    print('tail:', len(tk), 'frames from behind,', sum(int((fixed(k) != fixed(k, False)).sum()) for k in tk), 'pixels:', tk)
