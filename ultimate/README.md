@@ -826,6 +826,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   belt), Goku's fur over Daima's boot is his fur again, 87 pixels in 29 frames. In the finisher's first frame (his right leg kicked out
   sideways) the tail's top hangs in the air two rows under his hip, Goku's too: two pixels join it (`BRIDGE`). Preview
   `ssj4_daima_tail_before_fixed.pdf` (his hips to his feet, the combos first). In no build.
+  09:46, the owner: "It looks like you didn't do a single thing", "And now it looks attached to his hand on front view". The rule
+  had also turned a wristband pixel beside his fist to fur (combo 1's third frame from behind, row 60) and reached past the combos
+  (flying from behind: a row of his boots). Now only the combos (slots 4-6), only from row 62 down, only boot blue, never a pixel
+  beside skin: 28 pixels in 8 frames (combo 1's first, combo 2's first the most). The preview shows each changed frame big, before,
+  fixed, and fixed with the changed pixels in yellow, so the change can be seen.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

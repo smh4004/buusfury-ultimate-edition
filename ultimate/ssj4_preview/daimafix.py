@@ -146,13 +146,18 @@ def gogeta_head(out, mt, g):
 
 
 def tail(out, mt, k):
-    """from behind, his tail where Goku's is: the tail hangs from his crotch to the floor in front of his legs; v4.boots painted BF
-    Goku's boots over it in some frames (a combo's from behind most: combo 2's first frame kept only its tip), so it looked cut
-    off from him. The owner, Nov 12 09:28: "fix the tail on some of those back combo frames where it looks disconnected". Below his
-    belt, Goku's fur over Daima's boot -> his fur again"""
-    belt = P.belt_rows(P.bf_for(k))
-    out = out.copy(); top = max(belt) + 1 if belt else 62                # (BF's belt hidden by his arms: below row 61, his hips)
+    """from behind, in the combos (slots 4-6; the owner, Nov 12 09:28: "fix the tail on some of those back combo frames where it looks
+    disconnected"), his tail where Goku's is: it hangs from his crotch to the floor in front of his legs; v4.boots painted BF Goku's
+    boots over it (combo 2's first frame kept only its tip at the floor, combo 1's first had boot across its middle), so it looked cut
+    off from him. From his hips down (row 62), Goku's fur over Daima's boot -> his fur again; never a pixel beside his skin (09:46,
+    "now it looks attached to his hand": the first version also turned a wristband pixel beside his fist in combo 1's third frame to
+    fur, and touched other moves)"""
+    if k[0] not in (4, 5, 6): return out
+    out = out.copy(); top = 62
+    skin = np.isin(out, SKIN); near = np.zeros(out.shape, bool)
+    near[1:] |= skin[:-1]; near[:-1] |= skin[1:]; near[:, 1:] |= skin[:, :-1]; near[:, :-1] |= skin[:, 1:]
     m = np.zeros(out.shape, bool); m[top:] = np.isin(mt[top:], list(FUR)) & ~np.isin(out[top:], list(set(FUR.values())))
+    m &= np.isin(out, BLUES) & ~near
     for y, x in zip(*np.nonzero(m)): out[y, x] = FUR[int(mt[y, x])]
     for (y, x), v in BRIDGE.get(k, {}).items():
         assert out[y, x] == 0; out[y, x] = FUR[v]
@@ -248,23 +253,25 @@ if __name__ == '__main__':
     sheet(daima, armback, OUT + '/ssj4_daima_arms_back_before_fixed.pdf', 'Daima SSJ4 Goku: arms and back. In each pair: BEFORE left, FIXED right')
     sheet(armback, lambda k: fixed(k, False), OUT + '/ssj4_daima_heads_legs_holes_before_fixed.pdf',
           'Daima SSJ4 Goku: heads, spin legs, see-through pixels. Each pair: BEFORE left (the last preview), FIXED right')
-    # the tail from behind (09:28): his legs close up, the combos first
-    tk = [k for k in ks if k[2] == 1 and (fixed(k) != fixed(k, False)).any()]
-    tk = [k for k in tk if k[0] in (4, 5, 6)] + [k for k in tk if k[0] not in (4, 5, 6)]
-    cb = (50, 74, 36, 70); ch_, cw_ = cb[1] - cb[0], cb[3] - cb[2]; zz = 9; cols = 3; lab = 40; gap = 24
-    def crop(c):
-        c = c[cb[0]:cb[1], cb[2]:cb[3]]; im = v4.R.rgb(c).copy(); im[c == 0] = BG
+    # the tail from behind (09:28, 09:46): each changed frame big, before, fixed, and fixed with the changed pixels in yellow
+    tk = [k for k in ks if (fixed(k) != fixed(k, False)).any()]
+    cb = (40, 74, 34, 74); ch_, cw_ = cb[1] - cb[0], cb[3] - cb[2]; zz = 9; lab = 24; gap = 14
+    def crop(c, mark=None):
+        c2 = c[cb[0]:cb[1], cb[2]:cb[3]]; im = v4.R.rgb(c2).copy(); im[c2 == 0] = BG
+        if mark is not None: im[mark[cb[0]:cb[1], cb[2]:cb[3]]] = (255, 255, 0)
         return Image.fromarray(im).resize((cw_ * zz, ch_ * zz), Image.NEAREST)
-    pages = []; per = 9; pw = cols * (2 * cw_ * zz + 10 + gap)
-    for p in range(0, len(tk), per):
-        part = tk[p:p + per]; rows = (len(part) + cols - 1) // cols
-        img = Image.new('RGB', (pw, 34 + rows * (ch_ * zz + lab + 12)), (30, 40, 30)); d = ImageDraw.Draw(img)
-        d.text((8, 7), 'Daima SSJ4 Goku from behind, hips to feet: his tail. Each pair: BEFORE left, FIXED right', fill=(255, 255, 255), font=FB)
+    pages = []
+    for p in range(0, len(tk), 2):
+        part = tk[p:p + 2]; pw = 3 * (cw_ * zz + gap)
+        img = Image.new('RGB', (pw, 40 + len(part) * (ch_ * zz + 2 * lab + 12)), (30, 40, 30)); d = ImageDraw.Draw(img)
+        d.text((8, 9), 'Daima SSJ4 Goku from behind: his tail joined (combos only)', fill=(255, 255, 255), font=FB)
         for j, k in enumerate(part):
-            x = (j % cols) * (2 * cw_ * zz + 10 + gap); y = 34 + (j // cols) * (ch_ * zz + lab + 12)
-            d.text((x + 6, y + 2), '%s %d, back' % (NAME.get(k[0], k[0]), k[1] + 1), fill=(255, 255, 255), font=F)
-            d.text((x + 6, y + 20), 'BEFORE', fill=(255, 200, 120), font=F); d.text((x + cw_ * zz + 16, y + 20), 'FIXED', fill=(140, 255, 140), font=F)
-            img.paste(crop(fixed(k, False)), (x, y + lab)); img.paste(crop(fixed(k)), (x + cw_ * zz + 10, y + lab))
+            y = 40 + j * (ch_ * zz + 2 * lab + 12)
+            d.text((6, y + 2), '%s %d, back' % (NAME.get(k[0], k[0]), k[1] + 1), fill=(255, 255, 255), font=FB)
+            for i, (t, col) in enumerate((('BEFORE', (255, 200, 120)), ('FIXED', (140, 255, 140)), ('FIXED, changed pixels yellow', (255, 255, 0)))):
+                d.text((i * (cw_ * zz + gap) + 6, y + lab + 2), t, fill=col, font=F)
+            ch = fixed(k) != fixed(k, False)
+            for i, im in enumerate((crop(fixed(k, False)), crop(fixed(k)), crop(fixed(k), ch))): img.paste(im, (i * (cw_ * zz + gap), y + 2 * lab))
         pages.append(img)
     pages[0].save(OUT + '/ssj4_daima_tail_before_fixed.pdf', save_all=True, append_images=pages[1:], resolution=96)
     print('tail:', len(tk), 'frames from behind,', sum(int((fixed(k) != fixed(k, False)).sum()) for k in tk), 'pixels:', tk)
