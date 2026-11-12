@@ -56,7 +56,7 @@ def goku(k):
 
 def changes(k):
     """-> (Goku's fixed frame, the places Daima changes, the belt places)"""
-    g = fr(GOKU, *k); t, belt = goku(k); mix = v4.frame(*k, 'mix')
+    g = fr(GOKU, *k); t, belt = goku(first_place(k) if k[0] < 22 else k); mix = v4.frame(*k, 'mix')   # (the fix its picture has in the game)
     at = t != g
     if k not in HEAD_OVER:                                          # the build's first-place arm fixes v4 doesn't have here
         cg = np.vectorize(lambda v: CLASS.get(int(v), ''))(g); cm = np.vectorize(lambda v: CLASS.get(int(v), ''))(mix)
@@ -137,6 +137,7 @@ def gogeta_head(out, mt, g):
     head = hair | ((Y >= 47) & (Y <= 53) & (X >= 56) & (X <= 63))
     for y, x in zip(*np.nonzero((gt != mt) | head)):
         if gt[y, x] == 0: out[y, x] = 0; continue
+        if not head[y, x]: out[y, x] = HAIR_D[int(gt[y, x])] if int(gt[y, x]) in HAIR_D else int(gt[y, x]); continue   # a pocket filled
         v = int(g[y, x])
         if v in H.G_MAP: out[y, x] = HAIR_D[H.G_MAP[v]]
         elif v in (158, 175, 176): out[y, x] = HAIR_D[1]
@@ -169,19 +170,37 @@ def tail(out, mt, k):
 BRIDGE = {(6, 0, 1): {(64, 58): 104, (65, 58): 32}}
 
 
+_groups = {}
+def first_place(k):
+    """the first place (slot order) Goku's figure has this place's picture at: the game shows one picture there, fixed as for its first
+    place (fix_table), so Daima's too"""
+    if not _groups:
+        for q in keys():
+            c = fr(GOKU, *q)
+            if c.any(): _groups.setdefault(c.tobytes(), q)
+    c = fr(GOKU, *k)
+    return _groups.get(c.tobytes(), k) if c.any() else k
+
+
 _f = {}
 def fixed(k, with_tail=True):
     """Daima with every fix Super Saiyan 4 Goku's preview has (plainback.fixed: arms, plain back, see-through pixels, heads.py), and
-    (09:28) his tail joined from behind (tail); with_tail=False: the preview before that"""
+    (09:28) his tail joined from behind (tail); with_tail=False: the preview before that. A place whose picture is Goku's at an earlier
+    place (and Daima's the same there) is that place's (charging and the power-up face the camera in every view, the powering up is
+    also the special: Nov 12, the build). The see-through pixels the spin's legs and hit 2's new head leave are filled too."""
     if (k, with_tail) in _f: return _f[k, with_tail]
-    s, f, d = k
+    s, f, d = k; p0 = first_place(k) if s < 22 else k
     if s >= 22: r = daima(k)
+    elif p0 != k and (daima(p0) == daima(k)).all(): r = fixed(p0, with_tail)
     elif s == 21 and f == 10: r = fixed((21, 9, 0), with_tail)          # the special's last frame: the one before it, held
     elif s == 16 and d == 2: r = H.spin_side(fixed((16, f, 0), with_tail))   # the spin from the side: his front, mirrored and moved
     else:
-        r, mt = body(k)
-        if s == 16 and d == 0: r = spin_legs(r, mt, fr(BF, *k))
-        if k == (9, 1, 2): r = gogeta_head(r, mt, fr(GOG, *k))
+        r, mt = body(k); after = None
+        if s == 16 and d == 0: r = spin_legs(r, mt, fr(BF, *p0)); after = H.spin_legs(mt, fr(BF, *p0))
+        if k == (9, 1, 2): r = gogeta_head(r, mt, fr(GOG, *k)); after = H.gogeta_head(mt, fr(GOG, *k))
+        if after is not None:
+            t, at, belt = changes(k); mix = v4.frame(*k, 'mix'); r = r.copy()
+            for y, x in P.see_through(after): r[y, x] = nearest(k, mix, at, y, x, 1)
         if d == 1 and with_tail: r = tail(r, mt, k)
     _f[k, with_tail] = r; return r
 
@@ -210,7 +229,7 @@ if __name__ == '__main__':
     # his hasn't), skin and fur in the same places; the spin from the side his front mirrored
     shape = []; cls = []
     for k in ks:
-        dm = fixed(k); g = P.fixed(k)
+        dm = fixed(k); g = P.fixed(first_place(k))                  # (the game shows its first place's picture there)
         diff = (dm != 0) != (g != 0)
         for (y, x) in BRIDGE.get(k, {}): diff[y, x] = False                 # (the two pixels that join the finisher's tail)
         if k not in HEAD_OVER and diff.any(): shape.append((k, int(diff.sum())))

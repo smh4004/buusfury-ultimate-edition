@@ -75,6 +75,45 @@ check('arms raised: fur arms, hands of skin, blue wristbands', n(up[yy.min() + 9
 tail = n(fr(0, 0, 0)[:, 63:], FUR)
 check('his tail is fur (out past his hip, standing)', tail >= 12, 'fur %d' % tail)
 
+# --- his preview fixes (Nov 12: arm fur in every move, his back plain, the see-through pixels, the spin, hit 2 from the side, the
+# special's last frame; ssj4_preview/fix_table.py). Each is checked as already done: running the fix again on the ROM changes nothing.
+os.environ['BFU_GOG_ROM'] = ROM
+sys.path.insert(0, HERE + '/gogeta_preview')
+import plainback as P, armfur as A, heads as H
+places = {}                                                      # picture -> its first place (the one its fix was made for)
+for s in sorted(slots):
+    if s >= 22: continue
+    for f in range(slots[s]):
+        for d in range(3):
+            c = fr(s, f, d)
+            if c.any(): places.setdefault(c.tobytes(), (s, f, d))
+first = set(places.values())
+holes = ['%d.%d/%d' % k for k in first if P.see_through(fr(*k))]
+check('no see-through pixel in any frame (slots 0-21, every view)', not holes, '%s' % holes[:8])
+REDRAWN = {(16, f, 2) for f in range(4)} | {(21, 10, d) for d in range(3)} | {(9, 1, 2)}     # heads.py drew these anew
+arms = []
+for k in sorted(A.FIXES):
+    if k in REDRAWN or k not in first: continue
+    c = fr(*k)
+    if (A.apply(c, P.bf_for(k), fr(0, 0, k[2]), A.FIXES[k]) != c).any(): arms.append('%d.%d/%d' % k)
+check('his arms fur from the shoulder to the wristband in every frame armfur lists (%d)' % sum(k in first and k not in REDRAWN for k in A.FIXES),
+      not arms and len(A.FIXES) >= 80, '%s' % arms[:8])
+backs = [k for k in first if k[2] == 1 and P.from_behind(fr(*k))]
+lay = ['%d.%d' % k[:2] for k in backs if (P.plain_back(fr(*k), P.bf_for(k)) != fr(*k)).any()]
+check('his back plain from behind: no tail lying across it (%d frames)' % len(backs), not lay and len(backs) >= 25, '%s' % lay[:8])
+spin = ['%d' % (f + 1) for f in range(4) if not (fr(16, f, 2) == H.spin_side(fr(16, f, 0))).all()]
+check('the spin from the side is his front mirrored and moved 16 pixels (his face shows)', not spin, 'frames %s' % spin)
+legs = []
+for f in range(4):
+    if (16, f, 0) not in first: continue                         # (frame 4 is frame 2's picture)
+    c, b = fr(16, f, 0), R.frame(106, 16, f, 0)
+    if (H.spin_legs(c, b) != c).any(): legs.append('%d' % (f + 1))
+check('the spin from the front: his legs whole, in his boots\' and trousers\' colours', not legs, 'frames %s' % legs)
+hit = fr(9, 1, 2); hd = hit[40:56, 54:72]
+check('hit 2 from the side: his Super Saiyan 4 head (gold eye, black hair)', n(hd, (GOLD,)) >= 1 and n(hd, DARK) >= 80, 'gold %d, dark %d' % (n(hd, (GOLD,)), n(hd, DARK)))
+last = [d for d in range(3) if not (fr(21, 10, d) == fr(21, 9, 0)).all()]
+check('the special\'s last frame is the one before it, held, in every view', not last, 'views %s' % last)
+
 # --- Super Saiyan 4 Gogeta (the owner, 21:38: "Some weird clipping with Ssj4 Gogeta head and neck on side and back views especially on
 # walk frames mainly"; 22:25: "The back ones still doing it it's by a pixel or two moving slightly to the side"; 22:35: "Okay good lock it
 # for now"). gogeta_preview/fixes.py is what changed; held here to what the owner saw.

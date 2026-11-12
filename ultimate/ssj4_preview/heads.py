@@ -57,6 +57,10 @@ def gogeta_head(c, g):
     out[old & ~head] = 0
     for y, x in zip(*np.nonzero(head)):
         v = int(g[y, x]); out[y, x] = G_MAP.get(v, FACE.get(v, v))
+    lab, n = ndimage.label(out == 0); edge = set(lab[0]) | set(lab[-1]) | set(lab[:, 0]) | set(lab[:, -1])
+    for t in range(1, n + 1):                                  # pockets the old head left inside the new one (where Gogeta has his
+        m = lab == t                                           # shoulder pad behind his hair): the hair's black
+        if t not in edge and not (m & ~area).any(): out[m] = 1
     return out
 
 

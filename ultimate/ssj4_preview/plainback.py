@@ -96,7 +96,8 @@ def fixed_body(k):
     return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(fr(GOKU,*k)) else fill(c)
 def fixed(k):
     import heads
-    return heads.apply(k,fixed_body(k),fixed)                                              # then heads and legs (heads.py)
+    return fill(heads.apply(k,fixed_body(k),fixed))                                        # then heads and legs (heads.py), and the
+    # see-through pixels they leave filled too (Nov 12, build: hit 2's new head and the spin's legs left six, between hair and outline)
 BG=(88,120,88); BOX=(37,72,39,80); H=BOX[1]-BOX[0]; W=BOX[3]-BOX[2]
 F=ImageFont.load_default(size=16); FS=ImageFont.load_default(size=13)
 def cell(c):

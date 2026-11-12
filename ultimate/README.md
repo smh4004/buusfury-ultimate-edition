@@ -831,6 +831,23 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   (flying from behind: a row of his boots). Now only the combos (slots 4-6), only from row 62 down, only boot blue, never a pixel
   beside skin: 28 pixels in 8 frames (combo 1's first, combo 2's first the most). The preview shows each changed frame big, before,
   fixed, and fixed with the changed pixels in yellow, so the change can be seen.
+- Nov 12, 09:55, the owner: "Do 174 and 175 now" (Daima's tail, saved with his preview; Super Saiyan 4 Goku's preview fixes into the
+  build; at 08:47, of every Super Saiyan 4 preview: "everyone else is good").
+  - `build.py ssj4_fix`, after his touch-up and Gogeta's fixes (hit 2's head is read from Gogeta's fixed frame): every frame of his
+    figure through `sprites.composed_actor` with the table `ssj4_preview/fix_table.py` makes from the ROM so far, each picture ->
+    `plainback.fixed` of its first place in the figure (armfur, the plain back, the see-through pixels, heads.py), grown where it
+    outgrows its box (the spin from the side reaches 3-4 pixels further left, mirrored from the front; the special's last frame is its
+    frame before, 2 rows taller). 112 pictures change. Relocked (`BFU_RELOCK=kid_goku_ssj4`).
+  - One picture, one fix: the figure shows several pictures at more than one place (his stance is also his costume change and victory;
+    charging, the power-up and the powering up face the camera in all three views; the powering up is also his special; spin 4 is spin
+    2). The preview drew each place by itself and armfur lists the first place only, so the sheets showed some of those later places
+    unfixed (charging from behind and from the side, the special's first frames, jump 2, flying 3 and 4 from the side); in the game
+    every place shows the fixed picture. Daima's preview takes the same rule (`daimafix.first_place`).
+  - heads.py's new head for hit 2 and the spin's legs left six see-through pixels between hair and outline: `plainback.fixed` fills
+    them after heads.py (black, as the outline), and Daima's with his plum where they are in his hair.
+  - `test_ssj4.py`: no see-through pixel in any frame; armfur, run again on every frame it lists, and the plain back, run again on
+    every frame from behind, change nothing; the spin from the side is the front mirrored and moved 16 pixels; the spin's legs as
+    heads.py makes them; hit 2 from the side has his head (gold eye, black hair); the special's last frame is the one before it.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
