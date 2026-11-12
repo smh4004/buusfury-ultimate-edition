@@ -1,5 +1,5 @@
 {
- "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Reward flags (Nov 11, the owner's list): 873-875 the Saiyan armor and 879 Future Trunks, set by the Cell Games' prize (873 is Teen Gohan's since Nov 12: his purple gi and the armor, which was adult Gohan's); 876 Full Power Broly, 877 Android 13 and 880 Androids 17 and 18, the Super 13 reward; 878 the original game's Gogeta, set once the ending is seen and all 15 Z-Fighter exhibits are in the museum (outfit.c story_sync); 887 the Boss Rush. Flags from 2000 are the more flags (zone26.py): 2000 the Normal bracket (Yamcha, Krillin, Videl), 2002 the Hard bracket (Pikkon, Piccolo), 2046 all four Trials II (Super Saiyan 4 Gogeta), 2053 Battle of Gods finished (DBS and SSB Gogeta). GT looks (flag 2028) open when Ledgic falls, with Pan; Uub (2030) after his own challenge. \"bench\": outfits that share one fighter's progress (Pan's looks; Brapan, the Bulma-Pan fusion from Black Star Odyssey, is a fighter of her own).",
+ "_note": "Base forms the Switch Character screen can cycle. Only forms with full combat animations belong here. Great Saiyaman stays a skill. Story outfits unlock where the story first gives them (unlocks). Reward flags (Nov 11, the owner's list): 873-875 the Saiyan armor and 879 Future Trunks, set by the Cell Games' prize (873 is Teen Gohan's since Nov 12: his purple gi and the armor, which was adult Gohan's; 874 Future Trunks's armor, which was Trunks's); 876 Full Power Broly, 877 Android 13 and 880 Androids 17 and 18, the Super 13 reward; 878 the original game's Gogeta, set once the ending is seen and all 15 Z-Fighter exhibits are in the museum (outfit.c story_sync); 887 the Boss Rush. Flags from 2000 are the more flags (zone26.py): 2000 the Normal bracket (Yamcha, Krillin, Videl), 2002 the Hard bracket (Pikkon, Piccolo), 2046 all four Trials II (Super Saiyan 4 Gogeta), 2053 Battle of Gods finished (DBS and SSB Gogeta). GT looks (flag 2028) open when Ledgic falls, with Pan; Uub (2030) after his own challenge. \"bench\": outfits that share one fighter's progress (Pan's looks; Brapan, the Bulma-Pan fusion from Black Star Odyssey, is a fighter of her own).",
  "characters": {
   "1": [
    {
@@ -33,11 +33,6 @@
     "form": 21,
     "name": "Green gi",
     "flag": 0
-   },
-   {
-    "form": "trunks_armor",
-    "name": "Saiyan armor",
-    "flag": 874
    },
    {
     "form": "trunks_gt",
@@ -225,6 +220,13 @@
     "name": "Teen Gohan, armor",
     "flag": 873,
     "bench": "teen_gohan"
+   },
+   {
+    "form": "trunks_armor",
+    "also": "trunks_armor_ss",
+    "name": "Future Trunks, armor",
+    "flag": 874,
+    "bench": "future_trunks"
    }
   ],
   "7": [

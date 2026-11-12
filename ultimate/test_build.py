@@ -138,15 +138,16 @@ check('Piccolo attacks and uses all three skills with no bad jumps', 'bad pc' no
 # Teen Gohan (Nov 12): his own guest, in the purple gi and in the Saiyan armor, with ki blasts, rush, Masenko, Kamehameha and Super Saiyan.
 TEEN = [5, 7, 8, 17, 15, 20]
 for name_, downs_, want_ in (('Future Trunks', 4, [5, 7, 20, 4, 11, 38]), ('Android 18', 6, [4, 7, 27, 28, 29]), ('Krillin', 7, [5, 7, 15, 28, 42, 37]), ('Videl', 8, [2, 7, 37]), ('Majin Buu', 9, [3, 7, 8, 15]), ('Super Janemba', 10, [2, 7, 8]), ('Kid Buu', 11, [3, 7, 8, 15]), ('Master Roshi', 24, [4, 7, 8, 15, 45]),
-                             ('Teen Gohan', 25, TEEN), ('Teen Gohan in armor', 26, TEEN)):
+                             ('Teen Gohan', 25, TEEN), ('Teen Gohan in armor', 26, TEEN), ('Future Trunks in armor', 27, [5, 7, 20, 4, 11, 38])):
     gl = ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * 5 + ['tap DOWN 40'] * downs_ + ['tap A 200', 'run 60', 'dump p 03001068 8a8', 'keys RIGHT', 'run 8', 'keys', 'tap A 12', 'tap A 12', 'tap A 12', 'keys A', 'run 60', 'keys', 'run 60']
     for i_ in range(want_[0]):
         gl += ['poke8 %08X %02X' % (R + 0x15, i_), 'poke8 %08X FF' % (R + 0x1A), 'poke8 %08X 03' % (R + 0x1B), 'run 2', 'keys B', 'run 60', 'keys', 'run 200', 'mem %08X 1' % (R + 0x14), 'shot %s%d' % (name_.replace(' ', ''), i_)]
     o = run(rom, gl, d); p = open(d + '/p.bin', 'rb').read(); r8 = p[0x4F8 + 8 * REC:0x4F8 + 9 * REC]
     check('%s can be chosen with the right moves' % name_, p[0] == 8 and list(r8[0x0C:0x0D + want_[0]]) == want_)
     check('%s attacks and uses every move with no bad jumps' % name_, 'bad pc' not in o)
-    if name_ == 'Future Trunks':
-        check('Future Trunks goes Super Saiyan, and no further', [int(l.split(':')[1].split()[0], 16) & 255 for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x14))][1] == forms['future_trunks_ss'])
+    if name_.startswith('Future Trunks'):
+        base_, ss_ = ('future_trunks', 'future_trunks_ss') if name_ == 'Future Trunks' else ('trunks_armor', 'trunks_armor_ss')
+        check('%s goes Super Saiyan, and no further' % name_, r8[0x14] == forms[base_] and [int(l.split(':')[1].split()[0], 16) & 255 for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x14))][1] == forms[ss_])
     if name_.startswith('Teen Gohan'):
         base_ = 'teen_gohan' if name_ == 'Teen Gohan' else 'gohan_armor'
         got_ = [int(l.split(':')[1].split()[0], 16) & 255 for l in o.splitlines() if l.startswith('mem %08x' % (R + 0x14))]
@@ -182,8 +183,8 @@ ok_, got_ = chain(8, 5, forms['teen_gohan'], [7, 20], [1, 1])
 check('Teen Gohan: Super Saiyan 2 through the Super Saiyan skill (no story flag needed)', ok_ and got_[:2] == [forms['teen_gohan_ss'], forms['teen_gohan_ss2']])
 ok_, got_ = chain(3, 2, None, [7, 20, 35], [1, 2])
 check('Trunks: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [22, forms['trunks_ss2']])
-ok_, got_ = chain(3, 2, forms['trunks_armor'], [7, 20, 35], [1, 2])
-check('Trunks in armor: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [forms['trunks_armor_ss'], forms['trunks_armor_ss2']])
+ok_, got_ = chain(8, 5, forms['trunks_armor'], [7, 20, 35], [1, 2])
+check('Future Trunks in armor: Super Saiyan, and no further (his jacket\'s top, Nov 12)', ok_ and got_[:2] == [forms['trunks_armor_ss'], forms['trunks_armor_ss']])
 ok_, got_ = chain(6, 4, 39, [7, 20, 35], [1, 2])
 check('Vegito: Super Saiyan, Super Saiyan 2', ok_ and got_[:2] == [40, forms['vegito_ss2']])
 # Before the story reaches it, Super Saiyan 2 does nothing; Super Saiyan pressed again turns back as in the retail game.
@@ -249,6 +250,11 @@ for f_ in ('gohan_armor', 'gohan_armor_ss2', 'saiyaman_from_armor'):
     o = run(rom, ['guardon 0x09000000'] + route + ['poke8 %s %02x' % (arm, forms[f_]), 'run 2', 'tap A 60', 'tap A 60', 'run 30', 'dump j 03001068 8a8', 'tap B 150', 'run 60', 'dump k 03001068 8a8'], d)
     j = open(d + '/j.bin', 'rb').read(); k = open(d + '/k.bin', 'rb').read()
     check('old save, Gohan in %s: the Switch screen gives him his school uniform' % f_, 'bad pc' not in o and j[GOHAN + FORM] == 10 and k[GOHAN + FORM] == 10)
+TRUNKS = 0x4F8 + 3 * REC                         # and Trunks in the armor (Future Trunks's since Nov 12): his green gi (form 21)
+for f_ in ('trunks_armor', 'trunks_armor_ss2'):
+    o = run(rom, ['guardon 0x09000000'] + route + ['poke8 %08x %02x' % (0x03001068 + TRUNKS + FORM, forms[f_]), 'run 2', 'tap A 60', 'tap A 60', 'run 30', 'dump j 03001068 8a8', 'tap B 150', 'run 60'], d)
+    j = open(d + '/j.bin', 'rb').read()
+    check('old save, Trunks in %s: the Switch screen gives him his green gi' % f_, 'bad pc' not in o and j[TRUNKS + FORM] == 21)
 # (the route ends in a conversation, where the field's play code doesn't run: the Switch screen opened and cancelled first puts Goku in play)
 o = run(rom, ['guardon 0x09000000'] + route + ['tap A 60', 'tap A 60', 'run 30', 'tap B 150', 'run 60', 'poke8 %s %02x' % (arm, forms['gohan_armor']), 'run 600', 'dump j 03001068 8a8'], d)
 j = open(d + '/j.bin', 'rb').read()
@@ -263,7 +269,7 @@ j = open(d + '/j.bin', 'rb').read()
 check('unlocks: locked outfits are skipped (only the GT looks are left: a debug build opens them)', j[GOHAN + FORM] == forms['gohan_gt_noglasses'])
 
 # Saiyan armor: each outfit transforms and returns, attacks, and uses beam skills without hanging. Scrolling keeps sprites inside the frame.
-for who, char, rights, key, base, ss in (('TeenGohan', 8, 5, 'DOWN', 'gohan_armor', 'gohan_armor_ss'), ('Trunks', 3, 2, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss'),
+for who, char, rights, key, base, ss in (('TeenGohan', 8, 5, 'DOWN', 'gohan_armor', 'gohan_armor_ss'), ('FutureTrunks', 8, 5, 'DOWN', 'trunks_armor', 'trunks_armor_ss'), ('Vegeta', 4, 3, 'DOWN', 'vegeta_armor', 'vegeta_armor_ss'),
                                         ('TeenGohanGi', 8, 5, 'DOWN', 'teen_gohan', 'teen_gohan_ss')):
     presses = [o_['form'] for o_ in json.load(open('ultimate/outfits.json'))['characters'][str(char)]].index(base)    # the armor's place on the list
     rec = 0x03001560 + REC * char

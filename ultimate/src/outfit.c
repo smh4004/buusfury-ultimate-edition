@@ -32,12 +32,15 @@ extern const struct outfit outfit_table[];
 extern const u8 form_table[];
 
 /* Teen Gohan's forms (Nov 12): the purple gi and the Saiyan armor (adult Gohan's until then), base, Super Saiyan and 2. */
-static const u8 teen_forms[] = {TEEN_FORMS};
-static int is_teen(int form) {
+static const u8 teen_forms[] = {TEEN_FORMS}, ft_armor_forms[] = {FT_ARMOR};
+static int in_list(const u8 *list, int n, int form) {
     int i;
-    for (i = 0; i < (int)sizeof teen_forms; i++) if (teen_forms[i] == form) return 1;
+    for (i = 0; i < n; i++) if (list[i] == form) return 1;
     return 0;
 }
+static int is_teen(int form) { return in_list(teen_forms, sizeof teen_forms, form); }
+/* Future Trunks's Saiyan armor (Nov 12: Trunks's until then; kid Trunks never wore it) */
+static int ft_armor(int form) { return in_list(ft_armor_forms, sizeof ft_armor_forms, form); }
 /* The guest slot has one skill list but different fighters, so the list follows the outfit. A story form (Hercule, say) leaves it alone. */
 static void guest_sync(void) {
     static const u8 broly[] = {3, 7, 8, ERASER_SKILL}, thirteen[] = {5, 7, 8, BOMBER_SKILL, WAVE_SKILL, SUPER13_SKILL}, piccolo[] = {3, 7, 17, BEAM_SKILL},
@@ -65,7 +68,7 @@ static void guest_sync(void) {
     else if (form == FORM_PIKKON) list = pikkon;
     else if (form == FORM_HERCULE) list = hercule;
     else if (form == FORM_BLACK || form == FORM_ROSE) list = black;
-    else if (form == FORM_FUTURE_TRUNKS) list = trunks;
+    else if (form == FORM_FUTURE_TRUNKS || ft_armor(form)) list = trunks;
     else if (form >= FORM_PAN && form < FORM_PAN + 4) list = pan;          /* pan, pan_ssj, pan_nobandana, pan_ssj_spiky */
     else if (form >= FORM_PAN + 4 && form <= FORM_PAN_LAST) list = pan_plain;
     else if (form == FORM_UUB || form == FORM_MAJUUB) list = uub;
@@ -782,12 +785,14 @@ static void arena_keep(void) {
     }
 }
 static void crackle(void);
+static void glow_tick(void);
 static void bossbar_tick(void);
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
     kk_track();
     arena_keep();
     crackle();
+    glow_tick();
     bossbar_tick();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
@@ -881,21 +886,22 @@ static void scroll_row(void *obj, int first_frame) {
     }
 }
 
-/* Adult Gohan wore the Saiyan armor until Nov 12; it is Teen Gohan's now (is_teen). A save from before with Gohan in it (or in Great Saiyaman
-   over it) puts him in his first open look: when the Switch screen opens (restore_borrowed), or once he isn't the fighter in play (shelved_fix). */
-static int old_armor(int form) { return is_teen(form) || form == FORM_SAIYAMAN_ARMOR; }
-static void gohan_out_of_armor(void) {
+/* Adult Gohan and Trunks wore the Saiyan armor until Nov 12; it is Teen Gohan's and Future Trunks's now (is_teen, ft_armor). A save from
+   before with Gohan in it (or in Great Saiyaman over it) or Trunks in it puts him in his first open look: when the Switch screen opens
+   (restore_borrowed), or once he isn't the fighter in play (shelved_fix). */
+static int old_armor(int c, int form) { return c == 1 ? is_teen(form) || form == FORM_SAIYAMAN_ARMOR : c == 3 && ft_armor(form); }
+static void out_of_armor(int c) {
     int k;
-    for (k = 0; k < outfit_index[1][1]; k++)
-        if (outfit_open(&outfit_table[outfit_index[1][0] + k])) { FORM_OF(1) = outfit_table[outfit_index[1][0] + k].form; return; }
+    for (k = 0; k < outfit_index[c][1]; k++)
+        if (outfit_open(&outfit_table[outfit_index[c][0] + k])) { FORM_OF(c) = outfit_table[outfit_index[c][0] + k].form; return; }
 }
 /* The story borrows the guest slot for Hercule and Android 18. Afterwards it holds that form, which the guest's outfit list doesn't have,
    so a joined guest comes back in the first outfit it has unlocked when the screen opens. Skipped if that form is the one being played.
-   Gohan in the armor from an older save, too (old_armor), played or not. */
+   Gohan or Trunks in the armor from an older save, too (old_armor), played or not. */
 static void restore_borrowed(void *obj) {
     int n = *field(obj, OBJ_COUNT), s, i;
     for (s = 0; s < n; s++) {
-        int c = *field(obj, OBJ_LIST + s * 8), first, count, have = 0, armor = c == 1 && old_armor(FORM_OF(1));
+        int c = *field(obj, OBJ_LIST + s * 8), first, count, have = 0, armor = c >= 0 && c <= 8 && old_armor(c, FORM_OF(c));
         if (c != 7 && c != 8 && !armor) continue;
         if (c == *(u8 *)0x03001068 && !armor) continue;
         first = outfit_index[c][0]; count = outfit_index[c][1];
@@ -2387,7 +2393,7 @@ const u8 shelved_forms[][2] = SHELVED_FORMS;
 static void shelved_fix(int c, u8 *rec) {
     int i, k, n = 0, pick = 0;
     for (k = 0; k < 16; k++) if (skill_book[c][k] == 255) KNOWN(rec) &= ~(1 << k);
-    if (c == 1 && old_armor(rec[0x14]) && c != *(u8 *)0x03001068) gohan_out_of_armor();     /* (the fighter in play: the Switch screen does it) */
+    if (old_armor(c, rec[0x14]) && c != *(u8 *)0x03001068) out_of_armor(c);     /* (the fighter in play: the Switch screen does it) */
     for (k = 0; k < (int)(sizeof shelved_forms / sizeof shelved_forms[0]); k++)
         if (rec[0x14] == shelved_forms[k][0]) rec[0x14] = shelved_forms[k][1];
     for (i = 0; i < rec[0x0C]; i++) {
@@ -2666,6 +2672,64 @@ static void crackle(void) {
     if (!bolt_room(BOLT_BYTES)) return;
     { void *spark = NewSpark(0, pos, set + 12 * ((h >> 20) % 3), 4, 0x6000, BOLT_BYTES, 0x38); if (spark) ListAdd(ACTORS, spark); }
 }
+/* Super Saiyan Blue's glow (Nov 12, the owner: "a subtle blue aura post transformation too to go with the lightning"): while a Blue form plays
+   in a fight, a thin ring of flames round the fighter, the outer shades of Blue's aura (build.py glow_frames, three frames), drawn by an
+   actor of its own as the Spirit Bomb's orb is (bomb_*): 1 KB of sprite memory, taken only when a free block holds it (never another
+   sprite's), given back when the form ends, the fight ends or the area changes (the actor list's own clear calls glow_destroy). */
+#ifdef LOOK170
+const u32 glow_frames[3] = {1};
+struct glow { u8 *actor; int loaded; };
+#define GL (*(struct glow *)0x0203FB00)
+#define GLOW_BYTES 0x400
+const int glow_vt[14] = {1};      /* the Spirit Bomb orb's table with glow_destroy and glow_draw_oam (build.py) */
+void glow_destroy(u8 *actor, int free_it) {
+    OBJ_FREE(ACTOR_LIST, *(u16 *)(actor + 0xC));
+    if (GL.actor == actor) GL.actor = 0;
+    if (free_it) FreeMem(actor);
+}
+int glow_draw_oam(u8 *actor, u32 **cursor) {
+    u8 *me = *(u8 **)0x03001C34;
+    int box[4], x, y;
+    if (actor != GL.actor || !IN_EWRAM(me)) return 1;
+    SpriteBox(box, me);
+    x = ((box[0] + box[2]) >> 1) - SCREEN_X - 16; y = ((box[1] + box[3]) >> 1) + 1 - SCREEN_Y - 31;    /* where the power-up's aura stands */
+    if (x <= -32 || x >= 240 || y <= -32 || y >= 160) return 1;
+    (*cursor)[0] = 0x80002000 | (x & 0x1FF) << 16 | (y & 0xFF);
+    (*cursor)[1] = (*(u16 *)(actor + 0xC) & 0x3FF) | 2 << 10;
+    *cursor += 2;
+    return 1;
+}
+static int glow_listed(void) {                /* is GL.actor on the actor list? (work RAM isn't cleared at boot: never trust it otherwise) */
+    const u8 *list = (const u8 *)ACTOR_LIST; int b, i, n;
+    for (b = 4; b <= 0x40C; b += 0x408) {
+        n = *(const int *)(list + b);
+        if (n < 0 || n > 128) continue;
+        for (i = 0; i < n; i++) if (((u8 *const *)(list + b + 4))[i] == GL.actor) return 1;
+    }
+    return 0;
+}
+static void glow_tick(void) {
+    u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = *(u8 **)0x03001C34;
+    int form = rec[0x14], want = COMBAT_ON && IN_EWRAM(me) && AURA_MODE <= 1 && (is_ssb(form) || form == FORM_GOGETA_SSB_FORM), frame;
+    if (GL.actor && (!IN_EWRAM(GL.actor) || *(const u32 *)GL.actor != (u32)glow_vt || !glow_listed())) GL.actor = 0;
+    if (!want) { if (GL.actor) BOMB_LIST_REMOVE(ACTOR_LIST, GL.actor); GL.actor = 0; return; }
+    if (!GL.actor) {
+        u32 *a; int tile, i;
+        if (!bolt_room(GLOW_BYTES) || !(a = Alloc(0x20))) return;
+        for (i = 0; i < 8; i++) a[i] = 0;
+        tile = OBJ_ALLOC(ACTOR_LIST, GLOW_BYTES);
+        if (tile == -1) { FreeMem(a); return; }
+        a[0] = (u32)glow_vt; *((u8 *)a + 8) = 0x38;
+        *(u16 *)((u8 *)a + 0xC) = tile; *(u16 *)((u8 *)a + 0xE) = GLOW_BYTES;
+        GL.actor = (u8 *)a; GL.loaded = -1;
+        Actor_Add(ACTOR_LIST, a);
+    }
+    frame = (FRAMES >> 3) % 3;
+    if (GL.loaded != frame) { MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_frames[frame], GLOW_BYTES); GL.loaded = frame; }
+}
+#else
+static void glow_tick(void) {}
+#endif
 void majuub_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
     else SS_Use(record, sprite);

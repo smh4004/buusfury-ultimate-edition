@@ -22,7 +22,7 @@ rom = open(T.ROM, 'rb').read()
 u = lambda o: struct.unpack_from('<I', rom, o)[0]
 def figure(f):                    # a form's figure: its row's actor (+0x0E) in the moved actor table
     char = struct.unpack_from('<H', rom, 0x800000 + 24 * f + 0x0E)[0]
-    return u(0x840000 + 4 * (char - 9))
+    return u(u(0x3C0) - 0x08000000 - 4 + 4 * (char - 9))      # (the actor table: the game reads it from 0x3C0)
 fails = []
 def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)

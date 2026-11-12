@@ -65,7 +65,8 @@ CANCEL = ['tap B 200', 'run 120']
 # Androids 17 and 18's 880 and the Boss Rush's 887 with it.)
 OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'krillin', 'videl', 'tien', 'yamcha', 'pikkon', 'hercule', 'goku_black',
         'pan', 'pan_nobandana', 'pan_gi_tan', 'pan_gi_red', 'pan_bug', 'pan_brapan', 'uub', 'roshi',     # Master Roshi (Nov 9)
-        'teen_gohan', 'gohan_armor']     # Teen Gohan, the purple gi and the Saiyan armor (Nov 12: the Cell Games' flag 873, which this route leaves set)
+        'teen_gohan', 'gohan_armor',     # Teen Gohan, the purple gi and the Saiyan armor (Nov 12: the Cell Games' flag 873, which this route leaves set)
+        'trunks_armor']                  # Future Trunks's Saiyan armor (874)
 OPEN_V1 = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule']       # what the build before version 2 had open
 def go(a, b, open_=OPEN):
     """Down presses from guest a to guest b, round the list."""
@@ -246,6 +247,13 @@ check('Pan comes back with hers', 'bad pc' not in out and a['form'] == forms['pa
 t4 = talk_at(t3, *zone26.HUB_AT) + GUEST + go('pan', 'teen_gohan') + CONFIRM + state('t4')
 out = fresh(t4); a = read('t4')
 check('and Teen Gohan with his, in the purple gi', 'bad pc' not in out and a['form'] == forms['teen_gohan'] and a['exp'] == 1400000 and a['stat'] == 92)
+# 7c. Future Trunks's Saiyan armor (Nov 12, Trunks's until then) is Future Trunks: his group (3), the same progress.
+t5 = talk_at(t4, *zone26.HUB_AT) + GUEST + go('teen_gohan', 'future_trunks') + CONFIRM + poke_rec(exp=1500000, stat=93) + state('t5')
+t6 = talk_at(t5, *zone26.HUB_AT) + GUEST + go('future_trunks', 'trunks_armor') + CONFIRM + state('t6')
+out = fresh(t6); a = read('t6')
+r = a['raw'][0x4F8 + 8 * REC:0x4F8 + 9 * REC]
+check('Future Trunks in the Saiyan armor: the same fighter, with his moves', 'bad pc' not in out and a['form'] == forms['trunks_armor'] and a['exp'] == 1500000 and a['stat'] == 93
+      and list(r[0x0C:0x0D + r[0x0C]]) == [5, 7, 20, 4, 11, 38])
 
 # 8. A bench saved by a build before version 2 (pass its slot-test ROM as a fourth argument): every fighter's progress carries over.
 OLD_SLOT = sys.argv[4] if len(sys.argv) > 4 else None

@@ -77,7 +77,7 @@ GUARD = 0x0203F250
 rom = open(ROM, 'rb').read()
 def slot_anim(form, slot):
     char = struct.unpack_from('<H', rom, 0x800000 + 24 * form + 0x0E)[0]
-    rec = struct.unpack_from('<I', rom, 0x840000 + 4 * (char - 9))[0] - 0x08000000
+    rec = struct.unpack_from('<I', rom, struct.unpack_from('<I', rom, 0x3C0)[0] - 0x08000000 - 4 + 4 * (char - 9))[0] - 0x08000000      # (the actor table: the game reads it from 0x3C0)
     return struct.unpack_from('<I', rom, rec + 0x54 + 4 * slot)[0]
 def kk_fight(mastered, frames=900):
     h = H(); h.send(*T.setup([7, 20, 37], None, (0,)))

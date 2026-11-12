@@ -24,7 +24,7 @@ SS_FULL = ['poke8 %08X FF' % (R + 0x1E), 'poke8 %08X 00' % (R + 0x1F)]
 GODS = (forms['goku_ssg'], forms['goku_b_ssg'], forms['goku_halo_ssg'])
 rom = open(T.ROM, 'rb').read()
 u = lambda o: struct.unpack_from('<I', rom, o)[0]
-ACTORS_AT = 0x840000
+ACTORS_AT = struct.unpack_from('<I', rom, 0x3C0)[0] - 0x08000000 - 4      # the actor table (build.py ACTORS_AT; the game's code reads it from this literal)
 def figure(form):
     return u(ACTORS_AT + 4 * (struct.unpack_from('<H', rom, 0x800000 + 24 * form + 0x0E)[0] - 9))
 fails = []
