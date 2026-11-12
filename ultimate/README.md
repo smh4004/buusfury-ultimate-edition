@@ -736,6 +736,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   00:49, the owner: "You made the tail worse and also I meant his back itself but now both are broken wtf". The tail change is out of
   the preview (the sheet's tail stays). Nothing of this was ever in the build. Asked the owner what is broken on his back, with a
   picture of his back as it is in the game.
+  His answer: "Back shape warped and morphed with tail", from behind; where the tail sits: no preference. From behind the sheet's tail
+  grows out of his crotch four pixels wide down his left leg to the floor, so his lower body and the tail are one warped shape.
+  `walkfix.tail` now: the tail off, his legs whole (BF's legs in his own leg colours), stray skin and blue off his trousers, and a tail
+  of his reds hanging from the base of his spine (under the middle of his sash) straight down between his legs to his knees; the first
+  walk frame from behind moved whole one column (not his head alone, which bent his back at the seam).
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
