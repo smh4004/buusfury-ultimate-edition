@@ -6,6 +6,11 @@ side"; then, 00:06, of this one: "Send it what are you waiting for"):
   every walk frame and in the run (the arm swinging back), from the front and from behind in the walk and the run;
 - from behind, his head one column left in the first walk frame (BF Goku's own head does it there), so it steps sideways.
 Fixed to his own standing frames: fur from the shoulder to the wristband, the wristband blue, the hand skin.
+Then, 00:24, of that first preview: "Back view is fucked run frames are fucked". From behind the sheet's tail hangs to the floor in every
+frame, four pixels wide, over his left leg (and in the run past it, in the air): it reads as a red leg, and his left boot is gone. And
+the sheet left skin and blue on his trousers there. So from behind (tail()): the tail comes off, BF Goku's leg under it comes back in
+his own leg colours (BF's navy boots his dark ones, laces and hem in them grey; BF's orange trousers his yellow ones), and his tail is
+Super Saiyan 4 Vegeta's from behind (the owner's own figure, approved): a curl out to the side at his waist, beside his left arm.
 
 Each entry is a list for one frame (slot, frame, view), applied in order to his frame on lib4.Rom.frame's canvas:
   ('fur', (row0, row1, col0, col1)): his skin and blue in the box become fur: his standing frame's fur shade at that pixel when it
@@ -49,11 +54,80 @@ FIXES = {
     (2, 1, 1): [('fur', (55, 55, 48, 48)), ('fur', (56, 57, 60, 62)), ('fur', (58, 58, 59, 62)), ('blue', (59, 59, 49, 50))],
     (2, 2, 1): [('fur', (57, 59, 57, 60)), ('fur', (56, 59, 48, 49))],
 }
+NAVY = (157, 159, 161); ORANGE = (63, 64, 65, 79); SKINS = (200, 201, 202, 203, 16, 17)
+BOOT = {157: 1, 159: 111, 161: 111, 80: 116, 81: 118, 206: 206, 16: 16, 1: 1}
+TROUSER = {63: 25, 64: 26, 65: 27, 79: 24}
+
+
+def tail_mask(c, top=62):
+    """from behind: the sheet's tail, the fur below his hands' top row that reaches row 67 or lower"""
+    from scipy import ndimage
+    fur = np.isin(c, FURS); fur[:top] = False
+    lab, n = ndimage.label(fur, np.ones((3, 3))); t = np.zeros_like(fur)
+    for i in range(1, n + 1):
+        m = lab == i
+        if np.nonzero(m)[0].max() >= 67: t |= m
+    return t
+
+
+def leg_colour(b, y, x):
+    """his colour from behind for BF's leg pixel at (y, x): BF's navy boots his dark ones (laces and hem inside a boot grey), BF's orange
+    trousers his yellow ones; the sheet's own colours from behind"""
+    v = int(b[y, x])
+    if v in BOOT: return BOOT[v]
+    if v in ORANGE:
+        for yy in range(64, y + 1):
+            if np.isin(b[yy, max(x - 2, 0):x + 3], NAVY).any(): return 111
+        return TROUSER[v]
+    return v if v in SKINS else 0
+
+
+def curl(vegeta):
+    """Super Saiyan 4 Vegeta's tail from behind, his standing frame (lib4 canvas): {(row from his sash's top row 59, column from the
+    edge of his body 48): colour}"""
+    out = {}
+    for y in range(57, 66):
+        for x in range(40, 49):
+            if vegeta[y, x] in FURS and not (x >= 48 and y < 64): out[(y - 59, x - 48)] = int(vegeta[y, x])
+    return out
+
+
+def sash_top(c):
+    for y in range(55, 66):
+        if np.isin(c[y, 52:59], (69, 158, 160)).sum() >= 2: return y
+
+
+def from_behind(c):
+    """a frame that shows his back (BF draws some poses facing the camera in every view: the power-up, the change, the victory): no
+    face, so no skin and no gold eyes in his head's rows"""
+    ys = np.nonzero(c.any(1))[0]
+    if not len(ys): return False
+    head = c[ys.min():ys.min() + 16]
+    return not np.isin(head, (110,)).any() and int(np.isin(head, SKINS).sum()) < 3
+
+
+def tail(c, b, vegeta):
+    """from behind: the floor-length tail off, his leg back, Vegeta's curl at his waist"""
+    t = tail_mask(c)
+    if not t.any() or not from_behind(c): return c
+    out = c.copy()
+    for y, x in np.argwhere(t): out[y, x] = leg_colour(b, y, x) if b[y, x] else 0
+    for y, x in np.argwhere(np.isin(out, SKINS + (69, 158, 160))):
+        if y >= 64 and int(b[y, x]) in NAVY + ORANGE: out[y, x] = leg_colour(b, y, x)
+    s = sash_top(out)
+    if s is None: return out
+    edge = int(np.nonzero(out[s:s + 6].any(0))[0].min())
+    for (dy, dx), v in curl(vegeta).items():
+        if out[s + dy, edge + dx] == 0: out[s + dy, edge + dx] = v
+    return out
+
+
 FIXES[1, 3, 2] = FIXES[1, 1, 2]; FIXES[1, 3, 0] = FIXES.get((1, 1, 0), []); FIXES[2, 3, 0] = FIXES[2, 1, 0]; FIXES[2, 3, 1] = FIXES[2, 1, 1]
 
 
-def apply(c, b, entries, stand=None):
-    """c: his frame; b: BF Goku's frame of the same slot, frame and view (same canvas); stand: his standing frame in that view."""
+def apply(c, b, entries, stand=None, vegeta=None, view=None):
+    """c: his frame; b: BF Goku's frame of the same slot, frame and view (same canvas); stand: his standing frame in that view;
+    vegeta: Super Saiyan 4 Vegeta's standing frame from behind (then a frame from behind, view 1, gets tail())."""
     out = c.copy()
     for e in entries:
         if e[0] == 'shift':
@@ -65,4 +139,5 @@ def apply(c, b, entries, stand=None):
                 if op == 'fur' and (v in SKIN_FUR or v in BLUE_FUR):
                     out[y, x] = stand[y, x] if stand is not None and int(stand[y, x]) in FURS else SKIN_FUR.get(v, BLUE_FUR.get(v))
                 elif op == 'blue' and int(b[y, x]) in BF_BAND and v in FURS: out[y, x] = BF_BAND[int(b[y, x])]
+    if vegeta is not None and view == 1: out = tail(out, b, vegeta)
     return out
