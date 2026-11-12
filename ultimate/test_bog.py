@@ -69,20 +69,23 @@ def boss(hp):
     w = dump(0x02000000, 0x40000); i = w.find(struct.pack('<I', hp << 10))
     return (0x02000000 + i,) + struct.unpack_from('<II', w, i - 0xEC) if i >= 0 else (None, 0, 0)
 ENEMIES = 0x03001BB4
-def beat(hp, name, fighting):
-    """As test_cell.py: Beerus (the first enemy) left at 2 HP, Goku just below him facing up, three punches; again while `fighting()`."""
+def beat(hp, name, fighting, side=False):
+    """As test_cell.py: Beerus (the first enemy) left at 2 HP, Goku just below him facing up (side: just left of him, facing right), three
+    punches; again while `fighting()`. (In the forest, below him is 8 pixels from the trigger by his right: his beam knocked Goku through
+    it once, out to the flight map, Nov 12.)"""
     foe = mem(ENEMIES)[0]
     check('%s: Beerus is there with %d HP' % (name, hp), foe and mem(foe + 0x28C)[0] == hp << 10)
     seen = barcheck.expect(barcheck.Bar(open(ROM, 'rb').read(), mem), send, 'Beerus', full=True)        # the boss bar (outfit.c bossbar)
     check('%s: Beerus\'s bar is up and full: %s' % (name, seen[1]), seen[0])
-    if fighting(): RIG.spar('Beerus, ' + name)
+    if fighting(): RIG.spar('Beerus, ' + name, spot=(lambda x, y: (x - (20 << 8), y, 3)) if side else None)
     for _ in range(60):
         if not fighting(): break
         foe = mem(ENEMIES)[0]
         if not foe: send('run 160', 'tap A 20'); continue
         x, y = mem(foe + 0x1A0, 2); pl = mem(PLAYER)[0]; full()
-        send('poke %08X %08X' % (foe + 0x28C, 2 << 10), 'poke %08X %08X' % (pl + 0x1A0, x), 'poke %08X %08X' % (pl + 0x1A4, y + (20 << 8)),
-             'poke8 %08X 01' % (pl + 0x10), 'run 2', 'tap A 14', 'tap A 14', 'tap A 14', 'run 30')
+        gx, gy, face = (x - (20 << 8), y, 3) if side else (x, y + (20 << 8), 1)
+        send('poke %08X %08X' % (foe + 0x28C, 2 << 10), 'poke %08X %08X' % (pl + 0x1A0, gx), 'poke %08X %08X' % (pl + 0x1A4, gy),
+             'poke8 %08X %02X' % (pl + 0x10, face), 'run 2', 'tap A 14', 'tap A 14', 'tap A 14', 'run 30')
     for _ in range(14):
         if not fighting(): break
         send('run 160', 'tap A 20')
@@ -165,7 +168,7 @@ scene(104, 264, in_area(WEST), menu=True)
 check('and from there you can try again', at() == WEST)
 full(); beat(bog.ROWS[2][0], 'West City', in_area(WEST)); send('shot god_forest'); mem(G)
 check('beating him in West City carries the fight to the forest', at() == FOREST and more(bog.MORE_BOG_GOD2) and more(bog.MORE_BOG_FIGHT))
-full(); beat(bog.ROWS[3][0], 'the forest', in_area(FOREST)); send('shot god_desert'); mem(G)
+full(); beat(bog.ROWS[3][0], 'the forest', in_area(FOREST), side=True); send('shot god_desert'); mem(G)
 check('and from the forest to the desert', at() == DESERT and more(bog.MORE_BOG_GOD3))
 lose(in_area(DESERT))
 check('losing in the desert goes back to the party', at() == CAPSULE and not more(bog.MORE_BOG_DONE))

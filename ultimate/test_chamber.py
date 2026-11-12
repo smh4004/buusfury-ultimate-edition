@@ -75,7 +75,9 @@ for c, (cat, people) in enumerate(zone26.SPAR):
         if name == 'Broly' and not mem(G + 0x55 + 111 // 8)[0] >> (111 % 8) & 1:
             sheet('locked'); check('Broly stays locked until his story fight', at() == (1 << 8 | 6)); send('tap A 20', 'run 60'); send(flag_on(111)); pick()
         check('%s: into the Chamber' % name, at() == (room << 8 | 26))
-        seen = barcheck.expect(BAR, send, name, tries=90, full=True)     # the boss bar (outfit.c bossbar)
+        # the boss bar (outfit.c bossbar), full: but Kid Buu splits in two a few seconds in (each half his health, his own behaviour), and
+        # when that comes before the bar has slid in, his bar is right at half (Nov 12: one frame earlier or later decides it)
+        seen = barcheck.expect(BAR, send, name, tries=90, full=name != 'Kid Buu')
         check('%s: his bar is up and full: %s' % (name, seen[1]), seen[0])
         sheet('s_' + name.replace(' ', ''))
         e0 = mem(REC0 + 0x24)[0]
