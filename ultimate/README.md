@@ -600,6 +600,61 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - Teen Gohan in the purple gi, base, Super Saiyan and Super Saiyan 2 (12:01 to 13:12): `ultimate/teen.py` with `lib/headfit.py`
     composes all 212 frames from LoG2's records and checks every one (a frame that can't be placed or fails a check stops it).
     Not wired into the build; his preview PDF and GIFs are with the owner.
+    Approved Nov 11, 18:12 ("Teen Gohan looks good to lock"); wiring him in as his own fighter (apart from adult Gohan, both outfits,
+    opened by the Cell Games) is still to do.
+- Nov 11, 18:55, the owner: "Change Beerus beam attack to actually fire from the hand and also give him his own custom light yellow
+  Frieza style finger beam attack not kamehameha called Wrath of the Gods". `lib/wrath.py` tells all of it. What he had was the
+  game's enemy beam (Kid Buu's behaviour: start 0x08033002, each frame 0x080330AA, named by the one word at ROM 0x331D0), whose ball
+  and beam are laid at steps set for Kid Buu's figure (0x0875925C): on Beerus the beam left from his shins, 11 pixels under his hand,
+  and 13 pixels to one side of him from the front and from behind (firing straight up it missed a player standing right above him).
+  Now the word at 0x331D0 names a copy of that table whose first two entries are `outfit.c wrath_start` and `wrath_update`: both run
+  the game's function and do nothing more unless the fighter's figure is Beerus (`wrath_who`). For him: the beam object gets his own
+  table of levels (`wrath_params`: the Kamehameha's damage and strength, his rows), the ball and the beam are moved to his fingertip
+  (`wrath_at`, made by `wrath.places` from `FINGER`, his fingertip in the arm-out frame per facing), and his pose is the ki blast's
+  wind-up, then its arm out, held (the owner's rule of Nov 10; the game showed the two arm-out frames by turns, which from the front
+  are two different arms). Nothing is drawn new: the beam is the Kamehameha's level 1 frames with the near end, body and travelling
+  tip squeezed to half their width about the middle line, the glint before it is the Kamehameha's smallest ball, and the blues become
+  the game's light yellows (`TINT`: colours the palette already has). Strength, reach, time and what it hits are the enemy beam's.
+  The name shows nowhere in a fight: the game has no place for an enemy move's name.
+  Trap met on the way: a `const` array that build.py fills after compiling must be `const volatile` when C reads it at a constant
+  index, or the compiler folds the placeholder's value in (the first try copied 64 bytes from address 0 into sprite memory).
+  `test_wrath.py <beerus rig> <kid buu rig>` (48 checks: rigs `BFU_RIG_ENEMY="61 421"` and `"61 47"`): for each of his four facings
+  the beam's near end is at his fingertip and its middle line through his hand (its place in the game plus its rows read back from
+  the ROM), its tiles hold the light yellows and none of the blues, the pose is held, it hits the player in line, no bad jump; and
+  Kid Buu's figure on the same row fires the game's beam from the game's place with the game's frames. Before/after GIFs of all
+  four facings went to the owner at 20:40; his word on the look is awaited.
+- Nov 11, evening: Super Saiyan 4 Goku's touch-up, previews only (the owner, 18:13: "Don't make changes to SSJ4 Goku without
+  verifying first"). `ultimate/ssj4_preview/preview.py OUTDIR` makes the pictures of the fourth look from a built ROM (the figure is
+  `v4.frame(slot, frame, view, kind)`); nothing of it is in `gt.py` or a ROM yet. What it holds, with the words that asked for it:
+  - 18:44 "use the new Gogeta hair for the front view of SSJ4 Goku only, and leave the side and back views as the original";
+    20:10-20:12 "I don't want that gray strands in the front just the same colors as current"; "just the Gogeta front view hair for
+    both appropriately colored". The front head's hair is Super Saiyan 4 Gogeta's shape (rows 0-13, then strands: `v4.front_hair`),
+    in black and the one dark grey his hair has now. A hand raised beside his head stays in front of the wider hair (`v4.uncovered`).
+  - 19:17 "Stop with this head bob on the idle stuff": his second idle frame was the first with its top 16 rows a pixel to the left
+    (the sheet's); the two are one frame. The same is true of `trunks_gt`, `trunks_gt_ssj` and `majuub` in the build (still to fix,
+    with a test).
+  - 19:17, 19:29, 19:31, 19:33: "you managed to mess up the fur on the hands and arms"; "make sure the fur is always on his full
+    arms in every frame and only his hands without it"; "Do this check for both SSJ4 Goku and Daima SSJ4"; "Don't take fur off the
+    tail either". The sheet was drawn on BF Goku's frames, so BF Goku's own frame says what is what: sleeve, arm, wristband, hand.
+    `armhand.clean` and `fists` fix what can be told from the two frames alone (a hand is the skin beyond a wristband the sheet also
+    has). They cannot tell everything (a band drawn in two pieces, a fist joined to its forearm, the tail lying where BF's hand
+    is, an elbow seen from behind, which has no band), so every one of the 146 distinct frames was read as a letter map, BF's beside
+    the new one, and the rest is listed by frame in `armhand.py`: `FISTS` (hands drawn as fur), `ARMS` (arms left bare), `BANDS`,
+    `SLEEVES` (BF's sleeve kept blue: he has none) and `PIXELS`. 50 frames change. Four frames had it inverted (bare arm, fur
+    hand: ki blast and punch from behind, the knockdown). The Kamehameha from the front follows the owner's own Gogeta, drawn on
+    the same frame: fur down to the wrists, hands of skin under them (`v4.kame_hands`). The tail is never touched.
+    Left alone: the frames that show base Goku's head or bare arms while he changes (slot 10, slot 8's frames 3-10, 13.1) and the
+    fusion frames (the owner, 18:25: fine).
+  - Eyes gold on the GT form; the back head's stray light pixels gone (`v4.STRAY`).
+  - Daima (18:25 "additional Daima SSJ4 recolor"; 18:44 "Make the eyebrows red too"; 18:45 his picture's notes; 19:17 "make his
+    eyes the color to match the hair and eyebrows and then fix his boots color so they actually look right with the blue and the
+    red stripe in all frames"): two colourings, A (reds) and B (his picture's plum), his choice awaited; boots are BF Goku's own
+    where the frames agree and the sheet's own boot elsewhere (`v4.boots`), blue with a red lace in every frame.
+  - Asked of the owner and open: Daima A or B; whether the GT form's leg, painted boot-black from the thigh down in about ten frames
+    (the sheet's), should be trousers as on Daima.
+- Nov 11, noted for after this (the owner, 19:26 and 19:49): Super Saiyan God Goku's eyes match his red hair; Super Saiyan Blue Goku,
+  Vegeta and Gogeta: eyebrows and pupils match their hair, a light cyan glowing aura and Super Saiyan 2's bolts toned down in Blue's
+  colour; and, after everything, test all postgame content: every enemy must fight and be a challenge, never wait to be hit.
 
 ### Checking every move
 `python3 ultimate/figure_diff.py OLD.gba NEW.gba` lists every actor slot whose frames changed between two builds (by pixels, every view)
@@ -654,7 +709,7 @@ the collar under the chin, purple skin, gold wristbands, dark blue trousers with
 keep their colours. Kid Buu's slot 17 (dissolving, likely only his ending) becomes a hit, then the knockdown. Frames go through
 `sprites.composed_actor`, which keeps each frame's own pieces (a boss frame can have two). Actor `beerus` is the last new actor, so no other
 actor's id moves; `<rom>.map.json` records its id (character = id + 9). Checked on a sheet and in the emulator (an enemy rig with
-`BFU_RIG_ENEMY="61 <character>"`: he walks, punches, fires Kid Buu's beam and is knocked down).
+`BFU_RIG_ENEMY="61 <character>"`: he walks, punches, fires Kid Buu's beam and is knocked down). (His beam is his own since Nov 11: Wrath of the Gods, `lib/wrath.py`; see "Nov 11, 18:55".)
 
 ## Battle of Gods and Super Saiyan God (Nov 9)
 The owner: "build the entire movie Battle of Gods and super saiyan god ritual into the post game and once completed grant access to SSG",

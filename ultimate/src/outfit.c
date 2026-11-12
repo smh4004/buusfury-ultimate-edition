@@ -1796,6 +1796,47 @@ void wave_update(u32 *self, u8 *player) {
         *(int *)(beam + 0x24) += S13_BEAM[f][1];
     }
 }
+/* Wrath of the Gods: Beerus's own beam (Nov 11, the owner: "Change Beerus beam attack to actually fire from the hand and also give him his
+   own custom light yellow Frieza style finger beam attack not kamehameha called Wrath of the Gods"; lib/wrath.py tells it whole).
+   He fights on Kid Buu's behaviour, whose beam is the game's enemy beam: a Kamehameha made as a charging ball at the fighter's place plus
+   a step per facing and laid as a beam on the behaviour's 9th frame at another (0x0875925C, set for Kid Buu: on Beerus the beam left from
+   his shins). The enemy beam's table of functions is the mod's copy for every enemy (build.py: wrath_vt, named by the word at 0x080331D0),
+   with its start and its every-frame wrapped here; they add nothing to the game's unless the fighter's figure is Beerus (wrath_who: where
+   the actor table keeps his record). For him the glint and the beam go to his fingertip (wrath_at: steps per facing, for the ball, then
+   for the beam), the beam object gets his frames as beam_start gives the Special Beam Cannon its (wrath_params: thin, light yellow),
+   and his pose is his ki blast's wind-up, then its arm out, held: the game shows the two arm-out frames by turns, which from the front
+   are two different arms. The beam's strength, reach and time are the enemy beam's. */
+#define EBeam_Start ((void (*)(u32 *, u8 *))0x08033003)
+#define EBeam_Update ((void (*)(u32 *, u8 *))0x080330AB)
+#define WRATH_ARM_OUT 2                    /* the behaviour's frame his arm goes out on: shown two frames later, as the glint first is (its ball's first row, four frames, is empty) */
+const int wrath_vt[9] = {1};
+const volatile u32 wrath_params[12] = {1};   /* volatile, as boss_tab: read at fixed places here, and filled in after the compiler has seen {1, 0} */
+const volatile u32 wrath_who[1] = {1};
+const volatile signed char wrath_at[2][4][2] = {{{1}}};
+static int wrath_mine(const u8 *e) { return *(const u32 *)(e + 0x58) == *(const u32 *)wrath_who[0]; }
+void wrath_start(u32 *self, u8 *e) {
+    u32 *beam;
+    const u32 *rows;
+    int f;
+    EBeam_Start(self, e);
+    beam = (u32 *)self[4];
+    if (!IN_EWRAM(beam) || !wrath_mine(e)) return;
+    f = e[0x10] & 3;
+    beam[0x20 / 4] += wrath_at[0][f][0]; beam[0x24 / 4] += wrath_at[0][f][1];
+    rows = (const u32 *)wrath_params[2];
+    beam[0x40 / 4] = (u32)wrath_params;
+    beam[0x44 / 4] = beam[0x48 / 4] = beam[0x4C / 4] = (u32)rows;
+    MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (const void *)rows[2], 0x40);
+}
+void wrath_update(u32 *self, u8 *e) {
+    int at = *(u16 *)(e + 0x12), f = e[0x10] & 3;
+    u32 *beam;
+    EBeam_Update(self, e);
+    if (!wrath_mine(e)) return;
+    e[0x11] = at >= WRATH_ARM_OUT;
+    beam = (u32 *)self[4];
+    if (at == 8 && IN_EWRAM(beam)) { beam[0x20 / 4] += wrath_at[1][f][0]; beam[0x24 / 4] += wrath_at[1][f][1]; }
+}
 void wave_use(u8 *record, void *sprite) {
     int level = record[record[0x15] * 2 + 0x2E];
     u32 *b = Alloc(0x10);

@@ -32,6 +32,7 @@ CODE_END = 0x54FBC
 HEAP_WORDS = 0xFDFE - 0x400      # the top 4 KB of work RAM belongs to outfit.c
 SPACE = 0x800000                 # new data starts at the old 8 MB end: forms, then code
 ACTORS_AT = 0x840000             # moved actor table and imported sprites
+NEW_ACTORS = {}                  # the new actors' ids, once add_actors has made them (main)
 BEERUS_LOOK = 'new,2,2'          # Beerus's side head, pixels of torso, pixels of legs added (see cfg['beerus']). The owner, Nov 11 17:56: "New side view and 34 pixels for sure looks better"
 ROM32 = '--rom16' not in sys.argv  # 32 MB: the GT actors live above 16 MB and the save chip moves to 0x0DFFFF00 (lib/rom32.py). --rom16: the old 16 MB layout
 COMBO_SHA1 = 'f02d179accbeb9b68bcaef8720eb0ae426dde6ee'
@@ -2536,6 +2537,29 @@ def add_eraser(rom, clean, sym, at, art):
     for k in range(10):
         fn = (sym['bossbar_visible'] | 1) if k == 3 else ROM_BASE + GAME_BAR_VT + struct.unpack_from('<i', clean, GAME_BAR_VT + 4 * k)[0]
         struct.pack_into('<i', rom, vt + 4 * k, fn - (ROM_BASE + vt))
+    # Wrath of the Gods (lib/wrath.py; outfit.c wrath_start, wrath_update): Beerus's own beam. The enemy beam's table of functions becomes
+    # the mod's copy for every enemy (the one word that names it), its start and every-frame wrapped; his thin light-yellow frames and
+    # where they go from his fingertip are made there from the Kamehameha's own.
+    import wrath
+    if struct.unpack_from('<I', rom, wrath.ENEMY_BEAM_VT_REF)[0] != ROM_BASE + wrath.ENEMY_BEAM_VT: sys.exit('the word that names the enemy beam\'s table moved')
+    vt = sym['wrath_vt'] - ROM_BASE
+    for k in range(wrath.VT_ENTRIES):
+        fn = ROM_BASE + wrath.ENEMY_BEAM_VT + struct.unpack_from('<i', clean, wrath.ENEMY_BEAM_VT + 4 * k)[0]
+        if k < 2 and fn != (wrath.ENEMY_START, wrath.ENEMY_UPDATE)[k] + 1: sys.exit('the enemy beam\'s table is not as lib/wrath.py has it')
+        struct.pack_into('<i', rom, vt + 4 * k, ((sym[('wrath_start', 'wrath_update')[k]] | 1) if k < 2 else fn) - (ROM_BASE + vt))
+    struct.pack_into('<I', rom, wrath.ENEMY_BEAM_VT_REF, ROM_BASE + vt)
+    made = []
+    for rows_, block, base in (wrath.ball_rows(clean), wrath.beam_rows(clean)):
+        tiles = put_art(block)
+        for k in range(0, len(rows_), 12):
+            t = struct.unpack_from('<I', rows_, k + 8)[0]
+            if base <= t < base + len(block): struct.pack_into('<I', rows_, k + 8, tiles + t - base)
+        made.append(put(bytes(rows_)))
+    for i in range(3):                               # (the enemy beam only ever asks for the first level: all three are his)
+        struct.pack_into('<4I', rom, sym['wrath_params'] - ROM_BASE + 16 * i, *struct.unpack_from('<II', clean, wrath.BEAM_PARAMS), *made)
+    ball, beam = wrath.places(clean, *wrath.beam_rows(clean))
+    struct.pack_into('<16b', rom, sym['wrath_at'] - ROM_BASE, *[int(c) for v in ball + beam for c in v])
+    struct.pack_into('<I', rom, sym['wrath_who'] - ROM_BASE, ROM_BASE + ACTORS_AT + 4 * NEW_ACTORS['beerus'])
     vt = sym['absorb_vt'] - ROM_BASE
     for k in range(14):
         fn = (sym['absorb_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
@@ -2731,6 +2755,7 @@ def main():
         sys.exit('modern ROM has outgrown the 8 MB base; move SPACE')
     rom += b'\xff' * (0x1800000 if ROM32 else 0x800000)
     actors, actors_end = add_actors(rom, clean)
+    NEW_ACTORS.update(actors)
     index, free = patch_forms(rom, clean, cfg, actors)
     os.makedirs(OUT, exist_ok=True)
     json.dump(index, open(OUT + '/_forms.json', 'w'))
