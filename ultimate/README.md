@@ -781,6 +781,16 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   fur, a see-through pixel filled, the sash pixels, or the one fur pixel in a hand to skin. `plainback.fixed` reads BF's nearest
   frame where BF has fewer frames in a slot. Preview `ssj4_preview/everyframe.py`: every one of his 142 pictures (slots 0-21),
   and this round's before and after. His charged punch (slots 22-23) is still BF Goku's own frames, the job after this.
+  07:59, the owner, on that sheet: "Special 11 and 12 have the wrong hair and the arms are still fucked, spin 2 and spin 3 dont show
+  the front of his head properly, spin 1 side either, spind 3 front legs missing, hit 2 is base goku still". `ssj4_preview/heads.py`
+  (run last in `plainback.fixed`; `fixed_body` is everything before it): the spin from the side is BF's front frame mirrored and
+  moved 16 pixels, every pixel the same, so his face shows; the sheet had put a back of the head there: now his own fixed front
+  frame mirrored and moved the same. Spin 3 from the front: holes in his legs where BF has their outline and trousers, filled as
+  the sheet colours those legs in spins 1 and 2 (a few holes in spins 1 and 2 too). Hit 2 from the side: the sheet left BF's hair
+  shape and painted his face in fur; now Super Saiyan 4 Gogeta's sheet's head for that frame, hair in Goku's black and grey
+  (v2.G_MAP), eye gold. The special's last frame (21,10, all views): the sheet left BF's hair and bare crossed arms; now its frame
+  before (21,9), drawn in full by the sheet, held. Preview `everyframe.py` -> ssj4_goku_heads_and_legs.png. "Special 11 and 12"
+  read as the sheet's two pictures of frame 11 (front; back and side are one picture).
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

@@ -75,4 +75,18 @@ if __name__ == '__main__':
     rows = [head] + rows; sheet = Image.new('RGB', (cols * W * z, sum(r.height + 6 for r in rows)), (255, 255, 255)); y = 0
     for r in rows: sheet.paste(r, (0, y)); y += r.height + 6
     sheet.save(OUT + '/ssj4_goku_arms_last_round.png')
-    print(len(keys), 'pictures;', len(more), 'changed this round')
+    # the heads and legs (heads.py): the last preview above, fixed below
+    hk = [k for k in keys if (P.fixed_body(k) != P.fixed(k)).any()]
+    z = 7; cols = 4; rows = []
+    for i in range(0, len(hk), cols):
+        ch = hk[i:i + cols]; img = Image.new('RGB', (cols * W * z, 2 * H * z + 22), BG); d = ImageDraw.Draw(img)
+        for j, k in enumerate(ch):
+            d.text((j * W * z + 4, 3), '%s %d, %s' % (NAME.get(k[0], k[0]), k[1] + 1, VIEW[k[2]]), fill=(255, 255, 255), font=F)
+            img.paste(big(rgb(P.fixed_body(k)), z), (j * W * z, 22)); img.paste(big(rgb(P.fixed(k)), z), (j * W * z, 22 + H * z))
+        rows.append(img)
+    head = Image.new('RGB', (cols * W * z, 30), (30, 40, 30))
+    ImageDraw.Draw(head).text((6, 6), 'heads and legs: the last preview above, fixed below', fill=(255, 255, 255), font=ImageFont.load_default(size=18))
+    rows = [head] + rows; sheet = Image.new('RGB', (cols * W * z, sum(r.height + 6 for r in rows)), (255, 255, 255)); y = 0
+    for r in rows: sheet.paste(r, (0, y)); y += r.height + 6
+    sheet.save(OUT + '/ssj4_goku_heads_and_legs.png')
+    print(len(keys), 'pictures;', len(more), 'changed in the arm round;', len(hk), 'by heads and legs:', hk)

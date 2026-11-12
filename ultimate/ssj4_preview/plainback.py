@@ -89,10 +89,14 @@ def bf_for(k):
                     if best is None or m>best[0]: best=(m,dy,dx,b)
     _bf[k]=np.roll(np.roll(best[3],best[1],0),best[2],1); return _bf[k]
 import armfur
-def fixed(k):
+def fixed_body(k):
+    """his arms (armfur), his plain back and the see-through pixels filled"""
     c=fr(GOKU,*k)
     if k in armfur.FIXES: c=armfur.apply(c,bf_for(k),fr(GOKU,0,0,k[2]),armfur.FIXES[k])     # his arms first (BF: the same frame, or the nearest)
     return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(fr(GOKU,*k)) else fill(c)
+def fixed(k):
+    import heads
+    return heads.apply(k,fixed_body(k),fixed)                                              # then heads and legs (heads.py)
 BG=(88,120,88); BOX=(37,72,39,80); H=BOX[1]-BOX[0]; W=BOX[3]-BOX[2]
 F=ImageFont.load_default(size=16); FS=ImageFont.load_default(size=13)
 def cell(c):
