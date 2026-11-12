@@ -719,6 +719,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   The same reading showed leftovers of the same kind in the locked Super Saiyan 4 Goku's walk and run (from the side, walk frames 2 and
   4: BF's sleeve left as a blue band on his shoulder over a bare upper arm; the run from behind and from the front: part of an arm bare).
   Not touched (the owner, 18:13: "Don't make changes to SSJ4 Goku without verifying first"): to be shown to him as its own preview.
+  Nov 12, 00:06, the owner: "Send it what are you waiting for". `ssj4_preview/walkfix.py` reads his walk and run frames the same way
+  (against BF Goku's under them) and lists the fixes: BF's sleeve left blue on his shoulder and the arm under it bare, where his standing
+  frames have fur (from the side in every walk frame and in the run's arm that swings back; from the front and from behind in the walk
+  and the run), and from behind his head one column left in the first walk frame (rows 0-57 moved back in line: his head now keeps
+  one column through the walk and the run from behind, as it does from the front; from the side every walk and run frame keeps one
+  column too, one left of his standing frame, as BF Goku's do). New fur takes his standing frame's shade at that pixel. Fur from the
+  shoulder to the wristband, the wristband blue, the hand skin. `walkpreview.py` makes the now-and-fixed stills and GIFs. A preview
+  only: nothing in the build until the owner approves (then `BFU_RELOCK=kid_goku_ssj4`).
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The
