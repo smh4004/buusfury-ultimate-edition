@@ -773,6 +773,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   in his right hand back to skin (finisher frame 4), the white motion streak back across his punching arm in combo 2 (it was
   see-through), and two see-through pixels in the flying frame filled. Left as the sheet has them where arm and hand could not be
   told apart: a few hit, special and charging frames (9,1,2; 21,8-9; 8,3/6/9) and the skin beside his hands in 3,0,1.
+  07:49, the owner, on that preview: "Fix the fucking fur on the arms in every single frame holy fuck". No frame left out now
+  (`armfur.MORE`): the forearm between the two wristbands in hit 2 from the side, the skin beside his hands in ki blast 1 from
+  behind, the bare stripe on his left arm getting up, five lone skin pixels on shoulders, and every patch of blue left on his
+  arms from BF's undershirt sleeve or its outline (blue touching his fur and no hand, off his sash and boots; 27 pictures): only
+  his wristbands stay blue. In all, 64 pictures and 414 pixels change, and a check confirms each change is skin or sleeve blue to
+  fur, a see-through pixel filled, the sash pixels, or the one fur pixel in a hand to skin. `plainback.fixed` reads BF's nearest
+  frame where BF has fewer frames in a slot. Preview `ssj4_preview/everyframe.py`: every one of his 142 pictures (slots 0-21),
+  and this round's before and after. His charged punch (slots 22-23) is still BF Goku's own frames, the job after this.
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

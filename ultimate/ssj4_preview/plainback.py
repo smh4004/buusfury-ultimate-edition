@@ -91,7 +91,7 @@ def bf_for(k):
 import armfur
 def fixed(k):
     c=fr(GOKU,*k)
-    if k in armfur.FIXES: c=armfur.apply(c,fr(BF,*k),fr(GOKU,0,0,k[2]),armfur.FIXES[k])     # his arms (walk and run) first
+    if k in armfur.FIXES: c=armfur.apply(c,bf_for(k),fr(GOKU,0,0,k[2]),armfur.FIXES[k])     # his arms first (BF: the same frame, or the nearest)
     return plain_back(c,bf_for(k)) if k[2]==1 and from_behind(fr(GOKU,*k)) else fill(c)
 BG=(88,120,88); BOX=(37,72,39,80); H=BOX[1]-BOX[0]; W=BOX[3]-BOX[2]
 F=ImageFont.load_default(size=16); FS=ImageFont.load_default(size=13)

@@ -22,7 +22,7 @@ def before(k):
     """the last preview: the walk and run arm fixes, the plain back, the filled see-through pixels; not MOVES"""
     c = fr(GOKU, *k)
     old = [e for e in A.FIXES.get(k, []) if e not in A.MOVES.get(k, [])]
-    if old: c = A.apply(c, fr(BF, *k), fr(GOKU, 0, 0, k[2]), old)
+    if old: c = A.apply(c, P.bf_for(k), fr(GOKU, 0, 0, k[2]), old)
     return P.plain_back(c, P.bf_for(k)) if k[2] == 1 and P.from_behind(fr(GOKU, *k)) else P.fill(c)
 
 
