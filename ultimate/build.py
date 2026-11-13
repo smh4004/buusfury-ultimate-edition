@@ -109,6 +109,7 @@ LOOK170 = os.environ.get('BFU_LOOK170', '1') != '0'      # on since the owner's 
 GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.py STYLES): the owner's pick (Nov 12, 19:04: "1c looks good use that")
 GLOW_ALPHA = (6, 10)
 GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
+CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '0') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, the owner's preview: off until he OKs it)
 # Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
 # own), 1 Super Saiyan God (crimson to orange, a gold-white core), 2 Rose (magenta to pink, as Rose's power-up aura). Nearest palette entries.
 GLOW_KINDS = (None,
@@ -1474,7 +1475,12 @@ def add_actors(rom, clean):
     cfg['android13_absorb'] = {'template': 152, 'slots': {'0': 'a13_absorb!front', '1': 'a13_absorb!front'}}     # a cutscene figure: only an idle animation plays by itself, as in Gero's Legacy
     for name, rec in (('cell_imperfect', 'r25'), ('cell_semi', 'r26'), ('cell_perfect', 'r27'), ('cell_junior', 'r28')):      # LoG2's own sprites, whole: 64x64 like the prototype's Super 13 (the Juniors are smaller)
         cfg[name] = {'template': 38, 'stretch': True, 'reserve': 1024 if name == 'cell_junior' else 4096, 'log2_record': rec,
-                     'log2_slots': {**{str(k): 0 for k in range(22)}, '1': 1, '2': 1, '4': 6, '5': 7, '6': 7, '7': '3@0:1' if name != 'cell_junior' else '2@0:1', '8': 5, '9': 5, '10': 5, '13': 5, '14': 6, '15': 2, '16': 3 if name != 'cell_junior' else 2, '17': 3 if name != 'cell_junior' else 2, '18': 5, '19': 5, '20': 6, '21': 5}}
+                     # Perfect Cell fights with Kid Buu's row, whose beam plays slot 3 (Kid Buu's: standing, then the arm out, held): it was LoG2's
+                     # idle, so he fired his beams standing with his arms down (Nov 12, the owner: "Perfect Cell Kamehameha frames glitched").
+                     # Now LoG2's ki (animation 5): its side and back views go hand in -> arm out -> arm out, but its front view has the arm out
+                     # in frame 0 and the fists-in crouch in 1-2, so the front is reordered to crouch -> arm out -> arm out
+                     **({'reframe_view': {'3': {'0': [1, 0, 0]}}} if name == 'cell_perfect' and CELL_BEAM else {}),
+                     'log2_slots': {**{str(k): 0 for k in range(22)}, **({'3': 5} if name == 'cell_perfect' and CELL_BEAM else {}), '1': 1, '2': 1, '4': 6, '5': 7, '6': 7, '7': '3@0:1' if name != 'cell_junior' else '2@0:1', '8': 5, '9': 5, '10': 5, '13': 5, '14': 6, '15': 2, '16': 3 if name != 'cell_junior' else 2, '17': 3 if name != 'cell_junior' else 2, '18': 5, '19': 5, '20': 6, '21': 5}}
     for k in range(7):                                   # the game's own item icons, as things you can walk up to
         p = symbol_items_icon(16 + k)
         t, size = struct.unpack_from('<II', clean, p); icon = np.frombuffer(bytes(wfz.decompress_stream(clean, p + 8, size)[0]), np.uint8).reshape(16, 16)
