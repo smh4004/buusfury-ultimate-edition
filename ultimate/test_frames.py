@@ -224,7 +224,8 @@ for slot in range(20):
             ok = False
             for ss in same:
                 diff = blue != ss
-                if np.isin(ss[diff], GOLD + [202, 201, 16]).all() and np.isin(blue[diff], list(goku_blue)).all(): ok = True; break   # (none, if no hair shows)
+                if np.isin(ss[diff], GOLD + [202, 201, 16, 215, 216]).all() and np.isin(blue[diff], list(goku_blue)).all(): ok = True; break   # (none, if no hair shows;
+                                                                                                         # 215, 216: his eyes' greens, Blue's since Nov 11)
             if not ok: bad_hair.append((slot, i, d))
 check('Blue Gogeta is Buu\'s Fury\'s Super Saiyan Gogeta pixel for pixel, the same hair shape%s' % ((': %s' % bad_shape[:6]) if bad_shape else ''), not bad_shape)
 check('only his hair changed, into Blue Goku\'s hair colours %s%s' % (sorted(goku_blue), (': %s' % bad_hair[:6]) if bad_hair else ''), goku_blue and not bad_hair)
@@ -266,9 +267,19 @@ def behind_eye(b):
     else: zone[rows.min() - 1:rows.max() + 1, :max(0, cols.min() - 1)] = True
     return zone
 face_blue, edge_gold = [], []
+def brows(b):
+    """Blue's brows (lib/ssb.face, Nov 11, the owner: "eyebrows and pupils match their hair"): the row over the eyes, from two pixels
+    before the first eye to two past the last."""
+    m = np.zeros(b.shape, bool)
+    eyes = np.isin(b, (215, 216, 12, 11)); ew = (np.isin(b, (2, 120))) & ndimage.binary_dilation(eyes, np.ones((3, 3), bool))
+    ys, xs = np.nonzero(eyes | np.isin(b, (117, 118)) | ew)
+    if not eyes.any() or not len(ys) or ys.min() == 0: return m
+    m[ys.min() - 1, max(0, xs.min() - 2):xs.max() + 3] = True
+    return m
 for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 28, 26), ('vegeta_ssb_b', 29, 27), ('vegeta_armor_ssb', forms['vegeta_armor_ss'], None)):
     under = ssb.base_under(retail, actor_of(ss), actor_of(base)) if base is not None else {}
     for slot in range(22):
+        if slot == 10: continue          # Blue's change is the base figure's Super Saiyan change, not this figure's (Nov 12): see below
         A, B = anim(actor_of(forms[name]), slot), anim(actor_of(ss), slot)
         for i, (f, g) in enumerate(zip(A or [], B or [])):
             for d in range(3):
@@ -277,17 +288,18 @@ for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 
                 ew = (b == 2) & ndimage.binary_dilation(np.isin(b, (215, 216)), np.ones((3, 3), bool))
                 blue = a != b
                 h = np.pad(blue, 1); nh = h[:-2, 1:-1].astype(int) + h[2:, 1:-1] + h[1:-1, :-2] + h[1:-1, 2:]
+                fblue = blue & ~brows(b)                                          # (the brows are Blue's on purpose)
                 ub = under.get((b.shape, b.tobytes()))
                 same = (b == ub) & np.isin(b, SKIN_SHADES) if ub is not None else np.zeros(b.shape, bool)
-                skin_blue = same & blue
+                skin_blue = same & fblue
                 lab, nl = ndimage.label(skin_blue)
                 for k in range(1, nl + 1):
                     m = lab == k
                     if m.sum() <= 3 and blue[ndimage.binary_dilation(m) & ~m].all(): skin_blue &= ~m
                 q = np.pad(np.isin(b, (200, 203, 215, 216)) | ew, 1)
                 zone = behind_eye(b) if name.startswith('goku') else np.zeros(b.shape, bool)
-                outline = blue & np.isin(b, SKIN_SHADES) & (q[1:-1, :-2] | q[1:-1, 2:]) & ~zone
-                n = int((ew & blue).sum() + skin_blue.sum() + outline.sum())
+                outline = fblue & np.isin(b, SKIN_SHADES) & (q[1:-1, :-2] | q[1:-1, 2:]) & ~zone
+                n = int((ew & fblue).sum() + skin_blue.sum() + outline.sum())
                 if n: face_blue.append((name, slot, i, d, n))
                 if ub is None: continue
                 e = np.pad(np.isin(b, (215, 216, 117, 118)) | ew, 1)

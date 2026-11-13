@@ -3395,6 +3395,24 @@ int bossbar_visible(u8 *a) {                              /* every frame, for a 
     a[0x15] = cols > BOSSBAR_COLS ? BOSSBAR_COLS : cols;
     return 1;
 }
+/* Kid Buu's behaviour taking his copy back (vtable 0x0804B148, its second method, sub_08032DC8; Nov 12): it asks every actor which is one of
+   his kind (message 6 with his kind's id, sub_08011C70), takes the one that isn't himself from the answers (the second answer when the
+   first is himself), moves to the midpoint between them and takes the other off the actor list. Perfect Cell plays Kid Buu's behaviour
+   (zone26 CELL: row 61) with no copy: he alone answered, the "other" was whatever the stack held there, and taking it off the list
+   called a destructor through garbage (seen: a jump to 0xF083A4C0 thirty seconds into his fight, the game frozen). With fewer than two
+   answers there is no copy to take back: the method ends as it ends after a merge (1). The owner (Nov 12): Perfect Cell "possible
+   crash/hang". */
+#define SendAll ((void (*)(u32, int, u32 *))0x08011C71)
+#define KindOf ((u32 (*)(int))0x08000159)
+int buu_merge(u32 *state, u8 *me) {
+    u32 q[16];
+    int i;
+    for (i = 0; i < 16; i++) q[i] = 0;
+    q[0] = KindOf(0x2F);
+    SendAll(*(const u32 *)0x0875922C, 6, q);
+    if (q[1] < 2) return 1;
+    return ((int (*)(u32 *, u8 *))0x08032DC9)(state, me);
+}
 static void bossbar_tick(void) {
     int hp, full, name;
     u16 at = *(volatile u16 *)0x0300197C;

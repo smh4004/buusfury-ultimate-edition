@@ -1364,6 +1364,13 @@ def thumb_bl(at, to):
     return struct.pack('<HH', 0xF000 | (off >> 12) & 0x7FF, 0xF800 | (off >> 1) & 0x7FF)
 
 
+def buu_merge_hook(rom, sym):
+    """Kid Buu's behaviour taking his copy back with no copy there (Perfect Cell): outfit.c buu_merge in its state table's second method."""
+    VT = 0x4B148
+    if ROM_BASE + VT + struct.unpack_from('<i', rom, VT + 4)[0] != 0x08032DC9: sys.exit('Kid Buu\'s merge state changed')
+    struct.pack_into('<i', rom, VT + 4, (sym['buu_merge'] | 1) - (ROM_BASE + VT))
+
+
 def ssj4_ki_hooks(rom, sym):
     DRAIN = 0xE506                   # the Super Saiyan 3 class's drain: from here ssj4_drain decides, then jumps back to either branch
     if rom[DRAIN:DRAIN + 10] != bytes.fromhex('0a14011c20310b889342'):
@@ -1990,6 +1997,7 @@ def add_outfits(rom, clean, at, art):
         sys.exit('Combat_Damage changed: %s' % rom[DAMAGE:DAMAGE + 8].hex())
     rom[DAMAGE:DAMAGE + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['combat_hook'] | 1)
     ssj4_ki_hooks(rom, sym)
+    buu_merge_hook(rom, sym)
     end, art = add_eraser(rom, clean, sym, (potara_at + 3) & ~3, art)    # after the row edits above: it moves the skill table (and after the Potara's scene)
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:

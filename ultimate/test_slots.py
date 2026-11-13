@@ -127,8 +127,11 @@ at = lambda base: talk_at(base, *zone26.HUB_AT, sav=None)
 s = hub + ['shot hub0'] + GUEST + ['shot hub1'] + CONFIRM + ['shot hub2'] + state('a')
 out = fresh(s); a = read('a')
 check('no bad jumps reaching the picker', 'bad pc' not in out)
-check('picking without changing outfit swaps nothing', a['gen'] == 0 and a['out'] == 0 and a['form'] == forms['broly'])
-check('and the save stays clean', set(open(sav, 'rb').read()[0x1A20:]) == {255})
+# (Nov 12: Goku's and Vegeta's book places past the sixteenth live in the bench, and after the ending they know the Fusion Dance, their
+# seventeenth and twelfth: the bench may be written on this route, its generation moving. No guest's entry is.)
+check('picking without changing outfit swaps nothing', a['out'] == 0 and a['form'] == forms['broly'])
+sv = open(sav, 'rb').read(); used = sv[BN.sector(0) + 16:BN.sector(0) + 24]
+check('and the save keeps no guest entry (the bench\'s used bits clear, or no bench written)', set(used) <= {0} or set(used) == {255})
 base_stats = a
 
 s1 = hub + poke_rec(exp=111111, stat=11, gear=ROW, hp=77) + GUEST + go('broly', 'piccolo') + CONFIRM + state('b')

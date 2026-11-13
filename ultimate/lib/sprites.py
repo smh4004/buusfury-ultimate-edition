@@ -392,6 +392,13 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
             k = struct.unpack_from('<I', rom, ap - BASE)[0]; old = struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)
             seq = [old[min(j, k - 1) * 4 + d] for j in idx for d in range(4)]
             struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.put(struct.pack('<I', len(idx)) + struct.pack('<%dI' % len(seq), *seq)))
+        for slot, views in a.get('reframe_view', {}).items():     # one view's frames in another order (Perfect Cell's front firing pose, Nov 12)
+            ap = struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]
+            if int(slot) >= n or not ap: continue
+            k = struct.unpack_from('<I', rom, ap - BASE)[0]; old = list(struct.unpack_from('<%dI' % (4 * k), rom, ap - BASE + 4)); seq = list(old)
+            for v, idx in views.items():
+                for j, i in enumerate(idx[:k]): seq[4 * j + int(v)] = old[4 * min(i, k - 1) + int(v)]
+            struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(seq), *seq)))
         if a.get('stance_back'):                           # slot 11 is the change back: an animation as long as a retail one takes four seconds, the stance one
             struct.pack_into('<I', rec, 0x54 + 44, struct.unpack_from('<I', rec, 0x54)[0])
         if target is not None:

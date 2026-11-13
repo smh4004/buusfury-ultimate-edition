@@ -5,6 +5,7 @@ One emulator per case, in parallel: open Switch Character at the end of the debu
 move and go through the transformation chain, checking the form after each step. Sheets of what it looks like go in the work dir."""
 import json, os, subprocess, sys, tempfile, threading
 from PIL import Image
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import guestnav
 ROM = sys.argv[1] if len(sys.argv) > 1 else 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba'
 D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='gt'); os.makedirs(D, exist_ok=True)
 forms = json.load(open(ROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
@@ -79,7 +80,12 @@ def case(name, c, look, skills, steps, pos, poke_form=None):
         r.send(*['tap RIGHT 40'] * pos[c]); r.send('poke8 %08X %02X' % (R + 0x14, F(poke_form)), 'run 4'); r.snap('picker'); r.send('tap A 200', 'run 60')
     else:
         r.send(*['tap RIGHT 40'] * pos[c]); cur = r.forms()[c]
-        r.send(*['tap DOWN 40'] * outfit_steps(c, cur, look), 'run 20'); r.snap('picker'); r.send('tap A 200', 'run 60')
+        if c == 8:                                       # the guest slot: Up and Down from fighter to fighter, L and R through his looks (lib/guestnav.py)
+            at = next(n for n in guestnav.guests() if F(n) == cur)
+            r.send(*guestnav.keys(look, start=at, wait=40), 'run 20')
+        else:
+            r.send(*['tap DOWN 40'] * outfit_steps(c, cur, look), 'run 20')
+        r.snap('picker'); r.send('tap A 200', 'run 60')
     check(name, 'wearing it', r.forms()[c] == F(poke_form if poke_form is not None else look) and r.mem(G)[0] & 255 == c)
     if c != 8: r.send('poke8 %08X %02X' % (R + 0x0C, len(skills)), *['poke8 %08X %02X' % (R + 0x0D + i, s) for i, s in enumerate(skills)])
     rec = r.mem(R, 26); have = [(rec[3] >> 8 * i) & 255 for i in (1, 2, 3)] + [rec[4] & 255, rec[4] >> 8 & 255]
