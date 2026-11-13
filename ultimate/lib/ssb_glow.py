@@ -211,6 +211,80 @@ STYLES['1c'] = STYLES['flame']
 BANDS = {'1c': lambda: inner_glow([np.zeros((H, W), np.uint8)] * 0 + flame(3, thick=2), lambda d, t, yy, xx: np.where((d >= 1) & (d <= 3), 14, 0))}
 
 
+# From the power-up into the glow (Nov 12, 20:29, the owner on the glow fading in: "Looks choppy is there any way to add a few more frames
+# that actually match the vanilla aura shape and then blend into the new one after that one ends better so its more smooth"): the
+# power-up's own aura (the field aura, 32x32, three frames, in the form's tint) sits on rows BURST_ROW to BURST_ROW + 31 of the glow's box,
+# in its 32 columns (measured in the game: Blue Goku's, x 104-135 and y 55-86 against the glow's 104-135 and 27-90). The transition
+# plays its three frames, then TRANS_MORPH frames whose outline goes from the aura's to the flame's (the two shapes' signed distances
+# mixed, a little more of the flame's each frame), drawn as the flame's rim is.
+BURST_ROW = 28
+TRANS_MORPH = 6
+
+
+def _sdf(m):
+    """signed distance to a mask's edge: positive inside"""
+    return ndimage.distance_transform_edt(m) - ndimage.distance_transform_edt(~m)
+
+
+def burst_shape(img):
+    """the power-up aura's outline filled: every row between its leftmost and rightmost pixel (it is an oval of flames, open below)"""
+    m = np.zeros(img.shape, bool)
+    for y in range(img.shape[0]):
+        xs = np.nonzero(img[y])[0]
+        if len(xs): m[y, xs.min():xs.max() + 1] = True
+    return m
+
+
+def flame_shape(f):
+    """a flame frame's inside: its rim and what it closes in (shut along the bottom, where the flame is open at the feet)"""
+    pad = np.vstack([f > 0, np.ones((1, W), bool)])
+    return ndimage.binary_fill_holes(pad)[:H]
+
+
+def rim(inside, thick=2):
+    """an outline of a shape as the flame draws its own: 1 the outer pixel, 2 the next in, open at the feet"""
+    cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
+    pad = np.vstack([inside, np.ones((3, W), bool)])
+    e1 = ndimage.binary_erosion(pad, cross, border_value=0)[:H]
+    e2 = ndimage.binary_erosion(np.vstack([e1, np.ones((3, W), bool)]), cross, border_value=0)[:H]
+    img = np.zeros((H, W), np.uint8)
+    img[inside & ~e1] = 1
+    if thick >= 2: img[inside & e1 & ~e2] = 2
+    img[:, 0] = 0
+    return img
+
+
+BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
+
+
+def transition(burst, lut, flames, morph=TRANS_MORPH):
+    """The frames from the power-up's aura into the glow: `burst` its three frames (32x32 palette indices, in the form's tint), `lut` the
+    glow's values -> palette indices, `flames` the glow's frames (values). -> 3 + morph frames of 32x64 palette indices: the aura's own
+    three, then the aura (its frames in turn) stretched up towards the flame's height and narrowed towards its width, dissolving into the
+    flame (an ordered dither: a little more of the flame's pixels and less of the aura's each frame)."""
+    out = []
+    for b in burst:
+        f = np.zeros((H, W), np.uint8); f[BURST_ROW:BURST_ROW + 32, :32] = b[:32, :32]; out.append(f)
+    yy, xx = np.mgrid[0:H, 0:W]
+    lut = np.asarray(lut, np.uint8)
+    bottom = BURST_ROW + 31
+    for i in range(1, morph + 1):
+        a = i / (morph + 1.0)
+        b = burst[(i - 1) % len(burst)][:32, :32]
+        sy, sx = 1 + 0.5 * a, 1 - 0.12 * a                 # taller (from its bottom row), narrower (about the middle)
+        src_y = np.round(bottom - (bottom - yy) / sy).astype(int) - BURST_ROW
+        src_x = np.round(CX + (xx - CX) / sx).astype(int)
+        ok = (src_y >= 0) & (src_y < 32) & (src_x >= 0) & (src_x < 32)
+        warped = np.zeros((H, W), np.uint8)
+        warped[ok] = b[src_y[ok], src_x[ok]]
+        fl = lut[flames[(i - 1) % len(flames)]]
+        mine = BAYER[yy % 4, xx % 4] < a * 16          # the flame's share of the pixels
+        f = np.where(mine, fl, warped).astype(np.uint8)
+        f[:, 0] = 0
+        out.append(f)
+    return out
+
+
 def band_only(frames):
     """the band's pixels alone (value 14), the rim taken out"""
     return [np.where(f == 14, 14, 0).astype(np.uint8) for f in frames]

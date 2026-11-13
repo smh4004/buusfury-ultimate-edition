@@ -3007,7 +3007,9 @@ static void crackle(void) {
 #define GLOW_KINDS 1
 #endif
 const u32 glow_frames[GLOW_KINDS][GLOW_FRAMES] = {{1}};
-struct glow { u8 *actor; short loaded; u16 cnt_was, alpha_was; u8 blending, kind; u16 rise; u8 fade; };
+struct glow { u8 *actor; short loaded; u16 cnt_was, alpha_was; u8 blending, kind; u16 rise, trans; };
+const u32 glow_trans[GLOW_KINDS][GLOW_TRANS] = {{1}};     /* each kind's frames from the power-up's aura into the glow (build.py, ssb_glow.transition) */
+#define TRANS_STEP 3                                      /* game frames each */
 #define GL (*(struct glow *)0x0203FB00)
 typedef char glow_fits[sizeof(struct glow) <= 16 ? 1 : -1];
 #define RIM_BYTES 0x800                  /* 32x64, 8 bpp */
@@ -3048,23 +3050,20 @@ void glow_destroy(u8 *actor, int free_it) {
     if (free_it) FreeMem(actor);
 }
 static void glow_frame(void);
-static const u8 glow_spread[16] = {0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15};     /* 0-15 with their bits turned round */
 int glow_draw_oam(u8 *actor, u32 **cursor) {
     u8 *me = *(u8 **)0x03001C34;
     int box[4], x, y;
     if (actor != GL.actor || !IN_EWRAM(me)) return 1;
-    if (GL.rise) glow_frame();                                          /* (powering up: the fighter's input doesn't run) */
-    if (!GL.fade) return 1;
+    if (GL.rise) return 1;                                              /* (powering up: nothing yet, the power-up's own aura is up) */
+    if (GL.trans) glow_frame();                                         /* (the transition runs by frames: in step with the draw) */
     SpriteBox(box, me);
     x = ((box[0] + box[2]) >> 1) - SCREEN_X - 16; y = ((box[1] + box[3]) >> 1) - SCREEN_Y - 59;     /* its bottom row a pixel under his feet */
     if (x <= -32 || x >= 240 || y <= -64 || y >= 160) return 1;
-    if (GL.fade < 16 && glow_spread[FRAMES & 15] >= GL.fade) return 1;  /* fading in: shown in `fade` of every 16 frames, spread out (half: every
-                                                                           other frame), so it looks see-through, not blinking (no blending: see glow_frame) */
     (*cursor)[0] = 0xC000A000 | (x & 0x1FF) << 16 | (y & 0xFF);        /* 32x64 (tall, size 3), 256 colours */
     (*cursor)[1] = (*(u16 *)(actor + 0xC) & 0x3FF) | 2 << 10;
     *cursor += 2;
 #ifdef GLOW_BAND
-    if (GL.rise) return 1;                                              /* (the band comes with the form) */
+    if (GL.trans) return 1;                                             /* (the band comes when the flame is all there) */
     (*cursor)[0] = 0xC0008400 | (x & 0x1FF) << 16 | (y & 0xFF);        /* the band: semi-transparent, 16 colours */
     (*cursor)[1] = ((*(u16 *)(actor + 0xC) + RIM_BYTES / 32) & 0x3FF) | 2 << 10 | (((const volatile u8 *)glow_band_at)[GL.kind] >> 4) << 12;
     *cursor += 2;
@@ -3088,16 +3087,16 @@ static int glow_kind(int form) {
 #endif
     return -1;
 }
-/* The glow comes in during the power-up (Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a
-   smoother transition"). A power-up into a glowing form (Blue's state; Super Saiyan 4's going to a God form; Rose's) starts the glow of
-   the form it goes to as it starts (glow_begin, from its start: after the power-up's own aura, which keeps first claim on sprite memory;
-   no room, and the glow comes when the form does, as before), and it fades in: nothing for RISE_FROM frames, then the rim shown in
-   more and more of every 16 frames over RISE_LEN frames (on screen: brighter and brighter; blending it with BLDALPHA faded the fighter
-   and the power-up's aura as well, the power-up sets the blend registers for its flash), then the band with the form. The power-up lasts about 96 frames (Blue's from Super Saiyan, measured). While it plays the fighter's input (player_input,
-   glow_tick) doesn't run: the glow's own draw (every frame) moves the fade and the flame (glow_frame). A power-up cut short ends it
-   (glow_tick, once the fighter's input runs again). */
-#define RISE_FROM 20
-#define RISE_LEN 64
+/* From the power-up into the glow (Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a smoother
+   transition"; 20:29, on it fading in during the power-up: "Looks choppy is there any way to add a few more frames that actually match
+   the vanilla aura shape and then blend into the new one after that one ends better so its more smooth"). A power-up into a glowing form
+   (Blue's state; Super Saiyan 4's going to a God form; Rose's) takes the glow's sprite memory as it starts (glow_begin, from its start,
+   after its own aura: with no room left the glow comes with the form, as before) and shows nothing while it plays. When the form comes
+   the power-up's aura is gone, and the glow plays GLOW_TRANS frames first (TRANS_STEP game frames each): that aura's own three frames in
+   the form's tint, where it was, then that aura stretching up and narrowing into the flame and dissolving into it (lib/ssb_glow.py
+   transition), then the flame and its band. Not after a power-up in the other aura mode (AURA_MODE 1: its aura is another shape): the
+   glow comes with the form. A first try blended the glow in over the power-up (BLDALPHA): the fighter and the aura faded with it (the
+   power-up sets the blend registers for its flash); a second showed it on more and more frames: "choppy". */
 static int glow_rise(u8 *me) {                /* the kind of glow a power-up under way goes to, or -1 */
     u32 *state = IN_EWRAM(me) ? *(u32 **)(me + 0x14) : 0;
     if (!IN_EWRAM(state)) return -1;
@@ -3126,13 +3125,20 @@ static int glow_make(void) {                  /* the glow's actor, if it can hav
     Actor_Add(ACTOR_LIST, a);
     return 1;
 }
-static void glow_frame(void) {                /* the fade, the flame's frame and the blend, every frame the glow is up */
+static void glow_frame(void) {                /* the flame's frame (or the transition's) and the blend, every frame the glow is up */
     int frame;
-    if (GL.rise) {
-        int t = (u16)((u16)FRAMES - GL.rise);
-        GL.fade = t < RISE_FROM ? 0 : t >= RISE_FROM + RISE_LEN ? 16 : (t - RISE_FROM) * 16 / RISE_LEN;
+    if (GL.trans) {
+        int k = (u16)((u16)FRAMES - (GL.trans & 0xFFFE)) / TRANS_STEP;     /* (it is the start frame | 1: never 0) */
+        if (k < GLOW_TRANS) {
+            if (GL.loaded != -2 - k) {
+                MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_trans[GL.kind][k], RIM_BYTES);
+                GL.loaded = -2 - k;
+            }
+            return;
+        }
+        GL.trans = 0;
     }
-    else GL.fade = 16;
+    if (GL.rise) return;
     frame = (FRAMES / GLOW_STEP) % GLOW_FRAMES;
     if (GL.loaded != frame) {
         MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_frames[GL.kind][frame], RIM_BYTES);
@@ -3141,25 +3147,26 @@ static void glow_frame(void) {                /* the fade, the flame's frame and
 #endif
         GL.loaded = frame;
     }
-    if (!GL.rise) glow_blend(1);              /* (not while it comes in: the power-up's flash sets the blend registers too; turned over to the
-                                                 band's then, every sprite on screen faded with the rim) */
+    glow_blend(1);
 }
 void glow_begin(int kind) {                   /* a power-up into a glowing form starts (its start, after its own aura) */
     u8 *me = *(u8 **)0x03001C34;
     if (!COMBAT_ON || !IN_EWRAM(me) || AURA_MODE > 1 || !glow_make()) return;
-    GL.kind = kind; GL.loaded = -1; GL.rise = (u16)FRAMES | 1; GL.fade = 0;
+    GL.kind = kind; GL.loaded = -1; GL.rise = (u16)FRAMES | 1; GL.trans = 0;
 }
 static void glow_tick(void) {
     u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = *(u8 **)0x03001C34;
     int form = rec[0x14], kind = glow_kind(form), want;
     glow_check();
-    if (kind >= 0) GL.rise = 0;
+    if (kind >= 0) {
+        if (GL.rise) { GL.rise = 0; GL.trans = AURA_MODE ? 0 : (u16)FRAMES | 1; GL.loaded = -1; }     /* the form has come: the transition */
+    }
     else if (GL.actor && GL.rise && glow_rise(me) == GL.kind) kind = GL.kind;      /* still powering up */
     want = COMBAT_ON && IN_EWRAM(me) && AURA_MODE <= 1 && kind >= 0;
     if (!want) {
         glow_check();
         if (GL.actor) BOMB_LIST_REMOVE(ACTOR_LIST, GL.actor);
-        GL.actor = 0; GL.rise = 0; glow_blend(0); return;
+        GL.actor = 0; GL.rise = GL.trans = 0; glow_blend(0); return;
     }
     if (!glow_make()) return;
     if (GL.kind != kind) { GL.kind = kind; GL.loaded = -1; }

@@ -1012,13 +1012,18 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   glow has three kinds (`outfit.c glow_kind`, `GLOW_KINDS`): Blue's, Super Saiyan God's (crimson to orange, a gold-white core) and Rose's
   (magenta to pink, as Rose's power-up aura), each with its own frames and see-through band colour (`build.py GLOW_KINDS`, the nearest
   palette entries; `glow_band_at`). On by default; `BFU_GLOW_MORE=0` builds Blue's alone.
-- Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a smoother transition". A power-up into a
-  glowing form (Blue, Super Saiyan God, Rose) starts that form's glow from its own start (`outfit.c glow_begin`, after the power-up's aura
-  has its sprite memory; with no room left the glow comes with the form, as before). It comes in over the power-up: nothing for 20
-  frames, then the flame shown on more and more of every 16 frames for 64 frames (spread out: at half, every other frame), then all the
-  time; the see-through band comes with the form. While the power-up plays the fighter's input code doesn't run, so the glow's own draw
-  moves it (`glow_frame`). Blending it in with BLDALPHA was tried first: the fighter and the power-up's aura faded with it (the power-up
-  sets the blend registers for its flash), so the glow leaves them alone until the form arrives. A power-up cut short drops it.
+- Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a smoother transition", then (20:29, on
+  the glow shown on more and more frames over the power-up) "Looks choppy is there any way to add a few more frames that actually match
+  the vanilla aura shape and then blend into the new one after that one ends better so its more smooth". A power-up into a glowing form
+  (Blue, Super Saiyan God, Rose) takes the glow's sprite memory as it starts (`outfit.c glow_begin`, after the power-up's own aura) and
+  shows nothing while it plays. When the form comes, the glow first plays nine frames, three game frames each (`glow_trans`,
+  `lib/ssb_glow.py transition`): the power-up's field aura's own three frames in the form's tint (Blue's cyan, God's Super Saiyan 4 red,
+  Rose's pink) where it was (rows 28-59 of the glow's box, measured in the game), then six in which it stretches up, narrows and
+  dissolves into the flame (an ordered dither, a little more flame each frame); then the flame and its see-through band. While the
+  power-up plays the fighter's input code doesn't run, so the glow's own draw moves the transition (`glow_frame`). Tried first: blending
+  it in with BLDALPHA (the fighter and the power-up's aura faded with it: the power-up sets the blend registers for its flash), and
+  showing it on more and more frames ("choppy"). Not after a power-up in the other aura mode (AURA_MODE 1, another aura shape): the glow
+  comes with the form. A power-up cut short drops it.
 - Nov 12, the Fusion Dance as Super Saiyan 4 never gave Super Saiyan 4 Gogeta: `dance_use` only starts global script 13, which plays the
   dance and its button game over seconds and calls the fusion native at its end, and the "Super Saiyan 4 dance" mark was cleared as soon
   as the script started. Now it is noted for the native (`DANCE_SSJ4`, `DANCE_AT`, good for a minute, only after the ending) and taken
