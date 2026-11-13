@@ -168,27 +168,29 @@ for v in ('head', 'hair', 'recolour'):
         fr, notes = AG.frames(clean, 0x6B6BD8, f, v, gh=gh, gt=gk)
         bad = AG.problems(gh, fr, notes)
         check('%s head, %s: %d frames, none with a hole, a stray piece or gi colours %s' % (v, f, len(notes), bad[:3]), not bad)
-# 6: the grown look's portraits (Gohan's head set into Gotenks's own picture, lib/adult_gotenks.py Portraits.inlay): one skin, one
-# background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind him, the Super Saiyan pictures'
-# purple), the game's frame untouched; and Gotenks's hair is his picture's own: above his brow line pixel for pixel, and nearly all of it
-# over the whole picture (the rest is behind his ears, moved up, and Gohan's face)
+# 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
+# Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
+# him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line
+# pixel for pixel, and nearly all of it over the whole picture: the rest is behind Gohan's face and shoulders); his collar's rolls whole
 import numpy as np
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)
 ROWS = np.mgrid[:64, :64][0]
 for f in AG.ACTORS:
-    kraw = pics.art[{'base': 68, 'ssj': 71, 'ssj3': 73}[f]]; kface = pics.face(kraw)
+    kp = {'base': 68, 'ssj': 71, 'ssj3': 73}[f]; kraw = pics.art[kp]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
     top = khair & (ROWS < pics._eyes(kraw, AG._rows_filled(kface))[0] - 4 - AG.LIFT[f])      # (above Gohan's brow line)
+    rolls = pics.rolls_whole(kp)
     for i, a in enumerate(pics.make('grown', f)):
         inner = a[pics.inner]
         left = {'pink skin': int(np.isin(inner, (37, 212, 213, 214)).sum()), "Gohan's background": int(np.isin(inner, (5, 7, 73, 74)).sum()),
                 'purple background': int((inner == 88).sum()) if f != 'base' else 0}
         check('portrait %s %d: nothing of the two pictures left over %s, the frame as the game has it' % (f, i, left),
               not any(left.values()) and (a[pics.frame] == pics.art[69][pics.frame]).all())
-        same = a == kraw; share = (same & khair).sum() / khair.sum()
-        check("portrait %s %d: Gotenks's hair is his picture's own: all %d pixels above his brow line, %.0f%% of it in the whole picture"
-              % (f, i, top.sum(), 100 * share), bool(same[top].all()) and share >= 0.85)
+        same = a == kraw; share = (same & khair).sum() / khair.sum(); whole = (same & rolls).sum() / rolls.sum()
+        check("portrait %s %d: Gotenks's hair is his picture's own (all %d pixels above his brow line, %.0f%% of it in the whole picture) and "
+              "his collar's rolls are whole (%.0f%%)" % (f, i, top.sum(), 100 * share, 100 * whole),
+              bool(same[top].all()) and share >= 0.85 and whole >= 0.98)
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')
