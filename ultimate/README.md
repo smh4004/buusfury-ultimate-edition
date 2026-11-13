@@ -1090,6 +1090,32 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   the ki blast's, the arm held, the side points against the built frames; `test_wrath.py`'s Kid Buu checks follow. Broly (the Dojo's)
   was looked at in the game the same way: from his hand every side (he knocks the player down before firing, so his rig can't show a
   hit).
+- Nov 12, Adult Gotenks (`lib/adult_gotenks.py`, behind `BFU_ADULT_GOTENKS=1` until the owner picks his look; `BFU_AG_HEAD` picks the
+  head). The owner, 22:09: GT Goten and GT Trunks's fusion, "base it on the Gohan black suit outfit from BF, then overlay Gotenks head and
+  each SSJ form, vest, and then recolor to fit ... Make this separate from the other Gotenks too where it's only possible to use them for
+  those two chars, and build a portrait too from Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible way"; 22:46,
+  after the first try: "Both glitched bad. Possibly use Mystic Gohans head as a base as an option too and try both Gotenks hair and Gohans
+  hair recolored in Gotenks colors on top of the style with Gotenks head we started with so 3 total. Don't allow any invisible stuff no
+  clipping no stray pixels no backwards head body missing limbs wrong colors missing vest missing hair wrong face etc etc".
+  - The body: Mystic Gohan's frames (actor 101, twenty slots) in the outfit: the gi black (dark greys), its edge round the neck and
+    along the shoulders the vest's yellow padding, the belt the teal sash (a belt pixel is in a run of 3+ blue by the gi; the rest are the
+    wristbands, brown leather), the shoes the yellow wraps (pieces of their colours that touch no skin: 206 shades his hands too).
+    His change of form (slot 10) is Goku's and Vegeta's, as Mystic Gohan's (`build.mystic_change`).
+  - Three heads: Gotenks's own (117, 120, 121), collar on collar; Mystic Gohan's face with Gotenks's hair; Gohan's own hair in Gotenks's
+    colours (lavender where the nearest of Gotenks's hair, laid on his head, is lavender; gold as a Super Saiyan, both in a patch of
+    Gotenks's own hair's strokes, outlined; Super Saiyan 3 adds Gotenks's long hair behind). Gohan's head is found in each of his 135
+    pictures by his standing heads turned the way the frame's view has it; the frames whose head turns otherwise (a three-quarter
+    head gets the front one, a spin, a fall, a hit's thrown-back head) are listed in `HEAD_KIND`, read off a sheet of every frame.
+  - Every frame of every head and form is checked (`problems`, the build stops on any): no gi or blue left, no hole the frame didn't have
+    (a gap the new head leaves is filled), no piece of 4 pixels or less cut off from the figure (a lock of Gohan's hair past the new head).
+  - Portraits: Gotenks's own for his head; for the Gohan heads Mystic Gohan's (46, 45; serious the black suit's 38; Super Saiyan Gohan's
+    54, 51, 53) with Gotenks's hair over his own and the background, or his own hair lavender where Gotenks's is, on Gotenks's blue,
+    with Gotenks's padded collar (his picture's rolls, behind the face), what Gohan wears there black and the chest the undershirt.
+  - The fusion (`outfit.c fusion_native`): Goten in a GT look and Trunks in a GT look dancing make him; the game's Gotenks otherwise, and
+    a wrong dance's fat or thin Gotenks as ever. He comes in in his base form, as the game's Gotenks does, and changes form as Gotenks.
+  - `test_adult_gotenks.py` (a build with him in): each outcome for their own looks and the GT looks (the dance's button game pressed
+    through, the outcome set at the fusion native), his changes base -> Super Saiyan -> Super Saiyan 3 in the game, his rows and
+    portraits, and every frame of all three heads.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

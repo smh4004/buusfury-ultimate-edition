@@ -2657,6 +2657,9 @@ static void fused_restore(u8 *g) {
 }
 /* Script native 0xA8 (the fusion: fused, who started it, the two dancers, time in seconds or -1): ours first keeps Gogeta's own progress, and
    turns a Super Saiyan 4 dance's Gogeta into Super Saiyan 4 Gogeta with a third of the time. */
+#ifdef ADULT_GOTENKS
+static const u8 gt_goten[] = GT_GOTEN, gt_trunks[] = GT_TRUNKS;
+#endif
 void fusion_native(int *sp) {
     int n = *sp, fused = sp[n - 4], fresh = GetFlag(G_FLAGS, 149) && (u16)((u16)FRAMES - DANCE_AT) < 3600;     /* (only after the ending: the story's
                                                                           own Gogeta never danced through dance_use, and work RAM isn't cleared at boot) */
@@ -2670,6 +2673,17 @@ void fusion_native(int *sp) {
         if (sp[n] > 0) sp[n] = (sp[n] + 2) / 3;
     }
     if (fused == 7) DANCE_SSJ4 = DANCE_FORM = 0;
+#ifdef ADULT_GOTENKS
+    /* Adult Gotenks (Nov 12, the owner: "Make this separate from the other Gotenks too where it's only possible to use them for those two
+       chars"): Goten and Trunks dancing in their GT looks make him, the script's Gotenks (record 5; base, Super Saiyan, Super Saiyan 3, as
+       the script gave) in his own forms. A wrong dance's fat or thin Gotenks stay as they are. */
+    if (fused == 5 && in_list(gt_goten, sizeof gt_goten, FORM_OF(2)) && in_list(gt_trunks, sizeof gt_trunks, FORM_OF(3))) {
+        int f = FORM_OF(5);
+        if (f == 31 || f == 36) FORM_OF(5) = FORM_AG;
+        else if (f == 34 || f == 37) FORM_OF(5) = FORM_AG_SSJ;
+        else if (f == 35 || f == 38) FORM_OF(5) = FORM_AG_SSJ3;
+    }
+#endif
     NativeA8(sp);
 }
 static void story_sync(int post) {
