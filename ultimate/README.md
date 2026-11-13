@@ -1177,6 +1177,21 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     above the line (dark that is dark mirrored across his face too), and a lock of his hair hanging over them (dark that isn't, joined
     to his hair above) is taken out with its shadow; his hair between his ears and his face is skin; the face's brown outline stays
     brown but for the shirt's edge. `test_adult_gotenks.py` checks the seven pictures hold nothing of either source's own colours.
+  - 13:15, the owner: "The hair is STILL FUCKED". Read at 10x: `blend` moved Gotenks's picture up onto Gohan's (3 rows of his hair lost
+    off the top), kept Gohan's whole picture from the brow line down and laid Gotenks's side hair over it. That left, in the Super Saiyan
+    pictures, the tip of Gohan's own lock on his left brow and pieces of his side hair as curls, the tips of Kid Gotenks's own brows
+    above Gohan's, blue showing between Gohan's ears and the hair (Kid Gotenks's ears are lower and wider), the collar's leaves cut flat
+    at row 40, and the vest black beside his ears when he shouts (Gohan hunches). Now `Portraits.inlay`: Gotenks's own picture (68, 71,
+    73) is the canvas and is not moved, so his hair, his rolls and what is behind him are the game's pixels (all of his hair above his
+    brow line, 90-98% of it in the whole picture; the rest is behind Gohan's ears and jaw). Gohan's picture is moved so his eyes sit on
+    Gotenks's (the two faces are the same size: both chins 21 rows under the eyes) and only his head, neck and what he wears are used:
+    his face and ears from the brow line down (`gohan_clean`: black-haired as before; Super Saiyan, his left brow is his right one
+    mirrored, since his lock ends on it), his own hair over his temples his skin, his skin's brown line where Gotenks's hair now lies
+    against it; Gotenks's forehead above, his brow tips off; Gohan's own neck to 3 rows under his chin (found without his jaw's line:
+    38's face and neck are one piece of skin), then the dark undershirt, from under his ears down only. What Gohan's head doesn't cover
+    of Gotenks's face is his hair mirrored in from right outside it (base: the blue as his other two pictures have it there). Super
+    Saiyan 3: his hanging lock stays in front of Gohan's face, and Gohan's brows are skin (a Super Saiyan 3 has none). The test now also
+    checks the hair is Gotenks's picture's own. Still off in the normal build until the owner approves the pictures.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
