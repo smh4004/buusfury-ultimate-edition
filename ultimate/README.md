@@ -1161,6 +1161,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     picture to the eyes, columns by the faces' widths at the eyes), never over his face below the brows; his forehead between Gotenks's
     hairline and his brows skin; the rest of Gohan's old hair outline in Gotenks's nearest hair colour; the undershirt, vest and
     Gotenks's padded collar below.
+  - 11:21, the owner: "Those portraits are awful do better". Two things made every try look pasted: Gotenks's pictures draw skin pink
+    (37, 214, 213, 212) and Gohan's tan (84, 67, 83, 19), and his hair was cut out piece by piece or stretched. Now (`Portraits.transplant`)
+    the picture is cut in two at Gohan's brow line (4 rows above his eyes): above it Gotenks's own picture (hair, hairline, forehead, in
+    Gohan's skin colours), below it Gohan's (brows, eyes, face, ears, neck), Gotenks's side hair carried on below the line behind Gohan's
+    face; Gotenks's picture is widened by the faces' widths (columns doubled 7 out from his middle, where it is plain hair or forehead)
+    and lined up brow on brow, middle on middle. Every expression uses the same hair (Gotenks's serious picture's; his Super Saiyan serious
+    one's; Super Saiyan 3 his own), since all of it is above the brows.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

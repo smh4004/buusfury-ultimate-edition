@@ -989,6 +989,47 @@ class Portraits:
         a[rest] = hcol[rest]
         return self.dress(a, gp, rolls_from, gface, put | rest)
 
+    def transplant(self, gp, kp, form, rolls_from):
+        """Gohan's own picture gp from his brows down (his eyes, face, ears, neck), Gotenks's picture kp above them (his hair, his hairline,
+        his forehead) and his side hair below them behind Gohan's face (Nov 13, 11:21, the owner on the last try: "Those portraits are
+        awful do better"). Gotenks's skin in Gohan's (37 84, 214 67, 213 83, 212 19: the pictures' skins are pink and tan); his picture
+        widened by the faces' widths at the eyes (columns doubled 7 out from his face's middle, each side) and moved so his brow line
+        (4 rows above his eyes) is Gohan's and his face's middle Gohan's; his frame's edge filled with what is inside it. The same hair for
+        every expression (Gotenks's serious picture's, his Super Saiyan serious one's; Super Saiyan 3 his own): it is all above the brows.
+        Then the outfit (`dress`)."""
+        g = self.art[gp]; k = self.art[kp].copy()
+        for a_, b_ in ((37, 84), (214, 67), (213, 83), (212, 19)): k[k == a_] = b_
+        col, _ = _nearest(self.inner, k); k[self.frame] = col[self.frame]
+        Y, X = np.mgrid[:64, :64]
+        gsp = _rows_filled(self.face(g)); ksp = _rows_filled(self.face(self.art[kp]))
+        def eye_top(a, sp): return [y for y in range(64) if (sp[y] & (a[y] == 2)).sum() >= 2][0]
+        def span(sp, y):
+            xs = np.nonzero(sp[y])[0]; return int(xs.min()), int(xs.max())
+        ge = eye_top(g, gsp); ke = eye_top(self.art[kp], ksp)
+        sg, sk = ge - 4, ke - 4
+        gx0, gx1 = span(gsp, ge + 1); kx0, kx1 = span(ksp, ke + 1)
+        gcx, kcx = (gx0 + gx1) / 2, (kx0 + kx1) / 2
+        n = max(0, (gx1 - gx0) - (kx1 - kx0)); l, r = n // 2, n - n // 2
+        lc, rc, c = int(round(kcx - 7)), int(round(kcx + 7)), int(round(kcx))
+        cols = list(range(0, lc + 1)) + [lc] * l + list(range(lc + 1, c + 1)) + list(range(c + 1, rc + 1)) + [rc] * r + list(range(rc + 1, 64))
+        cols = cols[l:len(cols) - r]
+        hairc = P_HAIR + P_LAV if form == 'base' else P_GOLD + (208, 1)
+        kw = k[:, cols]; hw = self.hair(self.art[kp], hairc)[:, cols]
+        dy, dx = sg - sk, int(round(gcx - kcx))
+        ks = np.zeros_like(kw); hs = np.zeros(hw.shape, bool)
+        ys, xs = np.nonzero(np.ones(kw.shape, bool)); Yy, Xx = ys + dy, xs + dx
+        ok = (Yy >= 0) & (Yy < 64) & (Xx >= 0) & (Xx < 64)
+        ks[Yy[ok], Xx[ok]] = kw[ys[ok], xs[ok]]; hs[Yy[ok], Xx[ok]] = hw[ys[ok], xs[ok]]
+        out = g.copy()
+        top = (Y < sg) & self.inner
+        out[top] = ks[top]
+        side = (Y >= sg) & hs & np.isin(g, BG_OF[gp]) & self.inner
+        if form != 'ssj3': side &= Y < 50
+        out[side] = ks[side]
+        out[self.frame] = g[self.frame]
+        hair_now = (self.hair(out, hairc) & (Y < sg + 2)) | side
+        return self.dress(out, gp, rolls_from, self.face(g), hair_now)
+
     def gotenks_own(self, kp):
         """Gotenks's own picture kp, his face older (`older`), his bare chest under the vest the black undershirt."""
         k = self.older(kp); face = _rows_filled(self.face(k)); res = k.copy()
@@ -1025,7 +1066,7 @@ class Portraits:
                 out.append(self.art[GOTENKS_PICS[form][k]].copy())
                 continue
             if variant == 'grown':                 # (Gohan's own pictures with Gotenks's hair: the owner, Nov 13, 10:29)
-                out.append(self.gohan_face(gp, kp, form, 68 if form == 'base' else 71))
+                out.append(self.transplant(gp, {'base': 68, 'ssj': 71, 'ssj3': 73}[form], form, 68 if form == 'base' else 71))
                 continue
             if variant == 'hair':                  # (Nov 13, 09:40, the owner: "use one or the other": Gohan's own face and hair)
                 out.append(self.gohan_own(gp if form != 'ssj3' else 54, 68 if form == 'base' else 71))
