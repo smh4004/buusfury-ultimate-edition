@@ -940,6 +940,55 @@ class Portraits:
         res[self.frame] = k[self.frame]
         return res
 
+    def gohan_face(self, gp, kp, form, rolls_from):
+        """Gohan's own picture gp (his face, neck and proportions) with Gotenks's hair from his picture kp (Nov 13, 10:29, the owner:
+        "portraits shit try again with Gohan face and gotenks hair"). Gohan's hair goes, all of it down to his brows (his fringe too);
+        Gotenks's hair is laid on sized to Gohan's head: its rows above the eyes stretched from the picture's top to his eyes onto Gohan's
+        top to his, below them as they are; its columns by the faces' widths at the eyes, middle on middle; never over Gohan's face below
+        his brows. Where Gohan's hair was and Gotenks's isn't: his forehead (inside his face, below the hair in its column) skin, the rest
+        the nearest of Gotenks's hair's inside colours, so the hair keeps Gohan's head's outline with no gaps. Then the outfit (`dress`)."""
+        a = self.art[gp].copy(); kart = self.art[kp]
+        Y, X = np.mgrid[:64, :64]
+        gface = self.face(a); kface = self.face(kart)
+        gspan = _rows_filled(gface); kspan = _rows_filled(kface)
+        def eyes_top(img, sp):
+            w = [y for y in range(64) if (sp[y] & (img[y] == 2)).sum() >= 2]
+            return w[0] if w else None
+        ge = eyes_top(a, gspan); ke = eyes_top(kart, kspan)
+        brow = ge - 4
+        if form == 'base':
+            ghair = self.hair(a, P_HAIR) & ~(gface & (Y >= brow))
+            khair = self.hair(kart, P_HAIR + P_LAV) & ~kface
+        else:
+            ghair = self.hair(a, P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)) & ~(gface & (Y >= brow))
+            khair = self.hair(kart, P_GOLD + (208, 1)) & ~kface
+            if form != 'ssj3': khair[46:] = False
+        gh = ghair.copy(); gh[brow:] &= ~gspan[brow:]
+        a[gh] = 97
+        def span_at(sp, y):
+            xs = np.nonzero(sp[y])[0]; return xs.min(), xs.max()
+        gx0, gx1 = span_at(gspan, ge + 2); kx0, kx1 = span_at(kspan, ke + 2)
+        gcx = (gx0 + gx1) / 2; kcx = (kx0 + kx1) / 2; sx = (kx1 - kx0) / max(1, gx1 - gx0)
+        T = 4
+        ysrc = np.where(Y < ge, T + (Y - T) * (ke - T) / max(1, ge - T), Y - (ge - ke))
+        xsrc = kcx + (X - gcx) * sx
+        yi = np.clip(np.round(ysrc).astype(int), 0, 63); xi = np.clip(np.round(xsrc).astype(int), 0, 63)
+        put = khair[yi, xi] & self.inner & ~(gspan & (Y >= brow))
+        a[put] = kart[yi, xi][put]
+        left = gh & ~put
+        lowest = np.full(64, -1)
+        for x in range(64):
+            ys_ = np.nonzero(put[:, x])[0]
+            if len(ys_): lowest[x] = ys_.max()
+        fore = left & gspan & (Y > lowest[None, :]) & (Y < brow + 1)
+        col, _ = _nearest(np.isin(a, P_SKIN) & gspan & (Y >= brow) & (Y < ge + 6), a)
+        a[fore] = col[fore]
+        inside = put & ~np.isin(a, (16, 17, 208, 1, 111) if form != 'base' else (16,))
+        hcol, _ = _nearest(inside if inside.any() else put, a)
+        rest = left & ~fore
+        a[rest] = hcol[rest]
+        return self.dress(a, gp, rolls_from, gface, put | rest)
+
     def gotenks_own(self, kp):
         """Gotenks's own picture kp, his face older (`older`), his bare chest under the vest the black undershirt."""
         k = self.older(kp); face = _rows_filled(self.face(k)); res = k.copy()
@@ -975,8 +1024,8 @@ class Portraits:
             if variant == 'head':                  # (Gotenks's own pictures as they are: his head, his vest's padded collar)
                 out.append(self.art[GOTENKS_PICS[form][k]].copy())
                 continue
-            if variant == 'grown':                 # (Gotenks's own pictures, his bare chest the black undershirt)
-                out.append(self.gotenks_own(GOTENKS_PICS[form][k]))
+            if variant == 'grown':                 # (Gohan's own pictures with Gotenks's hair: the owner, Nov 13, 10:29)
+                out.append(self.gohan_face(gp, kp, form, 68 if form == 'base' else 71))
                 continue
             if variant == 'hair':                  # (Nov 13, 09:40, the owner: "use one or the other": Gohan's own face and hair)
                 out.append(self.gohan_own(gp if form != 'ssj3' else 54, 68 if form == 'base' else 71))
