@@ -171,7 +171,7 @@ for v in ('head', 'hair', 'recolour'):
 # 6: the grown look's portraits (Gohan's head set into Gotenks's own picture, lib/adult_gotenks.py Portraits.inlay): one skin, one
 # background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind him, the Super Saiyan pictures'
 # purple), the game's frame untouched; and Gotenks's hair is his picture's own: above his brow line pixel for pixel, and nearly all of it
-# over the whole picture (the rest is behind Gohan's ears and jaw)
+# over the whole picture (the rest is behind his ears, moved up, and Gohan's face)
 import numpy as np
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)
@@ -179,7 +179,7 @@ ROWS = np.mgrid[:64, :64][0]
 for f in AG.ACTORS:
     kraw = pics.art[{'base': 68, 'ssj': 71, 'ssj3': 73}[f]]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
-    top = khair & (ROWS < pics._eyes(kraw, AG._rows_filled(kface))[0] - 4)
+    top = khair & (ROWS < pics._eyes(kraw, AG._rows_filled(kface))[0] - 4 - AG.LIFT[f])      # (above Gohan's brow line)
     for i, a in enumerate(pics.make('grown', f)):
         inner = a[pics.inner]
         left = {'pink skin': int(np.isin(inner, (37, 212, 213, 214)).sum()), "Gohan's background": int(np.isin(inner, (5, 7, 73, 74)).sum()),

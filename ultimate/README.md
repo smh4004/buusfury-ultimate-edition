@@ -1192,6 +1192,18 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     of Gotenks's face is his hair mirrored in from right outside it (base: the blue as his other two pictures have it there). Super
     Saiyan 3: his hanging lock stays in front of Gohan's face, and Gohan's brows are skin (a Super Saiyan 3 has none). The test now also
     checks the hair is Gotenks's picture's own. Still off in the normal build until the owner approves the pictures.
+  - 14:36, the owner: "Fix the ears neck and face more still off". What was off, measured: Gohan's eyes sat on Kid Gotenks's, and a
+    child's eyes sit low, so the forehead was a child's (15 rows) and Gohan's chin was 5 rows from the picture's edge with no room for
+    a neck; his own ears, dithered dark because his own hair shades them, read as brown smudges on the lavender; and the skin beside
+    his jaw (his neck and shoulders: in 38 and 54 one piece of skin with his face) was drawn as part of his head, so his neck was as
+    wide as his face. `Portraits.inlay` now: his eyes `LIFT` rows above Gotenks's (3; Super Saiyan 2), which puts base Gohan's pictures
+    where the game has them (forehead about 12 rows, chin at row 50, 8 rows under it); his head ends at his jaw's line (`gohan_clean`: the
+    line 2 pixels thick, the light on his cheek, colour 120, counted as his face); the ears are Gotenks's own, moved up to his brows'
+    height against his face's edge; the neck is 23 columns under his chin for 3 rows, then the undershirt, black in every picture
+    (what was bare skin too); under his ears, between his jaw and the rolls, the undershirt's black (base) or the rolls and hair
+    mirrored in (Super Saiyan); the two shouting pictures (`HUNCHED`) keep the shirt up to his ears; Super Saiyan serious (51 has a
+    collar to its chin) takes 54's neck and shirt (`INLAY_BODY`) so the three match. Gotenks's hair is still his picture's own: all
+    of it above Gohan's brow line, 92-96% in the whole picture.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
