@@ -171,7 +171,8 @@ for v in ('head', 'hair', 'recolour'):
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line
-# pixel for pixel, and nearly all of it over the whole picture: the rest is behind Gohan's face and shoulders); his collar's rolls whole
+# pixel for pixel, and nearly all of it over the whole picture: the rest is behind Gohan's face and shoulders and Gotenks's own ears,
+# which are in front of it as in his picture); his collar's rolls whole but for what his ears' lobes cover
 import numpy as np
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)

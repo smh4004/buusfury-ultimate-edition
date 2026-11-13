@@ -1211,6 +1211,19 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     behind him (the bottom corners); in the Super Saiyan pictures, hair and rolls mirrored into what shows through beside his jaw
     where Gotenks's wider face was; where he shouts (`HUNCHED`), his shoulders up beside his ears left out. Gotenks's hair: all of
     it above Gohan's brow line, 92-99% in the whole picture (the rest is behind Gohan's face and shoulders).
+  - 16:56, the owner: "Fix the hair fix the clipping fix the ears". Read at 15x: Gotenks's hair lay over the tops of Gohan's ears and
+    cut them off with a ragged edge; a pixel of an ear's outline that was in none of the masks showed through the lavender; Gohan's
+    ears themselves are drawn in his own hair's shade (four browns mixed) and read as smudges even a tone lighter; and where Kid
+    Gotenks's wider cheeks had been, specks of blue and of the shirt were left shut in between the rolls, the hair and his jaw (the
+    rolls' own outline colour, 79, was not counted as rolls, which made holes in them). `Portraits.inlay` now: the ears are Gotenks's
+    own (drawn for this hair, light, one clean line to the cheek), set against Gohan's face's edge at the height they have by
+    Gotenks's own eyes, their lobes on the rolls as in his picture; they are in front of the hair and the rolls and behind the face,
+    so nothing cuts through anything. Gohan's own ears, and all outside them in their rows, are out of the picture. Gotenks's hair
+    goes over everything of Gohan's picture but his face and his body (`_dressed` returns that). Specks of 6 pixels or less of what
+    is behind him, and of 10 or less of the shirt, shut in among the hair, rolls and ears are the nearest of those. The kid's body
+    is only what reaches the picture's foot (a stray purple pixel by his ear was taken for it and came out black). Against the
+    form before, only the ears and what is right round them changed (137-216 pixels a picture; the face, brows, neck, shirt and
+    rolls are the same pixels). Gotenks's hair: all of it above Gohan's brow line, 92-98% in the whole picture.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
