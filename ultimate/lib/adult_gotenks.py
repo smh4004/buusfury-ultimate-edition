@@ -661,9 +661,10 @@ def frames(rom, actor_list, form='base', variant='head', slots=None, gh=None, gt
 # that was there). His head stays Gotenks's.
 GROWN = {'base': 117, 'ssj': 120, 'ssj3': 121}
 G_YEL = (243, 27, 250, 242)
-G_VEST = (112, 113, 115)
+G_VEST = (112, 113, 115) + G_YEL
 G_PANTS = (114, 117, 119)
-G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 16: 1}
+G_SKIN = SKIN + (67,)                   # (67: his stomach's shading)
+G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 67: 112, 16: 1}
 
 
 def _g_axis(c):
@@ -673,47 +674,76 @@ def _g_axis(c):
     return (0 if vy > 0 else 2) if abs(vy) >= abs(vx) else (1 if vx > 0 else 3)
 
 
-def _g_undershirt(n):
-    yel = np.isin(n, G_YEL); vest = yel | np.isin(n, G_VEST)
-    if not yel.any(): return n
+def _g_chest(n):
+    """His bare chest in a frame with his head up: each piece of skin below his collar (split by its outline) that the vest bounds (a
+    third or more of what is round it is the vest; arms and hands are bounded by their outline and the background), and the outline
+    between two such pieces. Bare from his collar to his trousers' top."""
+    yel = np.isin(n, G_YEL)
+    out = np.zeros(n.shape, bool)
+    if not yel.any(): return out
     collar = np.nonzero(yel.any(1))[0].min()
-    out = n.copy()
     rows = np.nonzero(np.isin(n, G_PANTS).sum(1) >= 2)[0]; rows = rows[rows > collar]
     stop = rows.min() if len(rows) else n.shape[0]
-    for y in range(collar + 1, stop):
-        vx = np.nonzero(vest[y])[0]
-        for x in np.nonzero(np.isin(n[y], SKIN + (LINE,)))[0]:
-            l = vx[vx < x]; r = vx[vx > x]
-            if len(l) and len(r) and x - l.max() <= 5 and r.min() - x <= 5: out[y, x] = G_UNDER.get(int(n[y, x]), n[y, x])
+    band = np.zeros(n.shape, bool); band[collar + 1:stop] = True
+    skin = np.isin(n, G_SKIN) & band
+    vest = np.isin(n, G_VEST)
+    lab, k = ndimage.label(skin)
+    for i in range(1, k + 1):
+        m = lab == i
+        ring = ndimage.binary_dilation(m) & ~m
+        if not ring.any(): continue
+        if (ring & vest).sum() * 3 >= ring.sum(): out |= m
+    if out.any():                       # (the outline between two pieces of his chest: his pecs' and stomach's lines)
+        line = (n == LINE) & band
+        both = ndimage.binary_dilation(out, np.array([[0, 0, 0], [1, 0, 0], [0, 0, 0]], bool)) & ndimage.binary_dilation(out, np.array([[0, 0, 0], [0, 0, 1], [0, 0, 0]], bool))
+        updown = ndimage.binary_dilation(out, np.array([[0, 1, 0], [0, 0, 0], [0, 0, 0]], bool)) & ndimage.binary_dilation(out, np.array([[0, 0, 0], [0, 0, 0], [0, 1, 0]], bool))
+        out |= line & (both | updown)
     return out
 
 
-def _g_grow(n):
+def _g_params(n):
+    """Where a frame with his head up grows: (rows to double, from his collar row down; the first row and the column his widening starts
+    from) or None."""
     yel = np.isin(n, G_YEL); ys = np.nonzero(n.any(1))[0]
-    if not yel.any() or not len(ys): return n
+    if not yel.any() or not len(ys): return None
     collar = np.nonzero(yel.any(1))[0].min(); L = ys.max() - collar
-    if L < 6: return n
+    if L < 6: return None
+    rows = sorted([collar + max(2, int(round(0.3 * L))), collar + int(round(0.62 * L)), collar + int(round(0.85 * L))], reverse=True)
+    c2 = collar                                         # (widened from his collar down: never his face)
+    body = np.zeros(n.shape, bool); body[collar:] = n[collar:] > 0
+    cx = int(np.round(np.argwhere(body)[:, 1].mean()))
+    return rows, c2, cx
+
+
+def _g_grow(n, prm):
+    if prm is None: return n
+    rows, c2, cx = prm
     out = n.copy()
-    for r in sorted([collar + max(2, int(round(0.3 * L))), collar + int(round(0.62 * L)), collar + int(round(0.85 * L))], reverse=True):
+    for r in rows:
         top = out[:r + 1].copy(); out[:r] = top[1:]; out[r] = top[r]
-    c2 = max(0, collar - 3); body = np.zeros(out.shape, bool); body[c2:] = out[c2:] > 0
-    if body.any():
-        cx = int(np.round(np.argwhere(body)[:, 1].mean()))
-        res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]; out = res
-    return out
+    res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]
+    return res
 
 
-def grown(c):
-    """One of Gotenks's frames (the 56 x 96 canvas) grown, in the undershirt."""
+def grown(c, ref=None):
+    """One of Gotenks's frames (the 56 x 96 canvas) grown, in the undershirt. ref: the same frame of base Gotenks (117), whose body his
+    Super Saiyan ones share: where his chest is and how he grows are read off it (his Super Saiyan hair is drawn in skin's colours, and
+    from behind his Super Saiyan 3 hair hides his collar)."""
     if not c.any(): return c.copy()
-    r = _g_axis(c); n = np.rot90(c, -r)
-    return np.rot90(_g_grow(_g_undershirt(n)), r)
+    ref = c if ref is None or not ref.any() else ref
+    r = _g_axis(ref); n = np.rot90(c, -r); nr = np.rot90(ref, -r)
+    chest = _g_chest(nr) & (n == nr)
+    n = n.copy()
+    for k, v in G_UNDER.items(): n[chest & (n == k)] = v
+    return np.rot90(_g_grow(n, _g_params(nr)), r)
 
 
 def grown_frames(rom, actor_list, form):
     """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form])."""
-    g = cells(rom, actor_list, GROWN[form])
-    return {s: [[grown(c)[OUT] for c in g[s][d]] for d in range(3)] for s in g}
+    g = cells(rom, actor_list, GROWN[form]); base = cells(rom, actor_list, GROWN['base'])
+    def ref(s, d, j):
+        return base[s][d][j] if s in base and len(base[s][d]) == len(g[s][d]) else None
+    return {s: [[grown(c, ref(s, d, j))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
 
 
 # ---- his portraits (the owner: "build a portrait too from Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible
@@ -857,9 +887,62 @@ class Portraits:
         res[neck] = a[neck]
         return res
 
+    def older(self, kp, eye_cut=3, nose=3, chin=3, jaw=2):
+        """Gotenks's picture kp with an older face (Nov 13, 09:58, the owner: "make the face in portrait look older not kid gotenks"): his
+        eyes shorter (rows out of their middle), his face longer (rows doubled where it has nothing but skin, between his eyes and his
+        mouth and between his mouth and his chin; what is above moves up, his collar stays), his jaw narrower (from below his eyes to his
+        chin each cheek loses up to `jaw` pixels inside its outline, never the mouth)."""
+        k = self.art[kp]; face = _rows_filled(self.face(k)); ys, xs = np.nonzero(face); chin_row = ys.max()
+        skinish = np.isin(k, P_SKIN)
+        def bands(rows):
+            out = []
+            for r in rows:
+                if out and r == out[-1][1] + 1: out[-1][1] = r
+                else: out.append([r, r])
+            return out
+        eye = bands([y for y in range(64) if (face[y] & (k[y] == 2)).sum() >= 2])[0]
+        plain = lambda y: face[y].sum() > 0 and (face[y] & ~skinish).sum() <= 2
+        feat = [y for y in range(eye[1] + 2, chin_row) if not plain(y)]
+        mouth_bot = max(feat) if feat else eye[1] + 8
+        cn = [y for y in range(eye[1] + 2, chin_row - 6) if plain(y)]
+        cc = [y for y in range(mouth_bot + 1, chin_row - 1) if plain(y)]
+        rows = list(range(64)); ops = []
+        # (the eye rows that go: ones that are all white across his eyes, no pupil or iris in them: his lids come down)
+        wc = {y: int((face[y] & (k[y] == 2)).sum()) for y in range(eye[0], eye[1] + 1)}
+        full = [y for y in sorted(wc) if wc[y] >= 0.85 * max(wc.values()) and (face[y] & np.isin(k[y], (1, 113, 117, 215, 216, 73, 74, 75, 99, 100))).sum() <= 4]
+        for y in full[:max(0, min(eye_cut, eye[1] - eye[0] + 1 - 5))]: ops.append((y, 'del', 1))     # (never under 5 rows)
+        if cn: ops.append((cn[len(cn) // 2], 'dup', nose))
+        if cc: ops.append((cc[0], 'dup', chin))
+        for r, kind, nn in sorted(ops, reverse=True):
+            i = rows.index(r)
+            if kind == 'dup': rows[i:i] = [r] * nn
+            else: del rows[i:i + nn]
+        rows = rows[len(rows) - 64:] if len(rows) >= 64 else [rows[0]] * (64 - len(rows)) + rows
+        out = k[rows, :]; out[self.frame] = k[self.frame]
+        f2 = _rows_filled(self.face(out)); ys2, xs2 = np.nonzero(f2); chin2 = ys2.max()
+        e2 = bands([y for y in range(64) if (f2[y] & (out[y] == 2)).sum() >= 2])[0]
+        y0 = e2[1] + 3; cx = xs2[ys2 >= chin2 - 1].mean()
+        res = out.copy()
+        for y in range(y0, chin2 + 1):
+            xs = np.nonzero(f2[y])[0]
+            if len(xs) < 6: continue
+            d = int(round(jaw * min(1.0, (y - y0) / max(1, (chin2 - y0) * 0.6))))
+            if d <= 0: continue
+            x0, x1 = xs.min(), xs.max(); c = int(round(cx))
+            row = out[y].copy(); new = row.copy(); sk = np.isin(row, P_SKIN)
+            ft = [x for x in range(x0 + 2, x1 - 1) if not sk[x]]
+            lm = min(min([x for x in ft if x < c] or [c - 3]), c - 3); rm = max(max([x for x in ft if x > c] or [c + 3]), c + 3)
+            if lm - x0 > d + 2:
+                new[x0 + d:lm] = np.concatenate([row[x0:x0 + 1], row[x0 + 1 + d:lm]]); new[x0:x0 + d] = row[x0 - 1] if x0 > 0 else 0
+            if x1 - rm > d + 2:
+                new[rm + 1:x1 + 1 - d] = np.concatenate([row[rm + 1:x1 - d], row[x1:x1 + 1]]); new[x1 + 1 - d:x1 + 1] = row[x1 + 1] if x1 < 63 else 0
+            res[y] = new
+        res[self.frame] = k[self.frame]
+        return res
+
     def gotenks_own(self, kp):
-        """Gotenks's own picture kp, his bare chest under the vest the black undershirt."""
-        k = self.art[kp]; face = _rows_filled(self.face(k)); res = k.copy()
+        """Gotenks's own picture kp, his face older (`older`), his bare chest under the vest the black undershirt."""
+        k = self.older(kp); face = _rows_filled(self.face(k)); res = k.copy()
         Y, X = np.mgrid[:64, :64]
         ys, xs = np.nonzero(face); jaw = ys.max(); cx = xs[ys >= jaw - 1].mean()
         neck = (np.abs(X - cx) <= 6) & (Y <= jaw + 2)

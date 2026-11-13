@@ -1144,6 +1144,17 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     attacks), each with his head up three rows more of body (chest, thighs, shins; his feet stay on the ground: 30 pixels to 33) and one
     column wider below his collar; his bare chest inside the vest the black undershirt. Its portraits are Gotenks's own with the
     undershirt (`Portraits.gotenks_own`). Built and played (`test_adult_gotenks.py` passes on both looks).
+  - 09:58, the owner picked the grown Gotenks and his own portraits (`BFU_AG_HEAD` defaults to 'grown'): "fix all the fucked up pixels
+    and bugs in grown gotenks, and make the face in portrait look older not kid gotenks". Fixed: his Super Saiyan and Super Saiyan 3 hair
+    is drawn in skin's colours, so the undershirt rule blackened it (32 pixels of one Super Saiyan 3 back view): where his chest is and
+    how each frame grows are now read off base Gotenks's same frame (`grown(c, ref)`), whose body the Super Saiyan ones share, and only
+    pixels the same in both change; his Super Saiyan 3 back views (his hair hides his collar) now grow like the rest. His chest is each
+    piece of skin below his collar (split by its outline) that the vest bounds a third or more of what is round it, his stomach's
+    shading (67) with it, and the lines between two such pieces: his flexing frame's whole bare torso, never his crossed arms or hands.
+    He is widened from his collar down (it was 3 rows above, through his chin). Portraits: `Portraits.older` before the undershirt: his
+    eyes' all-white rows out (his lids lower; never a row with a pupil or iris in it, never under 5 rows), 3 rows doubled where his face
+    is plain skin between his eyes and mouth and 3 between his mouth and chin (what is above moves up, his collar stays), and each cheek
+    in up to 2 pixels from below his eyes to his chin, never the mouth.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

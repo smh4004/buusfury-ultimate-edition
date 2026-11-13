@@ -110,7 +110,7 @@ GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.
 GLOW_ALPHA = (6, 10)
 GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
 ADULT_GOTENKS = os.environ.get('BFU_ADULT_GOTENKS', '0') != '0'      # Adult Gotenks (lib/adult_gotenks.py): GT Goten and GT Trunks's dance; off until the owner OKs his look
-AG_HEAD = os.environ.get('BFU_AG_HEAD', 'hair')         # his look: 'head' (Gotenks's), 'hair' (Mystic Gohan's face, Gotenks's hair), 'recolour', 'grown' (Gotenks grown) (lib/adult_gotenks.py)
+AG_HEAD = os.environ.get('BFU_AG_HEAD', 'grown')         # his look: 'head' (Gotenks's), 'hair' (Mystic Gohan's face, Gotenks's hair), 'recolour', 'grown' (Gotenks grown) (lib/adult_gotenks.py)
 CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '1') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, 21:40, the owner on the preview: "Make the beam actually come from Cell's hand too")
 # Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
 # own), 1 Super Saiyan God (crimson to orange, a gold-white core), 2 Rose (magenta to pink, as Rose's power-up aura). Nearest palette entries.
