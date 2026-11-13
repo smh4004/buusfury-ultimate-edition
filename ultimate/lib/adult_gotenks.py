@@ -7,13 +7,16 @@ Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible wa
 Gohans hair recolored in Gotenks colors on top of the style with Gotenks head we started with so 3 total. Don't allow any invisible stuff
 no clipping no stray pixels no backwards head body missing limbs wrong colors missing vest missing hair wrong face etc etc".
 
-From the pictures: the Metamoran vest, black, its thick padded collar and shoulders yellow; a black undershirt; bare arms with brown
-leather wrist guards; a teal sash at the waist; baggy black trousers; yellow ankle wraps; Gotenks's hair (black with lavender at the
-sides) on an adult's face.
+Nov 13, 08:16: "V2 but the vest/outfit/portraits need a lot of work"; 08:51, the pictures again (three, from Dragon Ball Heroes and a
+fan's drawing of him), then "You can do the white pants like kid gotenks honestly but do the top black with the vest". The pictures: the
+Metamoran vest, black, its thick padded collar yellow and big on his shoulders; a dark undershirt in its open front; bare arms; brown
+leather gloves; a teal sash; baggy white trousers; tall brown boots; Gotenks's hair (black with lavender at the sides) on an adult's face.
 
-The body: Buu's Fury's Mystic Gohan (actor 101, his orange gi: twenty slots) in the outfit's colours (`dress`): the gi black (its folds
-dark greys), its top along the shoulders and round the neck the vest's yellow padding, the blue belt the teal sash, the blue wristbands
-brown leather, the shoes the yellow wraps. Three heads (VARIANTS):
+The body: Buu's Fury's Mystic Gohan (actor 101, his orange gi: twenty slots) in the outfit (`outfit_parts`, `dress`): his top (the gi on
+his head's side of the sash) the black vest, its first two rows from its top edge (round the back of his neck and over his shoulders, not
+in front of his neck, where it is open) Gotenks's yellow padding, a roll lit from above; the dark Gohan wore under it the undershirt;
+the gi past the sash Kid Gotenks's white trousers (in shadow, Gohan's dark there, his greys); the shoes and the trousers' ends round them
+brown boots; the belt the teal sash; the wristbands and the hands past them brown gloves. Three heads (VARIANTS; the owner took 'hair'):
 - 'head': Gotenks's own head (actor 117 base, 120 Super Saiyan, 121 Super Saiyan 3) in place of Gohan's, collar on collar.
 - 'hair': Gohan's face with Gotenks's hair in place of his.
 - 'recolour': Gohan's own head, his hair in Gotenks's colours (black, lavender where Gotenks's is; gold as a Super Saiyan, with Gotenks's
@@ -33,7 +36,7 @@ VARIANTS = ('head', 'hair', 'recolour')
 
 # Gohan's colours (actor 101)
 GI = (63, 64, 65, 79, 4)                # (4: the symbol on Goku's gi, in his change's frames)
-BLUE = (157, 159, 161)
+BLUE = (157, 159, 161, 165)            # (165: the belt's light in Goku's change, which his is drawn from)
 SHOES = (77, 80, 81, 206, 248)          # (206 shades his hands too: a shoe is a piece of these that touches no skin)
 SKIN = (200, 201, 202, 203, 205)
 LINE = 16                               # skin's outline
@@ -282,63 +285,163 @@ class Gotenks:
 UP = {0: (-1, 0), 1: (0, -1), 2: (1, 0), 3: (0, 1)}      # quarter turns -> the head's "up" as (dy, dx) on the canvas
 
 
-def dress(c, src, kind, rot, headmask):
-    """Gohan's gi into the outfit (c is changed; src is the frame before any head was changed)."""
+def _runs(m):
+    """Each pixel of m: the longest run of m through it, across or down."""
+    out = np.zeros(m.shape, int)
+    for axis in (0, 1):
+        a = m if axis == 0 else m.T
+        r = np.zeros(a.shape, int)
+        for x in range(a.shape[1]):
+            y = 0
+            while y < a.shape[0]:
+                if a[y, x]:
+                    e = y
+                    while e < a.shape[0] and a[e, x]: e += 1
+                    r[y:e, x] = e - y; y = e
+                else: y += 1
+        out = np.maximum(out, r if axis == 0 else r.T)
+    return out
+
+
+def _depth(m, rot):
+    """For each pixel of m: how many pixels of m lie above it, unbroken, counted towards his head (rot: the head's quarter turns)."""
+    a = np.rot90(m, -rot)
+    d = np.zeros(a.shape, int)
+    for y in range(1, a.shape[0]): d[y] = np.where(a[y] & a[y - 1], d[y - 1] + 1, 0)
+    return np.rot90(d, rot)
+
+
+def _side(m, rot):
+    """Pixels beside m across his body (left or right of it, his head up)."""
+    a = np.rot90(m, -rot); b = np.zeros_like(a); b[:, 1:] |= a[:, :-1]; b[:, :-1] |= a[:, 1:]
+    return np.rot90(b, rot)
+
+
+def outfit_parts(src, kind, rot, headmask):
+    """Where each part of the outfit goes on a frame of Gohan's (src): {name: mask}. The pictures (the owner, Nov 13, with three of them,
+    and "do the white pants like kid gotenks honestly but do the top black with the vest"): a black vest whose thick padded collar runs
+    round his neck, down both edges of its open front and over his shoulders, yellow; a dark undershirt in its opening; bare arms; brown
+    leather gloves; a teal sash; Kid Gotenks's white trousers; brown boots."""
     gi = np.isin(src, GI); blue = np.isin(src, BLUE); skin = np.isin(src, SKIN)
-    # the shoes: pieces of their colours that touch no skin (206 shades his hands too)
-    sh = np.isin(src, SHOES); lab, n = _lab(sh)
-    shoe = np.zeros_like(sh)
+    k3 = np.ones((3, 3), bool)
+    near_head = ndimage.binary_dilation(headmask, k3)
+    # the sash and the wristbands: a sash pixel lies in a run of 3+ blue across or down, by his gi
+    belt = blue & (_runs(blue) >= 3) & ndimage.binary_dilation(gi, k3)
+    blab, bn = _lab(belt)
+    for i in range(1, bn + 1):                                  # (a wristband by a stray pixel of gi is still a wristband)
+        m = blab == i
+        if (ndimage.binary_dilation(m, k3) & gi).sum() < 4: belt &= ~m
+    guard = blue & ~belt
+    # his top and his trousers: the pieces of gi on his head's side of the sash, and the rest. Down his body is from his head to his sash
+    # where both are (a frame's head may be turned another way than his body: spinning, falling), else the way his head's up says
+    Y, X = np.mgrid[:src.shape[0], :src.shape[1]]
+    if belt.sum() >= 3 and headmask.any():
+        hy, hx = np.argwhere(headmask).mean(0); by, bx = np.argwhere(belt).mean(0)
+        vy, vx = by - hy, bx - hx; nv = np.hypot(vy, vx) or 1.0
+        along = (Y - hy) * vy / nv + (X - hx) * vx / nv
+        rot = (0 if vy > 0 else 2) if abs(vy) >= abs(vx) else (1 if vx > 0 else 3)
+    else:
+        dy, dx = UP[rot]
+        along = -(Y * dy + X * dx).astype(float)                # grows down his body, away from his head
+    dist = ndimage.distance_transform_edt(~headmask) if headmask.any() else np.full(src.shape, 99.0)
+    level = np.median(along[belt]) if belt.any() else None
+    lab, n = _lab(gi); top = np.zeros_like(gi)
     for i in range(1, n + 1):
         m = lab == i
-        if not (ndimage.binary_dilation(m, np.ones((3, 3), bool)) & skin).any(): shoe |= m
-    for k, v in WRAP.items(): c[shoe & (src == k)] = v
-    # the gi: his top (the pieces of it nearest his head) gets the padding along its edge towards his head
-    for k, v in SUIT.items(): c[gi & (src == k)] = v
-    lab, n = _lab(gi)
-    if n and headmask.any():
-        dist = ndimage.distance_transform_edt(~headmask)
-        near = [i for i in range(1, n + 1) if dist[lab == i].min() <= 3]
-        top = np.isin(lab, near)
-        if top.any():
-            # the padding: round his neck (2 pixels from his head) and along his shoulders (the top's first rows, counted from his head)
-            dy, dx = UP[rot]
-            ys, xs = np.nonzero(top)
-            along = -(ys * dy + xs * dx)                         # how far from his head along his body
-            rows = PAD_ROWS[kind] if rot in (0, 2) else 2
-            first = np.zeros_like(top); m = along <= along.min() + rows - 1; first[ys[m], xs[m]] = True
-            pad = top & ((dist <= 2.3) | first) & (dist <= 9)
-            for k, v in PAD.items(): c[pad & (src == k)] = v
-    # the blue: the belt the sash, the wristbands brown leather. A belt pixel lies in a run of 3+ blue pixels across or down, by his gi
-    # (one pixel off at most); the wristbands are the short pieces between his forearms and hands.
-    def runs(m):
-        out = np.zeros(m.shape, int)
-        for axis in (0, 1):
-            r = np.zeros(m.shape, int)
-            if axis == 0:
-                for x in range(m.shape[1]):
-                    y = 0
-                    while y < m.shape[0]:
-                        if m[y, x]:
-                            e = y
-                            while e < m.shape[0] and m[e, x]: e += 1
-                            r[y:e, x] = e - y; y = e
-                        else: y += 1
+        if dist[m].min() > 3: continue                          # (a leg, an arm's sleeve end: never his top)
+        if headmask.any() and along[m].mean() <= along[headmask].mean(): continue    # (his legs seen behind his head, flying at us)
+        if level is None or along[m].max() <= level: top |= m
+        else: top |= m & (along < level)
+    pants = gi & ~top
+    # his undershirt: the dark of Gohan's below his head that his top's gi is round (the open front, the sleeves under it at his shoulders)
+    dark = np.isin(src, (1, 111, 112)) & ~near_head
+    under = dark & (ndimage.convolve(top.astype(int), np.ones((3, 3), int), mode='constant') >= 2)
+    torso = top | under
+    # the padded collar: the torso's first two pixels down from its edge towards his head, over his shoulders and round the back of his
+    # neck; in front of his neck the vest is open (from the front its middle, from the side the part before his neck): black there
+    first = torso & (_depth(torso, rot) < 2)
+    ns = np.rot90(src, -rot).shape                                       # across his body, his head up: the column there
+    nx = np.rot90(np.tile(np.arange(ns[1]), (ns[0], 1)), rot)
+    neck = (skin | (src == LINE)) & ndimage.binary_dilation(torso, k3) & near_head & ~torso
+    open_ = np.zeros_like(top)
+    if kind != 1:
+        ref = neck if neck.any() else headmask
+        xs = nx[ref]
+        if len(xs):
+            lo, hi = xs.min(), xs.max(); mid = (lo + hi) / 2; half = max(2.0, (hi - lo) / 2)
+            if kind == 0: open_ = np.abs(nx - mid) <= half
             else:
-                for y in range(m.shape[0]):
-                    x = 0
-                    while x < m.shape[1]:
-                        if m[y, x]:
-                            e = x
-                            while e < m.shape[1] and m[y, e]: e += 1
-                            r[y, x:e] = e - x; x = e
-                        else: x += 1
-            out = np.maximum(out, r)
-        return out
-    by_gi = ndimage.binary_dilation(gi, np.ones((3, 3), bool))
-    belt = blue & (runs(blue) >= 3) & by_gi
-    guard = blue & ~belt
-    for k, v in GUARD.items(): c[guard & (src == k)] = v
-    for k, v in SASH.items(): c[blue & ~guard & (src == k)] = v
+                open_ = (nx < mid) if kind == 2 else (nx > mid)       # (the side view faces left, its mirror right)
+    pad = first & ~open_
+    # boots: the shoes' pieces that touch no skin (206 shades his hands too) and his trousers' ends round them
+    sh = np.isin(src, SHOES); slab, sn = _lab(sh); shoe = np.zeros_like(sh)
+    for i in range(1, sn + 1):
+        m = slab == i
+        if not (ndimage.binary_dilation(m, k3) & skin).any(): shoe |= m
+    foot_dark = np.isin(src, (1, 111, 112)) & ndimage.binary_dilation(shoe, k3) & ~near_head & ~torso
+    boot = shoe | (pants & (ndimage.distance_transform_edt(~shoe) <= 1.5)) | foot_dark
+    # gloves: his hands, the skin past each wristband (a piece of skin cut off by it that touches neither his top nor his head)
+    hand = np.zeros_like(skin)
+    if guard.any():
+        arm = (skin | (src == LINE)) & ~near_head
+        alab, an = _lab(arm & ~guard, 4)
+        for i in range(1, an + 1):
+            m = alab == i
+            if not (ndimage.binary_dilation(m, k3) & guard).any(): continue
+            if (ndimage.binary_dilation(m, k3) & (torso | near_head)).any(): continue
+            if m.sum() > 14: continue
+            hand |= m
+    # his trousers in shadow (seen from above or behind, Gohan's drew them dark): the dark joined to them on the far side of the sash
+    shade = np.zeros_like(gi)
+    if level is not None:
+        cand = np.isin(src, (1, 111, 112)) & ~near_head & ~torso & ~boot & (along > level)
+        clab, cn = _lab(cand | (pants & ~boot))
+        for i in range(1, cn + 1):
+            m = clab == i
+            if (m & pants).any(): shade |= m & cand
+        legs = pants | shade
+        if shade.any() and legs.any():                          # (their dark ends are his boots' soles: from behind, spinning)
+            tip = shade & (along >= along[legs].max() - 2.5)
+            boot |= tip; shade &= ~tip
+    return dict(top=top & ~pad, under=under & ~pad, pad=pad & ~boot, pants=pants & ~boot, shade=shade, boot=boot, belt=belt, guard=guard, hand=hand,
+                depth=_depth(torso, rot), rot=rot)
+
+
+# the outfit's colours, every one the game's own
+VEST_C = {79: 1, 63: 1, 64: 111, 65: 112, 4: 111, 1: 1, 111: 1, 112: 111}
+UNDER_C = {1: 112, 111: 112, 112: 113, 79: 112, 63: 112, 64: 113, 65: 113}
+PANTS_C = {79: 114, 63: 117, 64: 119, 65: 2, 4: 119}           # Kid Gotenks's white trousers (his own greys)
+PANTS_EDGE = 112
+BOOT_C = {79: 77, 63: 80, 64: 81, 65: 206, 4: 81, 248: 206, 206: 81, 80: 80, 81: 81, 77: 77, 1: 77, 111: 77, 112: 80, 16: 77}
+SASH_C = {157: 187, 159: 189, 161: 189}
+GLOVE_C = {157: 208, 159: 210, 161: 209, 200: 209, 201: 210, 202: 208, 203: 210, 205: 208, 16: 77}
+PAD_EDGE, PAD_MID, PAD_LIGHT = 243, 27, 250
+
+
+def dress(c, src, kind, rot, headmask):
+    """Gohan's gi into the outfit (c is changed; src is the frame before any head was changed)."""
+    # (Goku's change, which his is drawn from, lights his gi with the shoes' orange: pieces of it inside the gi are the gi's light)
+    src = src.copy(); k3 = np.ones((3, 3), bool); gi = np.isin(src, GI)
+    lab, n = _lab(src == 248)
+    for i in range(1, n + 1):
+        m = lab == i; ring = ndimage.binary_dilation(m, k3) & ~m
+        if (ring & gi).sum() * 2 > ring.sum(): src[m] = 65
+    src[src == 165] = 161
+    p = outfit_parts(src, kind, rot, headmask)
+    paint = lambda m, table: [c.__setitem__(m & (src == k), v) for k, v in table.items()]
+    paint(p['top'], VEST_C); paint(p['under'], UNDER_C)
+    paint(p['pants'], PANTS_C); paint(p['shade'], {1: 112, 111: 114, 112: 115})
+    edge = p['pants'] & ndimage.binary_dilation(src == 0, None) & (src == 79)
+    c[edge] = PANTS_EDGE
+    paint(p['boot'], BOOT_C)
+    paint(p['belt'], SASH_C); paint(p['guard'], GLOVE_C); paint(p['hand'], GLOVE_C)
+    # the padding: Gotenks's yellows, its outer edge the dark one, inside light where Gohan's gi caught the light
+    # the padding: Gotenks's yellows, a roll lit from above: its first row light, its second the yellow, its ends (by nothing, across his
+    # body) the dark one
+    pad = p['pad']
+    c[pad] = PAD_MID
+    c[pad & (p['depth'] == 0)] = PAD_LIGHT
+    c[pad & _side(src == 0, p['rot'])] = PAD_EDGE
     return c
 
 
@@ -552,6 +655,8 @@ P_CLOTHES = (54, 55, 56, 57, 58, 59, 62, 63, 64, 65, 69, 70, 71, 79, 93, 169, 17
 PICS = {'base': ((46, 69), (38, 68), (45, 70)), 'ssj': ((54, 72), (51, 71), (53, 71)), 'ssj3': ((54, 73),)}
 GOTENKS_PICS = {'base': (69, 68, 70), 'ssj': (72, 71, 71), 'ssj3': (73,)}
 ROLLS_FROM = {'base': (69, 68, 70), 'ssj': (72, 71, 71), 'ssj3': (73,)}
+P_SSJ_EDGE = (1, 111, 112, 16, 17, 20, 21, 23, 78, 82, 101, 72, 87, 88, 85, 86)     # Super Saiyan Gohan's hair's lines and shades
+NECK_HALF = 7
 
 
 def portrait_art(rom, i):
@@ -612,29 +717,29 @@ class Portraits:
         ring = ndimage.binary_dilation(keep, np.ones((3, 3), bool)) & ~keep & np.isin(a, (1, 17, 208, 2, 18)) & self.inner
         return keep | ring
 
-    def dress(self, a, i, g, face, keep_bg=False):
-        """The outfit on a picture a (made from picture i; Gotenks's collar from his picture g) -> new picture."""
+    def dress(self, a, i, g, face, hair):
+        """The outfit on a picture a (made from picture i; Gotenks's collar from his picture g; hair: where his hair is now) -> new
+        picture. As the owner's pictures (Nov 13): his neck, then the dark undershirt and the black vest, the vest's thick yellow padded
+        collar on his shoulders (Gotenks's own rolls, from his picture of the same expression, behind the face and hair); Gotenks's blue
+        behind him."""
         out = a.copy()
         bg = self.bg(i, face) & (a == self.art[i])
-        if not keep_bg:
-            for k, v in P_BG.items(): out[bg & (a == k)] = v
-        hairish = self.hair(a, P_HAIR + P_LAV + (16, 17, 20, 21, 23, 29, 30, 78, 82, 110, 205, 209, 248, 249, 247, 28, 26, 239, 101, 72))
-        ys = np.nonzero(face)[0]
-        jaw = ys.max()
-        body = self.inner & ~bg & ~face & ~hairish
-        skin = np.isin(a, P_SKIN)
-        # what he wears, wherever it shows, black; the neck's skin below 6 rows under the jaw the undershirt
-        clothes = body & np.isin(a, P_CLOTHES)
-        under = body & skin
-        under[:jaw + 6] = False
-        dark = under | clothes
-        lum = pal_lum(a)
-        lv = np.clip((lum / 255.0 * 6).astype(int), 0, 4)
+        for k, v in P_BG.items(): out[bg & (a == k)] = v
+        ys, xs = np.nonzero(face); jaw = ys.max(); cx = xs[ys >= jaw - 1].mean()
+        Y, X = np.mgrid[:64, :64]
+        body = self.inner & ~bg & ~face & ~hair & (Y >= jaw - 14)
+        neck = body & np.isin(a, P_SKIN) & (np.abs(X - cx) <= NECK_HALF) & (Y <= jaw + 3)
+        clothes = self.inner & ~face & ~hair & np.isin(a, P_CLOTHES)
+        dark = (body & ~neck) | clothes
+        lv = np.clip((pal_lum(a) / 255.0 * 4).astype(int), 0, 4)
         out[dark] = np.array(P_DARK)[lv[dark]]
-        # the collar, behind his face (and his hair)
         r = self.rolls(g); src = self.art[g]
-        put = r & ~face & ~hairish & self.inner
-        out[put] = src[put]
+        lab, n = _lab(r)
+        for k in range(1, n + 1):
+            m = lab == k
+            if m.sum() < 20: continue
+            put = m & ~face & ~hair & self.inner
+            out[put] = src[put]
         return out
 
     def make(self, variant, form):
@@ -649,26 +754,33 @@ class Portraits:
             if form == 'base':
                 ghair = self.hair(a, P_HAIR) & ~face
                 khair = self.hair(kart, P_HAIR + P_LAV) & ~kface
-                if variant == 'hair':
-                    put = khair & (ghair | bg)
-                    a[put] = kart[put]
-                else:                       # his hair lavender where the nearest of Gotenks's hair is lavender, in Gotenks's strokes there
-                    lav = np.isin(kart, P_LAV) & khair
-                    cls, _ = _nearest(khair, kart)
-                    span = np.zeros_like(face)                   # (never on his brows: only the hair beside and above his face)
+            else:
+                ghair = self.hair(a, P_GOLD + P_SSJ_EDGE) & ~face
+                khair = self.hair(kart, P_GOLD) & ~kface
+                if form != 'ssj3': khair[46:] = False
+            put = np.zeros_like(face)
+            if variant == 'hair' or form == 'ssj3':
+                put = khair & (ghair | bg)
+                a[put] = kart[put]
+                if form != 'base':                 # (what of Gohan's gold Gotenks's doesn't cover, off his face's span (his brows): in
+                    span = np.zeros_like(face)     #  the colour of Gotenks's nearest)
                     for y in range(64):
                         xs = np.nonzero(face[y])[0]
                         if len(xs): span[y, xs.min():xs.max() + 1] = True
-                    zone = ghair & np.isin(cls, P_LAV) & ~span
-                    col, _ = _nearest(lav, kart)
-                    a[zone] = np.where(lav[zone], kart[zone], col[zone])
-            else:
-                kh = self.hair(kart, P_GOLD) & ~kface
-                kh[46:] &= form == 'ssj3'
-                if variant == 'hair' or form == 'ssj3':
-                    put = kh & bg
-                    a[put] = kart[put]
-            out.append(self.dress(a, gp, ROLLS_FROM[form][k], face))
+                    left = ghair & ~put & ~span
+                    col, _ = _nearest(khair, kart); a[left] = col[left]
+                    a[ghair & ~put & np.isin(a, (85, 86, 87, 88))] = LINE     # (Gohan's purple hair lines over his brow: Gotenks's brown)
+            elif form == 'base':            # recolour: his hair lavender where the nearest of Gotenks's hair is, in Gotenks's strokes there
+                lav = np.isin(kart, P_LAV) & khair
+                cls, _ = _nearest(khair, kart)
+                span = np.zeros_like(face)                   # (never on his brows: only the hair beside and above his face)
+                for y in range(64):
+                    xs = np.nonzero(face[y])[0]
+                    if len(xs): span[y, xs.min():xs.max() + 1] = True
+                zone = ghair & np.isin(cls, P_LAV) & ~span
+                col, _ = _nearest(lav, kart)
+                a[zone] = np.where(lav[zone], kart[zone], col[zone])
+            out.append(self.dress(a, gp, ROLLS_FROM[form][k], face, ghair | put))
         return out
 
 

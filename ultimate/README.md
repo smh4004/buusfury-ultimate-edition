@@ -1116,6 +1116,16 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - `test_adult_gotenks.py` (a build with him in): each outcome for their own looks and the GT looks (the dance's button game pressed
     through, the outcome set at the fusion native), his changes base -> Super Saiyan -> Super Saiyan 3 in the game, his rows and
     portraits, and every frame of all three heads.
+  - Nov 13, the owner picked the second head ("V2 but the vest/outfit/portraits need a lot of work"; `BFU_AG_HEAD` defaults to 'hair'),
+    sent the pictures again and said "You can do the white pants like kid gotenks honestly but do the top black with the vest". The
+    outfit now follows them (`outfit_parts`): his top is the gi on his head's side of the sash (down his body is from his head to his
+    sash, so spins and falls split right); the black vest, its yellow padding the top's first two rows from its edge, over his shoulders
+    and round the back of his neck but open in front of it (the undershirt shows there), a roll lit from above (Gotenks's 250, 27, 243);
+    Kid Gotenks's white trousers (his greys; seen from above or behind, Gohan's dark legs his shadow greys); brown boots (the shoes and the
+    trousers' ends round them, and the dark tips of his legs from behind); the teal sash; brown gloves (the wristbands and the hands past
+    them). The orange that lights the gi in Goku's change is the gi's light there, not a shoe. Portraits: Gotenks's hair (his gold over
+    Gohan's as a Super Saiyan, Gohan's gold it doesn't cover in Gotenks's nearest colour, never on the brows), the neck, then the dark
+    undershirt and black vest wherever Gohan wore anything below his jaw, Gotenks's rolls on the shoulders behind the face and hair.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
