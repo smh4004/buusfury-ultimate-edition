@@ -1024,6 +1024,15 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   it in with BLDALPHA (the fighter and the power-up's aura faded with it: the power-up sets the blend registers for its flash), and
   showing it on more and more frames ("choppy"). Not after a power-up in the other aura mode (AURA_MODE 1, another aura shape): the glow
   comes with the form. A power-up cut short drops it.
+- Nov 12, 20:48-20:51, the owner: "Add that to mystic gohan full power too actually", then "Fix his transformation stance too and for him
+  can you make that aura fade out after like 3 more seconds but have the lightning remain. Have this apply ONLY for him nobody else with
+  this new aura". Full Power Mystic has the glow too (kind 3, silver-white with a cool blue, as his white lightning: `build.py
+  GLOW_KINDS`), with the transition from his power-up's white aura (`maxp_start`; Roshi's Max Power shares that state and gets none). His
+  glow alone holds 3 seconds after the transition (or after it comes with a new area's fight), then dissolves away over six frames
+  (`ssb_glow.fadeout`, `glow_fadeout`) and stays gone while he is in the form; the crackle (his lightning) goes on. The glow's phases:
+  `outfit.c GLOW_INTO`, `GLOW_FLAME`, `GLOW_HOLD`, `GLOW_OUT`, `GLOW_GONE`. His change (slot 10): his power-up's crouch, fists at his
+  sides, ten times, then his stance (`sprites.py _powerup_still`; it was the crouch twice and the arms-up shout eight times); the orange
+  gi's own change into Super Saiyan keeps its shout.
 - Nov 12, the Fusion Dance as Super Saiyan 4 never gave Super Saiyan 4 Gogeta: `dance_use` only starts global script 13, which plays the
   dance and its button game over seconds and calls the fusion native at its end, and the "Super Saiyan 4 dance" mark was cleared as soon
   as the script started. Now it is noted for the native (`DANCE_SSJ4`, `DANCE_AT`, good for a minute, only after the ending) and taken

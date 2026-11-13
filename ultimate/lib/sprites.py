@@ -404,19 +404,20 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
     # The frames: his own power-up (slot 13: the crouch, then arms up), front view in every view, ending on his stance, as GT Vegeta's change
     # (approved Nov 10). They were his slot 21 or 9, so these figures powered up with punches, kicks, being hit, or Gohan's green gi turning
     # to stone (Nov 10, the owner: "ssj2 he punches while transforming").
-    for key in cfg.get('_powerup', ()):
+    for key in [*cfg.get('_powerup', ()), *cfg.get('_powerup_still', ())]:
+        still = key in cfg.get('_powerup_still', ())     # the crouch all through, no arms up (Full Power Mystic's: the owner, Nov 12)
         at_ = key if isinstance(key, int) else ids[key]
         o = table[at_] - BASE; n = struct.unpack_from('<I', rom, o)[0] & 0xFF; rec = bytearray(rom[o:o + 0x54 + 4 * n])
         up, stand = (struct.unpack_from('<I', rec, 0x54 + 4 * s)[0] for s in (13, 0))
         if not up or struct.unpack_from('<I', rom, up - BASE)[0] < 2: sys.exit('_powerup %s: no two-frame power-up (slot 13)' % key)
         front = lambda ap, k: struct.unpack_from('<I', rom, ap - BASE + 4 + 16 * k)[0]
-        seq = [front(up, 0)] * 2 + [front(up, 1)] * 8 + [front(stand, 0)]
+        seq = [front(up, 0)] * (10 if still else 2) + ([] if still else [front(up, 1)] * 8) + [front(stand, 0)]
         struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', 11) + struct.pack('<44I', *[f for f in seq for d in range(4)])))
         table[at_] = ins.put(bytes(rec))
     # A same_as actor took its source's record as it was when it was made: point it at the record the source ends up with (_powerup above
     # makes a new one), or armour Gohan's Super Saiyan 2 kept the template's power-down (retail green-gi Gohan) after his own had changed.
     for name, a in cfg.items():
-        if isinstance(a, dict) and 'same_as' in a and name not in cfg.get('_powerup', ()):      # (one with a power-up of its own keeps it: Full Power)
+        if isinstance(a, dict) and 'same_as' in a and name not in cfg.get('_powerup', ()) and name not in cfg.get('_powerup_still', ()):      # (one with a power-up of its own keeps it: Full Power)
             src = a['same_as']
             table[ids[name]] = table[src] if isinstance(src, int) else table[ids[src]]
     # Actors drawn with no ground shadow (cfg '_no_shadow': ids or names). Record bytes +0xA/+0xB are the shadow's size, looked up when the

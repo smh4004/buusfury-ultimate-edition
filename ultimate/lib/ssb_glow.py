@@ -285,6 +285,18 @@ def transition(burst, lut, flames, morph=TRANS_MORPH):
     return out
 
 
+FADE_OUT = 6
+
+
+def fadeout(lut, flames, n=FADE_OUT):
+    """Full Power Mystic's glow going (the owner, Nov 12 20:51: "make that aura fade out after like 3 more seconds but have the lightning
+    remain ... ONLY for him"): the flame (its frames in turn) dissolving away, an ordered dither, a little less of it each frame. -> n
+    frames of 32x64 palette indices."""
+    yy, xx = np.mgrid[0:H, 0:W]
+    lut = np.asarray(lut, np.uint8)
+    return [np.where(BAYER[yy % 4, xx % 4] >= (i + 1) / (n + 1.0) * 16, lut[flames[i % len(flames)]], 0).astype(np.uint8) for i in range(n)]
+
+
 def band_only(frames):
     """the band's pixels alone (value 14), the rim taken out"""
     return [np.where(f == 14, 14, 0).astype(np.uint8) for f in frames]

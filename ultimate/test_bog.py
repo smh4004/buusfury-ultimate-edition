@@ -65,6 +65,13 @@ in_area = lambda a: lambda: at() == a
 def held():
     r = dump(REC0, 0x68)
     return list(r[0x0D:0x0D + r[0x0C]]) + [k for k in range(64) if k < 16 * 8 and False]
+# Goku's book (build.py SKILL_BOOK): a skill learned with six already held waits there, known (record +0x22, a bit per place), for
+# SELECT on the Skills tab to swap in (Nov 12: the Fusion Dance, learned after the ending, now fills a sixth slot before the ritual).
+BOOK = __import__('re').search(r'SKILL_BOOK = \{0: \(([0-9, ]+)\)', open('ultimate/build.py').read()).group(1)
+BOOK = [int(v) for v in BOOK.split(',')]
+def knows(skill):
+    r = dump(REC0, 0x68)
+    return skill in held() or (skill in BOOK and BOOK.index(skill) < 16 and struct.unpack_from('<H', r, 0x22)[0] >> BOOK.index(skill) & 1)
 def boss(hp):
     w = dump(0x02000000, 0x40000); i = w.find(struct.pack('<I', hp << 10))
     return (0x02000000 + i,) + struct.unpack_from('<II', w, i - 0xEC) if i >= 0 else (None, 0, 0)
@@ -155,9 +162,9 @@ check('beating him there leads on to the ritual, and fighting is off again', at(
 scene(104, 264, in_area(WEST), menu=True); send('shot god_west'); mem(G)
 for _ in range(40):         # skills_sync grants it within 64 frames when Goku is in play, within 512 when he is a party member (Nov 9: one run
                             # checked a few frames too soon; Nov 10: the frame-drop fix moved the party's turn 32 frames, past the old 80)
-    if 46 in held(): break
+    if knows(46): break
     send('run 16'); mem(G)
-check('the ritual makes Goku a Super Saiyan God (the skill is his)', more(bog.MORE_BOG_RITUAL) and 46 in held())
+check('the ritual makes Goku a Super Saiyan God (the skill is his: held, or known in his book)', more(bog.MORE_BOG_RITUAL) and knows(46))
 a, _, _ = boss(bog.ROWS[2][0])
 check('then Goku faces Beerus in West City', at() == WEST and a is not None)
 check('the West City resident stands aside meanwhile', not standing(320, 360))
@@ -178,7 +185,7 @@ full(); beat(bog.ROWS[4][0], 'the desert', in_area(DESERT)); send('shot home'); 
 check('winning there brings Goku home to Capsule Corporation', at() == CAPSULE and more(bog.MORE_BOG_DONE) and not more(bog.MORE_BOG_FIGHT))
 scene(264, 232, lambda: more(bog.MORE_BOG_TOLD)); send('shot told'); mem(G)
 check('where Beerus spares the Earth', more(bog.MORE_BOG_TOLD))
-check('and Super Saiyan God stays Goku\'s', 46 in held())
+check('and Super Saiyan God stays Goku\'s', knows(46))
 check('no bad jumps', not bad[0])
 send('quit')
 print('screens in', D)

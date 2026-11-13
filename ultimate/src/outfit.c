@@ -2918,7 +2918,12 @@ extern const int absorb_vt[14];
    bulked-up Roshi, so he keeps his own frames (the owner: "if the sprites exist if not just use the ones that do exist"). */
 const u32 maxp_aura_field[9] = {1}, maxp_aura_other[21] = {1};
 const int maxp_vt[14] = {1};
-void maxp_start(u32 *state, void *sprite) { tinted_start(state, sprite, maxp_aura_field, maxp_aura_other); }
+void maxp_start(u32 *state, void *sprite) {
+    tinted_start(state, sprite, maxp_aura_field, maxp_aura_other);
+#ifdef GLOW_MORE
+    if (XFORM && is_fp(XFORM - 1)) glow_begin(3);             /* Full Power Mystic's (not Roshi's Max Power, which shares the state) */
+#endif
+}
 void maxp_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, maxp_vt);
     else SS_Use(record, sprite);
@@ -2999,15 +3004,23 @@ static void crackle(void) {
    actor list's own clear calls glow_destroy). */
 #ifdef LOOK170
 /* GLOW_MORE (Nov 12 19:35, the owner: "draft a SSG version too maybe for Goku", "maybe a pink for Goku Black Rose form too"; 19:42 on the
-   drafts in the game: "Auras all look good to lock in"): the same glow in Super Saiyan God's reds (kind 1) and Rose's pinks (kind 2), each
-   with its own frames and band colour. On by default (build.py BFU_GLOW_MORE=0 builds Blue's alone). */
+   drafts in the game: "Auras all look good to lock in"; 20:48: "Add that to mystic gohan full power too actually"): the same glow in
+   Super Saiyan God's reds (kind 1), Rose's pinks (kind 2) and Full Power Mystic's whites (kind 3), each with its own frames and band colour. On by default (build.py BFU_GLOW_MORE=0 builds Blue's alone). */
 #ifdef GLOW_MORE
-#define GLOW_KINDS 3
+#define GLOW_KINDS 4
 #else
 #define GLOW_KINDS 1
 #endif
 const u32 glow_frames[GLOW_KINDS][GLOW_FRAMES] = {{1}};
-struct glow { u8 *actor; short loaded; u16 cnt_was, alpha_was; u8 blending, kind; u16 rise, trans; };
+struct glow { u8 *actor; signed char loaded; u8 phase; u16 cnt_was, alpha_was; u8 blending, kind; u16 rise, trans; };
+/* phases: 0 the flame (and band); 1 the transition from the power-up's aura; 2 Full Power's flame for HOLD_FRAMES, then 4 its fade-out
+   (GLOW_FADE frames), then 3 gone while the form lasts. `trans` is when the phase began (| 1: never 0). */
+enum { GLOW_FLAME, GLOW_INTO, GLOW_HOLD, GLOW_GONE, GLOW_OUT };
+#define FP_KIND 3                                         /* Full Power Mystic's glow: it fades out (the owner, 20:51) */
+#define HOLD_FRAMES 180
+#ifdef GLOW_MORE
+const u32 glow_fadeout[GLOW_FADE] = {1};                  /* Full Power's flame dissolving away (build.py, ssb_glow.fadeout) */
+#endif
 const u32 glow_trans[GLOW_KINDS][GLOW_TRANS] = {{1}};     /* each kind's frames from the power-up's aura into the glow (build.py, ssb_glow.transition) */
 #define TRANS_STEP 3                                      /* game frames each */
 #define GL (*(struct glow *)0x0203FB00)
@@ -3055,7 +3068,8 @@ int glow_draw_oam(u8 *actor, u32 **cursor) {
     int box[4], x, y;
     if (actor != GL.actor || !IN_EWRAM(me)) return 1;
     if (GL.rise) return 1;                                              /* (powering up: nothing yet, the power-up's own aura is up) */
-    if (GL.trans) glow_frame();                                         /* (the transition runs by frames: in step with the draw) */
+    if (GL.phase != GLOW_FLAME) glow_frame();                           /* (timed phases run by frames: in step with the draw) */
+    if (GL.phase == GLOW_GONE) return 1;
     SpriteBox(box, me);
     x = ((box[0] + box[2]) >> 1) - SCREEN_X - 16; y = ((box[1] + box[3]) >> 1) - SCREEN_Y - 59;     /* its bottom row a pixel under his feet */
     if (x <= -32 || x >= 240 || y <= -64 || y >= 160) return 1;
@@ -3063,7 +3077,7 @@ int glow_draw_oam(u8 *actor, u32 **cursor) {
     (*cursor)[1] = (*(u16 *)(actor + 0xC) & 0x3FF) | 2 << 10;
     *cursor += 2;
 #ifdef GLOW_BAND
-    if (GL.trans) return 1;                                             /* (the band comes when the flame is all there) */
+    if (GL.phase != GLOW_FLAME && GL.phase != GLOW_HOLD) return 1;      /* (the band only with the whole flame) */
     (*cursor)[0] = 0xC0008400 | (x & 0x1FF) << 16 | (y & 0xFF);        /* the band: semi-transparent, 16 colours */
     (*cursor)[1] = ((*(u16 *)(actor + 0xC) + RIM_BYTES / 32) & 0x3FF) | 2 << 10 | (((const volatile u8 *)glow_band_at)[GL.kind] >> 4) << 12;
     *cursor += 2;
@@ -3084,6 +3098,7 @@ static int glow_kind(int form) {
 #ifdef GLOW_MORE
     if (is_ssg(form)) return 1;
     if (form == FORM_ROSE) return 2;
+    if (is_fp(form)) return 3;
 #endif
     return -1;
 }
@@ -3104,6 +3119,7 @@ static int glow_rise(u8 *me) {                /* the kind of glow a power-up und
 #ifdef GLOW_MORE
     if (state[0] == (u32)ssj4_vt && XFORM && is_ssg(XFORM - 1)) return 1;
     if (state[0] == (u32)rose_vt) return 2;
+    if (state[0] == (u32)maxp_vt && XFORM && is_fp(XFORM - 1)) return 3;
 #endif
     return -1;
 }
@@ -3121,55 +3137,67 @@ static int glow_make(void) {                  /* the glow's actor, if it can hav
     if (tile == -1) { FreeMem(a); return 0; }
     a[0] = (u32)glow_vt; *((u8 *)a + 8) = 0x38;
     *(u16 *)((u8 *)a + 0xC) = tile; *(u16 *)((u8 *)a + 0xE) = GLOW_BYTES;
-    GL.actor = (u8 *)a; GL.loaded = -1;
+    GL.actor = (u8 *)a; GL.loaded = -1; GL.phase = GLOW_FLAME;
     Actor_Add(ACTOR_LIST, a);
     return 1;
 }
-static void glow_frame(void) {                /* the flame's frame (or the transition's) and the blend, every frame the glow is up */
-    int frame;
-    if (GL.trans) {
-        int k = (u16)((u16)FRAMES - (GL.trans & 0xFFFE)) / TRANS_STEP;     /* (it is the start frame | 1: never 0) */
-        if (k < GLOW_TRANS) {
-            if (GL.loaded != -2 - k) {
-                MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_trans[GL.kind][k], RIM_BYTES);
-                GL.loaded = -2 - k;
-            }
-            return;
-        }
-        GL.trans = 0;
-    }
-    if (GL.rise) return;
-    frame = (FRAMES / GLOW_STEP) % GLOW_FRAMES;
-    if (GL.loaded != frame) {
-        MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_frames[GL.kind][frame], RIM_BYTES);
+static void glow_load(const u32 *src, int key, int band) {        /* a frame (key: which) into the glow's sprite memory, once */
+    if (GL.loaded == key) return;
+    MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)src[0], RIM_BYTES);
 #ifdef GLOW_BAND
-        MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20 + RIM_BYTES, (void *)glow_band[GL.kind][frame], 0x400);
+    if (band) MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20 + RIM_BYTES, (void *)src[1], 0x400);
 #endif
-        GL.loaded = frame;
+    GL.loaded = key;
+}
+static void glow_frame(void) {                /* the phase, its frame and the blend, every frame the glow is up */
+    int k = (u16)((u16)FRAMES - (GL.trans & 0xFFFE)), frame = (FRAMES / GLOW_STEP) % GLOW_FRAMES;
+    u32 two[2];
+    if (GL.rise) return;
+    if (GL.phase == GLOW_INTO) {
+        if (k / TRANS_STEP < GLOW_TRANS) { two[0] = glow_trans[GL.kind][k / TRANS_STEP]; glow_load(two, -2 - k / TRANS_STEP, 0); glow_blend(0); return; }
+        GL.phase = GL.kind == FP_KIND ? GLOW_HOLD : GLOW_FLAME; GL.trans = (u16)FRAMES | 1; k = 0;
     }
+#ifdef GLOW_MORE
+    if (GL.phase == GLOW_HOLD && k >= HOLD_FRAMES) { GL.phase = GLOW_OUT; GL.trans = (u16)FRAMES | 1; k = 0; }
+    if (GL.phase == GLOW_OUT) {
+        if (k / TRANS_STEP < GLOW_FADE) { two[0] = ((const volatile u32 *)glow_fadeout)[k / TRANS_STEP]; glow_load(two, -20 - k / TRANS_STEP, 0); glow_blend(0); return; }
+        GL.phase = GLOW_GONE;
+    }
+#endif
+    if (GL.phase == GLOW_GONE) { glow_blend(0); return; }
+    two[0] = glow_frames[GL.kind][frame];
+#ifdef GLOW_BAND
+    two[1] = glow_band[GL.kind][frame];
+#endif
+    glow_load(two, frame, 1);
     glow_blend(1);
 }
 void glow_begin(int kind) {                   /* a power-up into a glowing form starts (its start, after its own aura) */
     u8 *me = *(u8 **)0x03001C34;
     if (!COMBAT_ON || !IN_EWRAM(me) || AURA_MODE > 1 || !glow_make()) return;
-    GL.kind = kind; GL.loaded = -1; GL.rise = (u16)FRAMES | 1; GL.trans = 0;
+    GL.kind = kind; GL.loaded = -1; GL.rise = (u16)FRAMES | 1; GL.phase = GLOW_FLAME; GL.trans = 0;
 }
 static void glow_tick(void) {
     u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = *(u8 **)0x03001C34;
     int form = rec[0x14], kind = glow_kind(form), want;
     glow_check();
     if (kind >= 0) {
-        if (GL.rise) { GL.rise = 0; GL.trans = AURA_MODE ? 0 : (u16)FRAMES | 1; GL.loaded = -1; }     /* the form has come: the transition */
+        if (GL.rise) {                                                   /* the form has come: the transition */
+            GL.rise = 0; GL.loaded = -1; GL.trans = (u16)FRAMES | 1;
+            GL.phase = AURA_MODE ? (kind == FP_KIND ? GLOW_HOLD : GLOW_FLAME) : GLOW_INTO;
+        }
     }
     else if (GL.actor && GL.rise && glow_rise(me) == GL.kind) kind = GL.kind;      /* still powering up */
     want = COMBAT_ON && IN_EWRAM(me) && AURA_MODE <= 1 && kind >= 0;
     if (!want) {
         glow_check();
         if (GL.actor) BOMB_LIST_REMOVE(ACTOR_LIST, GL.actor);
-        GL.actor = 0; GL.rise = GL.trans = 0; glow_blend(0); return;
+        GL.actor = 0; GL.rise = GL.trans = 0; GL.phase = GLOW_FLAME; glow_blend(0); return;
     }
     if (!glow_make()) return;
-    if (GL.kind != kind) { GL.kind = kind; GL.loaded = -1; }
+    if (GL.kind != kind) { GL.kind = kind; GL.loaded = -1; GL.phase = GLOW_FLAME; }
+    if (kind == FP_KIND && GL.phase == GLOW_FLAME) { GL.phase = GLOW_HOLD; GL.trans = (u16)FRAMES | 1; }    /* (Full Power's, come without a power-up:
+                                                                                                    a new area's fight) */
     glow_frame();
 }
 #else
