@@ -1168,6 +1168,15 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     face; Gotenks's picture is widened by the faces' widths (columns doubled 7 out from his middle, where it is plain hair or forehead)
     and lined up brow on brow, middle on middle. Every expression uses the same hair (Gotenks's serious picture's; his Super Saiyan serious
     one's; Super Saiyan 3 his own), since all of it is above the brows.
+  - 12:03, the owner: "Seriously you can literally see the line where the two are pasted together fucking do it right". The straight cut
+    showed for three reasons, read off the pixels at the cut: Gotenks's forehead's light stopped dead on it and Gohan's creases and light
+    began on it; Gohan's brow tips and the dark above them were cut through; and the forehead had been widened 3 pixels a side (the
+    faces' widths were measured with their ears: without them both faces are 30-31 pixels cheek to cheek, middle at 32, so nothing is
+    widened now). `Portraits.blend` has no cut in the face: above the brow line the forehead is Gohan's own wherever it shows clear of
+    his hair (so his creases and light run on up into it), Gotenks's with its light off where it doesn't; Gohan's brows are kept whole
+    above the line (dark that is dark mirrored across his face too), and a lock of his hair hanging over them (dark that isn't, joined
+    to his hair above) is taken out with its shadow; his hair between his ears and his face is skin; the face's brown outline stays
+    brown but for the shirt's edge. `test_adult_gotenks.py` checks the seven pictures hold nothing of either source's own colours.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

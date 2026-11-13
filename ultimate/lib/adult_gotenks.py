@@ -773,6 +773,7 @@ GOTENKS_PICS = {'base': (69, 68, 70), 'ssj': (72, 71, 71), 'ssj3': (73,)}
 ROLLS_FROM = {'base': (69, 68, 70), 'ssj': (72, 71, 71), 'ssj3': (73,)}
 P_SSJ_EDGE = (1, 111, 112, 16, 17, 20, 21, 23, 78, 82, 101, 72, 87, 88, 85, 86)     # Super Saiyan Gohan's hair's lines and shades
 NECK_HALF = 7
+G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 
 
 def portrait_art(rom, i):
@@ -833,7 +834,7 @@ class Portraits:
         ring = ndimage.binary_dilation(keep, np.ones((3, 3), bool)) & ~keep & np.isin(a, (1, 17, 208, 2, 18)) & self.inner
         return keep | ring
 
-    def dress(self, a, i, g, face, hair):
+    def dress(self, a, i, g, face, hair, trim=False):
         """The outfit on a picture a (made from picture i; Gotenks's collar from his picture g; hair: where his hair is now) -> new
         picture. As the owner's pictures (Nov 13): his neck, then the dark undershirt and the black vest, the vest's thick yellow padded
         collar on his shoulders (Gotenks's own rolls, from his picture of the same expression, behind the face and hair); Gotenks's blue
@@ -847,6 +848,9 @@ class Portraits:
         neck = body & np.isin(a, P_SKIN) & (np.abs(X - cx) <= NECK_HALF) & (Y <= jaw + 3)
         clothes = self.inner & ~face & ~hair & np.isin(a, P_CLOTHES)
         dark = (body & ~neck) | clothes
+        if trim:                    # (his face's and ears' brown outline stays brown where no cloth is by it: only the shirt's edge is black)
+            cloth = dark & ~np.isin(a, (208, 16, 17, 62))
+            dark = cloth | (dark & ndimage.binary_dilation(cloth, np.ones((3, 3), bool)))
         lv = np.clip((pal_lum(a) / 255.0 * 4).astype(int), 0, 4)
         out[dark] = np.array(P_DARK)[lv[dark]]
         r = self.rolls(g); src = self.art[g]
@@ -1030,6 +1034,122 @@ class Portraits:
         hair_now = (self.hair(out, hairc) & (Y < sg + 2)) | side
         return self.dress(out, gp, rolls_from, self.face(g), hair_now)
 
+    def blend(self, gp, kp, form, rolls_from):
+        """Gohan's face (picture gp) under Gotenks's hair (picture kp) with no join to see (Nov 13, 12:03, the owner on `transplant`'s
+        straight cut at the brow line: "you can literally see the line where the two are pasted together fucking do it right"). The
+        pictures' faces are the same width and middle already (cheek to cheek 30 and 31 pixels), so Gotenks's picture is only moved: his
+        brow line (4 rows above his eyes) onto Gohan's, his eyes' middle onto Gohan's; his skin in Gohan's colours.
+        - Above the brow line the picture is Gotenks's (his hair, his hairline with its soft edge, his background), but his forehead is
+          Gohan's own wherever Gohan's forehead shows clear of his hair (2 pixels clear: the hair's shadow goes with it), so the creases
+          and light over Gohan's brows run on up unbroken; where it doesn't show it is Gotenks's forehead with its light taken off.
+        - Gohan's brows are kept whole, above the line too: in his face from 7 rows above his eyes down, what is dark and is dark at the
+          same place mirrored across his face (a pixel either way) is brow. Dark that isn't, hanging from his hair above, is a lock of it:
+          gone, with its shadow each side, his nearest plain skin there.
+        - Below the line the picture is Gohan's; Gotenks's side hair carries on down over Gohan's background and hair; Gohan's hair
+          between his ears and his face is skin (base: Gotenks has none there), the rest of it background.
+        Then the outfit (`dress`, the face's brown outline kept brown where no cloth is by it), and a fleck of shirt cut off from the
+        rest (the tip of a collar Gohan wore) taken out."""
+        g = self.art[gp]; kraw = self.art[kp]; k = kraw.copy()
+        Y, X = np.mgrid[:64, :64]; K3 = np.ones((3, 3), bool)
+        for a_, b_ in ((37, 84), (214, 67), (213, 83), (212, 19)): k[k == a_] = b_
+        kbg = np.isin(kraw, BG_OF[kp]) & self.inner
+        if form != 'base': k[kbg & (kraw == 87)] = 97; k[kbg & (kraw == 88)] = 98
+        col, _ = _nearest(self.inner, k); k[self.frame] = col[self.frame]
+        def main(a):
+            m = np.isin(a, P_SKIN) & self.inner
+            lab, n = _lab(m, 4); sizes = ndimage.sum(m, lab, range(1, n + 1))
+            return ndimage.binary_fill_holes(lab == (int(np.argmax(sizes)) + 1))
+        def eye_top(a, sp): return [y for y in range(64) if (sp[y] & (a[y] == 2)).sum() >= 2][0]
+        def eye_mid(a, sp, e):
+            xs = np.nonzero((a == 2) & sp & (Y >= e) & (Y < e + 8))[1]; return (xs.min() + xs.max()) / 2
+        gface = self.face(g); kface = self.face(kraw)
+        gsp = _rows_filled(gface); ksp = _rows_filled(kface)
+        gm = _rows_filled(main(g)); km = _rows_filled(main(kraw))
+        ge = eye_top(g, gsp); ke = eye_top(kraw, ksp); sg, sk = ge - 4, ke - 4
+        gmid = eye_mid(g, gsp, ge)
+        dy, dx = sg - sk, int(round(gmid - eye_mid(kraw, ksp, ke)))
+        hairc = P_HAIR + P_LAV if form == 'base' else P_GOLD + (208, 1)
+        yi = np.clip(Y - dy, 0, 63); xi = np.clip(X - dx, 0, 63)
+        L = k[yi, xi]; LH = (self.hair(kraw, hairc) & ~kface)[yi, xi]; LS = (np.isin(k, P_SKIN) & km)[yi, xi]
+        ghc = P_HAIR if form == 'base' else G_SSJ_HAIR
+        dark_c = P_HAIR if form == 'base' else tuple(c for c in G_SSJ_HAIR if c not in (2, 21, 23, 82, 205))
+        raw = self.hair(g, ghc)
+        xs = np.nonzero(gm[ge + 2])[0]; m0, m1 = int(xs.min()), int(xs.max())            # (his cheeks)
+        bt = ge - 7
+        dark = np.isin(g, dark_c) & self.inner
+        band = (Y >= bt) & (Y <= ge - 1) & (X > m0) & (X < m1)
+        mx = np.clip(np.round(2 * gmid - X).astype(int), 0, 63)
+        mir = dark[Y, mx] | dark[Y, np.clip(mx - 1, 0, 63)] | dark[Y, np.clip(mx + 1, 0, 63)]
+        brow = dark & band & mir
+        cand = dark & band & ~brow
+        lab, _n = _lab(cand | (raw & (Y == bt - 1)))
+        lock = np.isin(lab, list(set(np.unique(lab[bt - 1]).tolist()) - {0})) & cand
+        GH = raw & ~((X >= m0) & (X <= m1) & (Y >= bt) & self.inner)
+        clean = np.isin(g, P_SKIN) & gface & ~ndimage.binary_dilation(GH | lock, K3, iterations=2)
+        above = (Y < sg) & self.inner; below = (Y >= sg) & self.inner
+        Lf = L.copy(); Lf[LS & np.isin(L, (68, 120))] = 84
+        out = g.copy()
+        out[above] = Lf[above]
+        keep = above & ((clean & LS & ~ndimage.binary_dilation(LH, K3, iterations=2)) | brow)
+        out[keep] = g[keep]
+        lk = lock & below
+        if lk.any():
+            sh = np.zeros_like(lk); sh[:, 1:] |= lk[:, :-1]; sh[:, :-1] |= lk[:, 1:]
+            lk |= sh & np.isin(g, (17, 18, 19, 204)) & ~dark & below
+            plain = np.isin(g, (83, 84, 67, 68)) & gface & ~lk & (Y >= sg - 2) & (Y <= ge + 1)
+            scol, _ = _nearest(plain, g); out[lk] = scol[lk]
+        gbg = np.isin(g, BG_OF[gp]) & self.inner
+        ex = np.nonzero(gsp[sg:sg + 12].any(0))[0]; e0, e1 = int(ex.min()), int(ex.max())
+        temple = below & GH & (X >= e0) & (X <= e1) & (Y < sg + 12)
+        side = below & LH & (gbg | GH) & ~temple
+        if form != 'ssj3': side &= Y < 50
+        out[side] = L[side]
+        rest = below & GH & ~side & ~temple
+        if rest.any():
+            bcol, _ = _nearest(gbg & ~GH, g)
+            out[rest] = np.array([P_BG.get(int(v), int(v)) for v in bcol[rest]], np.uint8)
+        if form == 'base' and temple.any():
+            for x in np.nonzero(temple.any(0))[0]:
+                up = out[sg - 1, x]
+                out[temple[:, x], x] = up if up in (83, 84, 67, 19) else 83
+        if form != 'base':                  # (Super Saiyan Gohan's hair's dark lines left by his ears: the brown of Gotenks's)
+            out[below & np.isin(g, (85, 86, 87, 88)) & (out == g) & ~gbg] = 208
+            out[temple & np.isin(g, (1, 111, 112))] = 208
+        if form == 'ssj3':                  # (his mane is round his face: a sliver of background, 5 pixels or less across, left between
+            hairm = side | temple           #  it and his face or ears is hair)
+            solid = gsp | ndimage.binary_dilation(gsp, K3)
+            isbg = below & np.isin(out, (96, 97, 98) + BG_OF[gp]) & ~solid & ~hairm
+            fill = np.zeros_like(isbg)
+            for y in range(sg, 50):
+                x = 0
+                while x < 64:
+                    if isbg[y, x]:
+                        e = x
+                        while e < 64 and isbg[y, e]: e += 1
+                        if e - x <= 5 and x >= 1 and e < 64 and ((hairm[y, x - 1] and solid[y, e]) or (solid[y, x - 1] and hairm[y, e])): fill[y, x:e] = True
+                        x = e
+                    else: x += 1
+            if fill.any():
+                inner_h = hairm & ~np.isin(out, (208, 16, 17, 1))
+                fcol, _ = _nearest(inner_h if inner_h.any() else hairm, out); out[fill] = fcol[fill]; side = side | fill
+        out[self.frame] = g[self.frame]
+        hair_now = (LH & above) | side
+        no = np.zeros_like(temple)
+        res = self.dress(out, gp, rolls_from, gface | (temple if form == 'base' else no), hair_now | (temple if form != 'base' else no), trim=True)
+        ch = (res != out) & np.isin(res, P_DARK)
+        lab, nc = _lab(ch)
+        if nc > 1:
+            sizes = ndimage.sum(ch, lab, range(1, nc + 1))
+            for i in range(1, nc + 1):
+                if sizes[i - 1] > 14: continue
+                m = lab == i
+                line = m & np.isin(out, (208, 16, 17, 62)); res[line] = out[line]
+                m &= ~line
+                if m.any():
+                    okc = self.inner & ~ch & ~np.isin(res, P_SKIN + (208, 16, 17, 62, 1, 2)) & ~gface
+                    ncol, _ = _nearest(okc, res); res[m] = ncol[m]
+        return res
+
     def gotenks_own(self, kp):
         """Gotenks's own picture kp, his face older (`older`), his bare chest under the vest the black undershirt."""
         k = self.older(kp); face = _rows_filled(self.face(k)); res = k.copy()
@@ -1066,7 +1186,7 @@ class Portraits:
                 out.append(self.art[GOTENKS_PICS[form][k]].copy())
                 continue
             if variant == 'grown':                 # (Gohan's own pictures with Gotenks's hair: the owner, Nov 13, 10:29)
-                out.append(self.transplant(gp, {'base': 68, 'ssj': 71, 'ssj3': 73}[form], form, 68 if form == 'base' else 71))
+                out.append(self.blend(gp, {'base': 68, 'ssj': 71, 'ssj3': 73}[form], form, 68 if form == 'base' else 71))
                 continue
             if variant == 'hair':                  # (Nov 13, 09:40, the owner: "use one or the other": Gohan's own face and hair)
                 out.append(self.gohan_own(gp if form != 'ssj3' else 54, 68 if form == 'base' else 71))

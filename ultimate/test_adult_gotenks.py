@@ -163,11 +163,24 @@ check('and portraits of his own (%s)' % ports, len({p for v in ports.values() fo
 
 # 5: every frame of every head
 gh = AG.Gohan(clean, 0x6B6BD8); gk = AG.Gotenks(clean, 0x6B6BD8, gh)
-for v in AG.VARIANTS:
+for v in ('head', 'hair', 'recolour'):
     for f in AG.ACTORS:
         fr, notes = AG.frames(clean, 0x6B6BD8, f, v, gh=gh, gt=gk)
         bad = AG.problems(gh, fr, notes)
         check('%s head, %s: %d frames, none with a hole, a stray piece or gi colours %s' % (v, f, len(notes), bad[:3]), not bad)
+# 6: the grown look's portraits (Gohan's face under Gotenks's hair, lib/adult_gotenks.py Portraits.blend): one skin, one background,
+# nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind him, the Super Saiyan pictures' purple),
+# the game's frame untouched
+import numpy as np
+AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
+pics = AG.Portraits(clean)
+for f in AG.ACTORS:
+    for i, a in enumerate(pics.make('grown', f)):
+        inner = a[pics.inner]
+        left = {'pink skin': int(np.isin(inner, (37, 212, 213, 214)).sum()), "Gohan's background": int(np.isin(inner, (5, 7, 73, 74)).sum()),
+                'purple background': int((inner == 88).sum()) if f != 'base' else 0}
+        check('portrait %s %d: nothing of the two pictures left over %s, the frame as the game has it' % (f, i, left),
+              not any(left.values()) and (a[pics.frame] == pics.art[69][pics.frame]).all())
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')
