@@ -32,7 +32,7 @@ CH, CW = 56, 96                 # the canvas: the sprite's origin at row 48, col
 OUT = (slice(0, CH), slice(16, 80))      # what goes to the build: 64 columns, bottom-centred on the origin as sprites.Inserter takes it
 GOHAN = 101
 GOTENKS = {'base': 117, 'ssj': 120, 'ssj3': 121}
-VARIANTS = ('head', 'hair', 'recolour')
+VARIANTS = ('head', 'hair', 'recolour', 'grown')
 
 # Gohan's colours (actor 101)
 GI = (63, 64, 65, 79, 4)                # (4: the symbol on Goku's gi, in his change's frames)
@@ -390,7 +390,11 @@ def outfit_parts(src, kind, rot, headmask):
                 xs_ = np.nonzero(nt_[yy])[0]
                 if len(xs_): on[yy, xs_.min() if kind == 2 else xs_.max()] = True
             open_ = np.rot90(on, rot)
-    pad = (first & ~open_) | sleeve | (top & ndimage.binary_dilation(sleeve, k3) & ~open_)
+    # the pads sit on his shoulders only (the pictures: black between them): from the front the top's first rows 3 or more pixels out
+    # from his neck's middle, from the side its first row; from behind the collar's whole width
+    if kind == 0 and headmask.any(): first &= np.abs(nx - nx[headmask].mean()) >= 3.0
+    elif kind in (2, 3): first &= _depth(torso, rot) < 1
+    pad = (first & ~open_) | sleeve | (top & ndimage.binary_dilation(sleeve, k3) & ~open_ & (_depth(torso, rot) < 3))
     # boots: the shoes' pieces that touch no skin (206 shades his hands too) and his trousers' ends round them
     sh = np.isin(src, SHOES); slab, sn = _lab(sh); shoe = np.zeros_like(sh)
     for i in range(1, sn + 1):
@@ -649,6 +653,69 @@ def frames(rom, actor_list, form='base', variant='head', slots=None, gh=None, gt
     return out, notes
 
 
+# ---- the second attempt: Kid Gotenks grown (Nov 13, 09:40, the owner: "do a second attempt and literally just upscale gotenks to adult size
+# and then give him the black sleeveless undershirt from Gohan and see if that's easier"). Gotenks's own frames (117, 120, 121, every slot,
+# his own moves and ghost attacks), each with his head up: three rows more of body (one in his chest, one in his thighs, one in his shins,
+# everything above each moved up, so his feet stay on the ground: 30 pixels tall to 33, Gohan 31) and one column wider below his collar
+# (his body's middle doubled); his bare chest inside the vest the black undershirt (Gohan's black suit's black and greys, by the light
+# that was there). His head stays Gotenks's.
+GROWN = {'base': 117, 'ssj': 120, 'ssj3': 121}
+G_YEL = (243, 27, 250, 242)
+G_VEST = (112, 113, 115)
+G_PANTS = (114, 117, 119)
+G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 16: 1}
+
+
+def _g_axis(c):
+    y = np.isin(c, G_YEL); p = np.isin(c, G_PANTS)
+    if y.sum() < 2 or p.sum() < 3: return 0
+    vy, vx = np.argwhere(p).mean(0) - np.argwhere(y).mean(0)
+    return (0 if vy > 0 else 2) if abs(vy) >= abs(vx) else (1 if vx > 0 else 3)
+
+
+def _g_undershirt(n):
+    yel = np.isin(n, G_YEL); vest = yel | np.isin(n, G_VEST)
+    if not yel.any(): return n
+    collar = np.nonzero(yel.any(1))[0].min()
+    out = n.copy()
+    rows = np.nonzero(np.isin(n, G_PANTS).sum(1) >= 2)[0]; rows = rows[rows > collar]
+    stop = rows.min() if len(rows) else n.shape[0]
+    for y in range(collar + 1, stop):
+        vx = np.nonzero(vest[y])[0]
+        for x in np.nonzero(np.isin(n[y], SKIN + (LINE,)))[0]:
+            l = vx[vx < x]; r = vx[vx > x]
+            if len(l) and len(r) and x - l.max() <= 5 and r.min() - x <= 5: out[y, x] = G_UNDER.get(int(n[y, x]), n[y, x])
+    return out
+
+
+def _g_grow(n):
+    yel = np.isin(n, G_YEL); ys = np.nonzero(n.any(1))[0]
+    if not yel.any() or not len(ys): return n
+    collar = np.nonzero(yel.any(1))[0].min(); L = ys.max() - collar
+    if L < 6: return n
+    out = n.copy()
+    for r in sorted([collar + max(2, int(round(0.3 * L))), collar + int(round(0.62 * L)), collar + int(round(0.85 * L))], reverse=True):
+        top = out[:r + 1].copy(); out[:r] = top[1:]; out[r] = top[r]
+    c2 = max(0, collar - 3); body = np.zeros(out.shape, bool); body[c2:] = out[c2:] > 0
+    if body.any():
+        cx = int(np.round(np.argwhere(body)[:, 1].mean()))
+        res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]; out = res
+    return out
+
+
+def grown(c):
+    """One of Gotenks's frames (the 56 x 96 canvas) grown, in the undershirt."""
+    if not c.any(): return c.copy()
+    r = _g_axis(c); n = np.rot90(c, -r)
+    return np.rot90(_g_grow(_g_undershirt(n)), r)
+
+
+def grown_frames(rom, actor_list, form):
+    """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form])."""
+    g = cells(rom, actor_list, GROWN[form])
+    return {s: [[grown(c)[OUT] for c in g[s][d]] for d in range(3)] for s in g}
+
+
 # ---- his portraits (the owner: "build a portrait too from Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible
 # way"; then three heads): 64 x 64 pictures in the portrait frame, the game's colours, one set per head (VARIANTS), each [calm, serious,
 # shouting] for base and Super Saiyan and one for Super Saiyan 3.
@@ -790,14 +857,46 @@ class Portraits:
         res[neck] = a[neck]
         return res
 
+    def gotenks_own(self, kp):
+        """Gotenks's own picture kp, his bare chest under the vest the black undershirt."""
+        k = self.art[kp]; face = _rows_filled(self.face(k)); res = k.copy()
+        Y, X = np.mgrid[:64, :64]
+        ys, xs = np.nonzero(face); jaw = ys.max(); cx = xs[ys >= jaw - 1].mean()
+        neck = (np.abs(X - cx) <= 6) & (Y <= jaw + 2)
+        chest = np.isin(k, P_SKIN) & self.inner & ~face & (Y >= jaw - 4) & ~neck
+        chest |= self.inner & (Y >= jaw + 1) & ~face & ~self.rolls(kp) & ~np.isin(k, BG_OF[kp]) & ~neck & np.isin(k, (2, 118, 119, 120, 21, 67, 83, 84))
+        lv = np.clip((pal_lum(k) / 255.0 * 4).astype(int), 0, 4)
+        res[chest] = np.array(P_DARK)[np.minimum(lv[chest], 2)]
+        return res
+
+    def gohan_own(self, gp, rolls_from):
+        """Gohan's own picture gp, his face and hair as they are: what he wears the black undershirt and vest (his shoulders beside his face
+        too, high when he shouts), Gotenks's padded collar on his shoulders behind his face and hair, Gotenks's blue behind."""
+        a = self.art[gp]; face = self.face(a); hair = self.hair(a, P_HAIR + P_GOLD + P_SSJ_EDGE) & ~face
+        res = self.dress(a.copy(), gp, rolls_from, face, hair)
+        Y, X = np.mgrid[:64, :64]
+        span = _rows_filled(face); jaw = np.nonzero(face)[0].max()
+        sh = np.isin(a, P_SKIN) & self.inner & ~span & ~hair & (Y >= jaw - 26) & (res == a)
+        lv = np.clip((pal_lum(a) / 255.0 * 4).astype(int), 0, 4)
+        res[sh] = np.array(P_DARK)[np.minimum(lv[sh], 2)]
+        r = self.rolls(rolls_from); src = self.art[rolls_from]; lab, n = _lab(r)
+        for i in range(1, n + 1):
+            m = lab == i
+            if m.sum() >= 20:
+                put = m & ~face & ~hair & self.inner; res[put] = src[put]
+        return res
+
     def make(self, variant, form):
         out = []
         for k, (gp, kp) in enumerate(PICS[form]):
             if variant == 'head':                  # (Gotenks's own pictures as they are: his head, his vest's padded collar)
                 out.append(self.art[GOTENKS_PICS[form][k]].copy())
                 continue
-            if variant == 'hair':
-                out.append(self.on_gotenks(gp, kp, form))
+            if variant == 'grown':                 # (Gotenks's own pictures, his bare chest the black undershirt)
+                out.append(self.gotenks_own(GOTENKS_PICS[form][k]))
+                continue
+            if variant == 'hair':                  # (Nov 13, 09:40, the owner: "use one or the other": Gohan's own face and hair)
+                out.append(self.gohan_own(gp if form != 'ssj3' else 54, 68 if form == 'base' else 71))
                 continue
             a = self.art[gp].copy(); face = self.face(a)
             kart = self.art[kp]; kface = self.face(kart)

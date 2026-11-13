@@ -1134,6 +1134,16 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     behind its ball and his flight toward the camera, where Gohan's own body hardly shows. Portraits (`Portraits.on_gotenks`): Gohan's
     face set into Gotenks's own picture of the same expression (Gotenks's hair, padded collar and background as he has them), Gotenks's
     face where Gohan's doesn't cover it the nearest of his hair or background, under the jaw the undershirt.
+  - 09:40, the owner: "Portraits bad still hairs messed up and face just looks wrong use one or the other. Also for the frames it's still
+    off refine it more. Also do a second attempt and literally just upscale gotenks to adult size and then give him the black sleeveless
+    undershirt from Gohan and see if that's easier". V2's portraits are now Gohan's own pictures as they are (`Portraits.gohan_own`: his
+    face and hair; what he wears, his shoulders too, the black undershirt and vest; Gotenks's collar rolls; Gotenks's blue; Super Saiyan
+    3 has no Gohan picture, so it is his Super Saiyan calm one). V2's frames: the pads sit on his shoulders only (from the front the top's
+    first rows 3 or more pixels out from his neck's middle; from the side its first row), black between. The second attempt is
+    `BFU_AG_HEAD=grown` (`grown`, `grown_frames`): Gotenks's own frames (117, 120, 121, with his own record, so his own moves and ghost
+    attacks), each with his head up three rows more of body (chest, thighs, shins; his feet stay on the ground: 30 pixels to 33) and one
+    column wider below his collar; his bare chest inside the vest the black undershirt. Its portraits are Gotenks's own with the
+    undershirt (`Portraits.gotenks_own`). Built and played (`test_adult_gotenks.py` passes on both looks).
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

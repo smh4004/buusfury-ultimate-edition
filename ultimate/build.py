@@ -110,7 +110,7 @@ GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.
 GLOW_ALPHA = (6, 10)
 GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
 ADULT_GOTENKS = os.environ.get('BFU_ADULT_GOTENKS', '0') != '0'      # Adult Gotenks (lib/adult_gotenks.py): GT Goten and GT Trunks's dance; off until the owner OKs his look
-AG_HEAD = os.environ.get('BFU_AG_HEAD', 'hair')         # his head: 'head' (Gotenks's), 'hair' (Mystic Gohan's face, Gotenks's hair), 'recolour' (lib/adult_gotenks.py)
+AG_HEAD = os.environ.get('BFU_AG_HEAD', 'hair')         # his look: 'head' (Gotenks's), 'hair' (Mystic Gohan's face, Gotenks's hair), 'recolour', 'grown' (Gotenks grown) (lib/adult_gotenks.py)
 CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '1') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, 21:40, the owner on the preview: "Make the beam actually come from Cell's hand too")
 # Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
 # own), 1 Super Saiyan God (crimson to orange, a gold-white core), 2 Rose (magenta to pink, as Rose's power-up aura). Nearest palette entries.
@@ -1568,10 +1568,14 @@ def add_actors(rom, clean):
         gh = adult_gotenks.Gohan(clean, sprites.ACTOR_LIST); gk = adult_gotenks.Gotenks(clean, sprites.ACTOR_LIST, gh)
         change = mystic_change(clean)                   # (his change: Goku's and Vegeta's, as Mystic Gohan's, the owner Nov 12)
         for form, name in adult_gotenks.ACTORS.items():
-            frames, notes = adult_gotenks.frames(clean, sprites.ACTOR_LIST, form, AG_HEAD, gh=gh, gt=gk, change=change)
-            bad = adult_gotenks.problems(gh, frames, notes)
-            if bad: sys.exit('%s: %s' % (name, bad[:5]))
-            cfg[name] = {'template': adult_gotenks.GOHAN, 'raw_frames': {str(k): v for k, v in sorted(frames.items())}, 'compress': True, 'high': True,
+            if AG_HEAD == 'grown':                      # (the second attempt: Gotenks's own frames grown, his own record and moves)
+                frames = adult_gotenks.grown_frames(clean, sprites.ACTOR_LIST, form); template = adult_gotenks.GROWN[form]
+            else:
+                frames, notes = adult_gotenks.frames(clean, sprites.ACTOR_LIST, form, AG_HEAD, gh=gh, gt=gk, change=change)
+                bad = adult_gotenks.problems(gh, frames, notes)
+                if bad: sys.exit('%s: %s' % (name, bad[:5]))
+                template = adult_gotenks.GOHAN
+            cfg[name] = {'template': template, 'raw_frames': {str(k): v for k, v in sorted(frames.items())}, 'compress': True, 'high': True,
                          'big': True, 'reserve': 4096}      # (Gotenks's hair makes some frames 33 or 34 pixels: past one 32 x 32 piece, as Broly's)
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
