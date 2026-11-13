@@ -777,6 +777,8 @@ P_LINES = (208, 16, 17, 1)                # the outlines' colours in the picture
 LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes sit above Gotenks's (near where the game has Gohan: room for his neck)
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
+EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
+BROW_C = (208, 248, 249, 82, 81, 110, 28, 29)                         # Super Saiyan Gohan's brows: their brown line and their gold
 
 
 def portrait_art(rom, i):
@@ -1178,6 +1180,68 @@ class Portraits:
         keep = ndimage.binary_fill_holes(keep)
         return keep | (ndimage.binary_dilation(keep, K3) & ~keep & np.isin(a, (1, 17, 208, 2, 18, 79)) & self.inner & ~ksp)
 
+    def _ssj_brows(self, g, ge, gmid, m0, m1, dark):
+        """Super Saiyan Gohan's brows made whole (Nov 13, 17:36, the owner: "the eyebrows on SSJ AND UP ARE SHIT"). A lock of his hair
+        hangs over his left brow; his right brow is whole. What was wrong: the right brow was mirrored about the middle of his eyes'
+        whites, but his face is turned a little and his brows mirror about a column 1-2 pixels from there, so the mirrored half sat
+        beside the piece of the left brow still showing, with a kink between them; the brow's tan fill (82) and soft tips were not
+        counted as brow, which left holes in it; and the end of the left brow that shows beside the lock, and his eye's corner under
+        it, were overwritten.
+        Here: the right brow is the pieces of BROW_C colour over his right eye that hold gold, with their soft tips. The column the
+        brows mirror about is fitted on the rows from his eyes' top down, where the lock hides nothing: the one that lays the most
+        of the right brow on the left's. The lock's columns are read in the row above the brows; left of them the picture is as he
+        is drawn (the end of his left brow, his eye's corner). From there in, above his eyes' top, the left brow is the right one
+        mirrored about the fitted column, and what else is there of the lock and its shadow is what the right side has at the
+        mirrored place (his skin, his eye's white). From his eyes' top down his own left brow stays; the lock's tip in his eye is the
+        mirrored place's too. -> (picture, brows, the lock, what was put right)."""
+        Y, X = np.mgrid[:64, :64]; K3 = np.ones((3, 3), bool)
+        out = g.copy(); bt = ge - 7
+        BR = np.isin(g, BROW_C) & self.inner
+        rz = (Y >= bt) & (Y <= ge + 2) & (X > gmid) & (X <= m1)
+        lab, n = _lab(BR & rz); comp = np.zeros((64, 64), bool)
+        for i in range(1, n + 1):
+            c = lab == i
+            if (c & np.isin(g, (248, 249)) & (Y <= ge)).any(): comp |= c
+        n4 = lambda m: m | np.roll(m, 1, 0) | np.roll(m, -1, 0) | np.roll(m, 1, 1) | np.roll(m, -1, 1)
+        comp |= np.isin(g, (16, 17, 205)) & rz & (Y < ge) & n4(comp)                      # (its soft tips)
+        best = None
+        for a in range(int(round(2 * gmid)) - 3, int(round(2 * gmid)) + 4):               # (x -> a - x)
+            ma = np.clip(a - X, 0, 63)
+            low = comp[Y, ma] & (Y >= ge - 1) & (X < a / 2.0)
+            score = int((low & BR).sum()) - 2 * int((low & np.isin(g, (2, 118, 119))).sum())
+            if best is None or score > best[0]: best = (score, a)
+        a = best[1]; ma = np.clip(a - X, 0, 63); R = g[Y, ma]
+        lz = (X >= a - m1) & (X < a / 2.0) & self.inner
+        compm = comp[Y, ma] & lz & (Y < ge)                                              # (the right brow mirrored, above his eyes' top)
+        top = int(np.nonzero(compm)[0].min()) if compm.any() else ge
+        hairish = np.isin(g, tuple(c for c in G_SSJ_HAIR if c not in (2, 21, 23))) & lz
+        xs = np.nonzero(hairish[top - 1])[0]
+        e = int(xs.min()) if len(xs) else 64                                             # (the lock's first column)
+        occ = lz & ((Y < top) | (X >= e))                                                # (what the lock can hide)
+        compm &= occ
+        soft = np.isin(g, (82, 205, 21, 23, 81, 30, 16, 17))
+        occ_in = occ & (X > m0)                                                          # (inside his face's edge)
+        old = dark & occ_in & (Y >= bt) & (Y < ge)
+        for _ in range(2): old = old | (soft & occ_in & (Y >= bt) & (Y < ge) & ndimage.binary_dilation(old, K3))
+        sh = np.zeros_like(old); sh[:, 1:] |= old[:, :-1]; sh[:, :-1] |= old[:, 1:]
+        old = old | (sh & np.isin(g, (17, 18, 19, 204)) & occ_in & (Y >= bt) & (Y < ge))
+        tip = np.isin(g, (78, 85, 86, 87, 88)) & lz & (Y >= ge) & (Y <= ge + 2)           # (the lock's tip in his eye)
+        fix = (old | tip) & ~compm
+        ok = ~np.isin(R, G_SSJ_HAIR + BROW_C) | np.isin(R, (2, 21, 23))                   # (the mirrored place is his skin or his eye)
+        out[compm] = R[compm]
+        out[fix & ok] = R[fix & ok]
+        rest = fix & ~ok
+        if rest.any():
+            plain = np.isin(out, (83, 84, 67, 68)) & ~rest & ~compm & (Y >= bt) & (Y <= ge + 1) & (X > m0) & (X < m1)
+            sc, _ = _nearest(plain, out); out[rest] = sc[rest]
+        shown = BR & lz & ~occ & (Y >= top) & (Y < ge)                                    # (the end of his left brow beside the lock)
+        lab, n = _lab((BR & lz & (Y >= ge) & (Y <= ge + 2) & ~tip) | compm | shown)       # (and his own left brow from his eyes' top down)
+        seeds = compm | shown
+        own = np.isin(lab, [i for i in np.unique(lab[seeds]) if i]) if seeds.any() else seeds
+        brow = comp | own
+        lock = dark & (X > m0) & (X <= gmid) & (Y >= bt) & (Y < ge) & ~brow
+        return out, brow, lock, compm | fix | shown
+
     def gohan_clean(self, gp):
         """Gohan's picture gp with what of his hair hangs in his face taken out -> (picture, what was found), in his picture's own place.
         His brows are kept whole. Black-haired: in his face from 7 rows above his eyes down, what is dark and is dark at the same place
@@ -1195,25 +1259,24 @@ class Portraits:
         band = (Y >= bt) & (Y <= ge - 1) & (X > m0) & (X < m1)
         mx = np.clip(np.round(2 * gmid - X).astype(int), 0, 63)
         out = g.copy(); below = (Y >= sg) & self.inner
+        fixed = np.zeros((64, 64), bool)
         if ssj:
-            rb = dark & band & (X > gmid); left = band & (X <= gmid)
-            put = left & rb[Y, mx]
-            brow = rb | put; lock = dark & left & ~brow
-            out[put] = g[Y, mx][put]
+            out, brow, lock, fixed = self._ssj_brows(g, ge, gmid, m0, m1, dark)
         else:
             mir = dark[Y, mx] | dark[Y, np.clip(mx - 1, 0, 63)] | dark[Y, np.clip(mx + 1, 0, 63)]
             brow = dark & band & mir
             cand = dark & band & ~brow
             lab, nl = _lab(cand | (raw & (Y == bt - 1)))
             lock = np.isin(lab, list(set(np.unique(lab[bt - 1]).tolist()) - {0})) & cand
-        ears = gface & ~self._main(g)
+        ears = gface & ~self._main(g) & (Y >= ge - 6)                    # (his ears: their inside, and the line round it)
+        ears = ears | (ndimage.binary_dilation(ears, K3) & (g == 208) & self.inner)
         eb = int(np.nonzero(ears)[0].max()) if ears.any() else ge + 10
-        hair = raw & ~((X >= m0) & (X <= m1) & (Y >= bt) & self.inner) & (Y <= eb + 3)   # (his hair: not what is in his face, nor his clothes' lines)
+        hair = raw & ~((X >= m0) & (X <= m1) & (Y >= bt) & self.inner) & (Y <= eb + 3) & ~ears   # (his hair: not what is in his face, his ears' line, nor his clothes' lines)
         clear = np.isin(g, P_SKIN) & gface & ~ndimage.binary_dilation(hair | lock, K3, iterations=2)
-        lk = lock & (self.inner if ssj else below)
+        lk = lock & (self.inner if ssj else below) & ~fixed
         if lk.any():
             sh = np.zeros_like(lk); sh[:, 1:] |= lk[:, :-1]; sh[:, :-1] |= lk[:, 1:]
-            lk = lk | (sh & np.isin(g, (17, 18, 19, 204)) & ~dark & ~brow & (Y >= bt))
+            lk = lk | (sh & np.isin(g, (17, 18, 19, 204)) & ~dark & ~brow & ~fixed & (Y >= bt))
             plain = np.isin(out, (83, 84, 67, 68)) & gface & ~lk & ~brow & (Y >= sg - 2) & (Y <= ge + 1)
             scol, _ = _nearest(plain, out); out[lk] = scol[lk]
         # his neck, where his face and neck are one piece of skin (38, 54): under his ears, what is outside his jaw's line (the skin of his
@@ -1241,7 +1304,7 @@ class Portraits:
         for k_, v in P_BG.items(): out[bg & (gc == k_)] = v
         ys, xs = np.nonzero(face); jaw = int(ys.max()); cx = xs[ys >= jaw - 1].mean()
         start = d['eb'] - 1 if gp in HUNCHED else jaw - 14
-        rest = self.inner & ~bg & ~face & ~hair
+        rest = self.inner & ~bg & ~face & ~hair & ~d['ears']
         body = rest & (Y >= start)
         dxc = np.abs(X - cx)
         if gp in HUNCHED: neck = body & np.isin(gc, P_SKIN) & (dxc <= NECK_HALF) & (Y <= jaw + 3)
@@ -1263,9 +1326,11 @@ class Portraits:
             up = rest & (Y < start) & (Y >= d['eye'] - 8) & ~d['span']
             if up.any() and bg.any():
                 bc, _ = _nearest(bg, out); out[up] = bc[up]; bg = bg | up
-        ear = ndimage.binary_fill_holes(d['ears']) & (Y >= d['eye'] - 5)   # (his ears are drawn in his own hair's shade, four browns
-        for a_, b_ in ((19, 83), (18, 19), (17, 18), (204, 18)):          #  mixed: a tone lighter, they read as ears under Gotenks's)
-            out[ear & (gc == a_)] = b_
+        ear = ndimage.binary_fill_holes(d['ears']) & (Y >= d['eye'] - 7)   # (his ears are drawn in his own hair's shade, five browns
+        for a_, b_ in EAR_LIGHT: out[ear & (gc == a_)] = b_               #  mixed: in his face's own light they read as ears)
+        fold = ear & (gc == 17)                                           # (the dark of them is their fold's line; a dot of it alone is not)
+        alone = fold & ~(ndimage.convolve(fold.astype(int), np.ones((3, 3), int), mode='constant') >= 2)
+        out[alone] = 83
         ch = dark & np.isin(out, P_DARK)
         lab, nc = _lab(ch)
         if nc > 1:
@@ -1280,33 +1345,33 @@ class Portraits:
                     ncol, _ = _nearest(okc, out); out[m] = ncol[m]
         return out, bg, (dark | neck) & ~bg
 
-    def inlay(self, gp, kp, form, lift=None, ears='kid'):
-        """Gohan's own picture gp, in the outfit, under Gotenks's own hair and rolls from his picture kp, with Gotenks's own ears.
+    def inlay(self, gp, kp, form, lift=None):
+        """Gohan's own picture gp, in the outfit, under Gotenks's own hair and rolls from his picture kp.
         The owner, Nov 13: 13:15 on `blend`, "The hair is STILL FUCKED"; 14:36, "Fix the ears neck and face more still off"; 15:13,
         "I said fix it not make it worse what the fuck is going on with the shirt neckline the shoulder pads the eyebrows etc";
-        16:56, "Fix the hair fix the clipping fix the ears". What each round settled is kept:
+        16:56, "Fix the hair fix the clipping fix the ears"; 17:36, on Gotenks's own ears set by his eyes, "You made the ears worse
+        and the eyebrows on SSJ AND UP ARE SHIT". What each round settled is kept:
         - Gotenks's hair and his collar's rolls: his picture's own pixels, not moved (13:15);
-        - Gohan's face, brows, neck, shoulders and what he wears: his own picture as he is drawn, dressed (`_dressed`); his neck and
-          shoulders are his own outline, so the neckline and the room between his jaw and the rolls are not a fill (15:13);
-        - his brows whole, no lock of his own hair in his face (`gohan_clean`).
+        - Gohan's face, brows, ears, neck, shoulders and what he wears: his own picture as he is drawn, dressed (`_dressed`); his neck
+          and shoulders are his own outline, so the neckline and the room between his jaw and the rolls are not a fill (15:13);
+        - his brows whole, no lock of his own hair in his face (`gohan_clean`; Super Saiyan, `_ssj_brows`, 17:36).
         Gohan's picture is moved so his eyes sit `lift` rows above Gotenks's (LIFT), close to where the game has him: a child's eyes
         sit low, and with Gohan's on Gotenks's his chin was at the picture's edge with no room for his neck.
         - Above Gohan's brow line (4 rows above his eyes): Gotenks's picture, the tips of his own brows off his forehead; Gohan's own
-          skin where his forehead shows clear of his hair, and his brows whole.
-        - From the line down: Gohan's dressed picture, his own ears and all outside them in their rows taken out. Gotenks's hair lies
-          over everything of it but his face and his body (16:56: it lay over the tops of Gohan's ears and cut them off, and an ear's
-          outline showed through it; Gohan's ears are drawn in his own hair's shade, four browns mixed, and read as smudges). His
-          rolls over all but his face.
-        - The ears are Gotenks's own (ears='kid'), drawn for this hair and light: against Gohan's face's edge, as high by his eyes as
-          they are by Gotenks's own, their lobes on the rolls where Gotenks's are (the ear `lift` rows taller for it, its rows spread
-          evenly). In front of the hair and the rolls, behind his face, as in Gotenks's picture: nothing cuts through anything.
-          Between an ear and his face in a row, his skin.
+          skin where his forehead shows clear of his hair, his brows whole and his ears' tops.
+        - From the line down: Gohan's dressed picture. Gotenks's hair lies over everything of it but his face, his ears and his body;
+          his rolls over all but his face and ears.
+        - The ears are Gohan's own, where he has them (their tops at his brows: a grown man's), whole and in front of the hair and the
+          rolls, as Gotenks's are in his picture: nothing cuts through anything (16:56: the hair lay over their tops). They are their
+          inside AND the line round it: until 17:36 only the inside counted as his, so Gotenks's hair took the line wherever it was
+          behind, and no form shown before had a whole ear. Their inside is in his face's own light (`_dressed`, EAR_LIGHT), since he
+          is drawn with them in his own black hair's shade.
         - A lock of Gotenks's that hangs in his face (Super Saiyan 3) stays in front of Gohan's.
         - Gohan's own hair still showing: on his temples his skin; a strip 3 pixels or less between his head and Gotenks's hair, that
           hair mirrored in; the rest what is behind him. Super Saiyan: where Gotenks's wider face was, his hair and rolls from right
-          outside it mirrored in. A few pixels of what is behind him or of the shirt shut in among Gotenks's hair, rolls and ears: the
+          outside it mirrored in. A few pixels of what is behind him or of the shirt shut in among Gotenks's hair and rolls: the
           nearest of those. The line Gotenks's face had against his hair is hair.
-        A Super Saiyan 3 has no brows: Gohan's are his skin, all but the line on his eyes. ears='front' keeps Gohan's own ears."""
+        A Super Saiyan 3 has no brows: Gohan's are his skin; what of them lies right on his eyes is his eyes' line."""
         kraw = self.art[kp]; k = kraw.copy()
         Y, X = np.mgrid[:64, :64]; K3 = np.ones((3, 3), bool)
         for a_, b_ in ((37, 84), (214, 67), (213, 83), (212, 19)): k[k == a_] = b_
@@ -1333,65 +1398,21 @@ class Portraits:
         low = (Y >= sk) & self.inner; above = (Y < sk) & self.inner
         out = k.copy()
         out[low] = G[low]
-        if ears == 'kid':                     # (Gohan's own ears and all outside them in their rows: out of the picture, what is behind him)
-            cut = np.zeros((64, 64), bool)
-            for side in (0, 1):
-                e = Gears & low & ((X < kmid) if side == 0 else (X > kmid))
-                rows = np.nonzero(e.any(1))[0]
-                if not len(rows): continue
-                for y in range(max(0, rows.min() - 1), min(63, rows.max() + 1) + 1):
-                    exs = np.nonzero(e[int(rows[np.argmin(np.abs(rows - y))])])[0]
-                    if side == 0: cut[y, :exs.max() + 1] = True
-                    else: cut[y, exs.min():] = True
-            gone = cut & low & ~Gbg
-            if gone.any():
-                bc0, _ = _nearest(Gbg & ~cut, G); out[gone] = bc0[gone]
-            Gbg = Gbg | gone; Gface = Gface & ~cut; Ghair = Ghair & ~cut; Gbody = Gbody & ~cut; Gears = Gears & False
         # Gotenks's hair and rolls over it; never over Gohan's face or ears
         edge = ndimage.binary_dilation(ksp, K3) & np.isin(kraw, P_LINES) & ~rolls & KH    # (the line his face had against his hair:
-        over = low & ~Gface & ~Gbody                                                     #  no face is there now, his hair carries on)
+        over = low & ~Gface & ~Gears & ~Gbody                                            #  no face is there now, his hair carries on)
         put = KH & over
         hc, _ = _nearest(core, k)
         out[put] = np.where(edge, hc, k)[put]
-        putr = rolls & low & ~(Gface & ~(S(d['neck'], False) & V))      # (the rolls lie on his shoulders round his neck: under his face only)
+        putr = rolls & low & ~((Gface | Gears) & ~(S(d['neck'], False) & V))      # (the rolls lie on his shoulders round his neck: under his face only)
         out[putr] = k[putr]
         fr = KH & ndimage.binary_erosion(ksp, np.ones((1, 5), bool)) & (Y < ke) & low & (kraw != 2)
         out[fr] = k[fr]
         done = put | putr | fr
-        earm = np.zeros((64, 64), bool); tem2 = np.zeros((64, 64), bool)
-        if ears == 'kid':                     # (Gotenks's own ears, drawn for this hair: as high by Gohan's eyes as they are by his own,
-            kear = ksp & ~km & np.isin(kraw, P_SKIN + P_LINES)            #  against his face's edge, in front of the hair, behind his face)
-            kear |= ndimage.binary_dilation(kear, K3) & np.isin(kraw, P_LINES) & ~km & ~rolls
-            for side in (0, 1):
-                e = kear & ((X < kmid) if side == 0 else (X > kmid))
-                eys = np.nonzero(e.any(1))[0]; offs = []
-                for y in eys:
-                    yy = y - lift
-                    if not (0 <= yy < 64) or not Gface[yy].any(): continue
-                    exs = np.nonzero(e[y])[0]; fxs = np.nonzero(Gface[yy])[0]
-                    offs.append(int(fxs.min()) - 1 - int(exs.max()) if side == 0 else int(fxs.max()) + 1 - int(exs.min()))
-                if not offs: continue
-                dxe = int(round(float(np.median(offs))))
-                r0, r1 = int(eys.min()), int(eys.max()); n = r1 - r0 + 1    # (its lobe stays on the roll where Gotenks's is: the ear is
-                for j in range(n + lift):                                  #  `lift` rows taller, a grown man's, its rows spread evenly)
-                    sy = r0 + int(round(j * (n - 1) / float(n + lift - 1))); ty = r0 - lift + j
-                    xs_ = np.nonzero(e[sy])[0]
-                    for x in xs_:
-                        tx = x + dxe
-                        if 0 <= tx < 64 and self.inner[ty, tx] and not Gface[ty, tx]: out[ty, tx] = k[sy, x]; earm[ty, tx] = True
-            for y in np.nonzero(earm.any(1))[0]:                           # (between an ear and his face in a row: his skin)
-                hx = np.nonzero(Gface[y])[0]
-                if not len(hx): continue
-                ex = np.nonzero(earm[y])[0]; l = ex[ex < hx.min()]; r = ex[ex > hx.max()]
-                if len(l): tem2[y, l.max() + 1:hx.min()] = True
-                if len(r): tem2[y, hx.max() + 1:r.min()] = True
-            tem2 &= low & ~earm & ~Gface
-            done = done | earm
         # Gohan's own hair still showing
         m0, m1 = d['cols'][0] + dx, d['cols'][1] + dx
         left = Ghair & low & ~done
-        temple = (left & (Gsp | ((X >= m0 - 6) & (X <= m1 + 6) & (Y < sk + 12) & ndimage.binary_dilation(Gface, K3, iterations=3)))) | tem2
-        left = left | tem2
+        temple = left & (Gsp | ((X >= m0 - 6) & (X <= m1 + 6) & (Y < sk + 12) & ndimage.binary_dilation(Gface, K3, iterations=3)))
         gap = ((left & ~temple) | (Gbg & low & ~done & ~temple))
         strip = np.zeros((64, 64), bool)
         for y in range(64):
@@ -1401,7 +1422,7 @@ class Portraits:
                 a, b = int(r[0]), int(r[-1])
                 if b - a > 2 or a == 0 or b == 63: continue
                 o, i = (a - 1, b + 1) if (a + b) / 2 < kmid else (b + 1, a - 1)
-                if (put | putr)[y, o] and (Gface | temple | earm)[y, i]: strip[y, a:b + 1] = True
+                if (put | putr)[y, o] and (Gface | Gears | temple)[y, i]: strip[y, a:b + 1] = True
         todo = _mirror_fill(out, strip, put | putr, out, kmid)
         if form != 'base':                    # (Super Saiyan: his hair is all round his head. Where Gotenks's head was and Gohan's isn't,
             hole = gap & ~strip & ndimage.binary_dilation(ksp, K3)     #  what is behind him would show through it: his hair and rolls
@@ -1412,7 +1433,7 @@ class Portraits:
         lab, nc = _lab(g2)
         for i in range(1, nc + 1):
             m = lab == i
-            if m.sum() <= 8 and (ndimage.binary_dilation(m, K3) & put).any() and (ndimage.binary_dilation(m, K3) & (Gface | earm | temple)).any():
+            if m.sum() <= 8 and (ndimage.binary_dilation(m, K3) & put).any() and (ndimage.binary_dilation(m, K3) & (Gface | Gears | temple)).any():
                 out[m] = hc[m]; strip = strip | m
         # his shoulders are at least where Gotenks's were: what is behind Gohan there is the vest
         kbody = low & ~KH & ~rolls & ~kbg & ~ndimage.binary_dilation(ksp, K3, iterations=2)
@@ -1424,7 +1445,7 @@ class Portraits:
             if dk.any(): c, _ = _nearest(dk, out); out[sh] = c[sh]
             else: out[sh] = 111
         if temple.any():
-            scol, _ = _nearest(np.isin(G, (83, 84, 67)) & Gface & ~Gears, G); out[temple & ~earm] = scol[temple & ~earm]
+            scol, _ = _nearest(np.isin(G, (83, 84, 67)) & Gface & ~Gears, G); out[temple] = scol[temple]
         rest = left & ~temple & ~(strip & ~todo)
         if rest.any():
             bc, _ = _nearest(Gbg & ~Ghair, G); out[rest] = bc[rest]
@@ -1435,22 +1456,33 @@ class Portraits:
         if kbrow.any():
             pc, _ = _nearest(np.isin(Lf, (83, 84, 67)) & km & above & ~kbrow, Lf); Lf[kbrow] = pc[kbrow]
         out[above] = Lf[above]
-        keep = above & ((Gclear & kskin & ~ndimage.binary_dilation(KH, K3, iterations=2)) | Gbrow)
+        keep = above & ((Gclear & kskin & ~ndimage.binary_dilation(KH, K3, iterations=2)) | Gbrow | Gears)     # (and his ears' tops)
         out[keep] = G[keep]
-        if form == 'ssj3':
-            b = Gbrow & self.inner
-            eye = (out == 2) | (G == 2); e1 = np.roll(eye, -1, 0)
-            go = b & ~(e1 | np.roll(e1, 1, 1) | np.roll(e1, -1, 1)) & ~fr
-            sc, _ = _nearest(np.isin(out, (83, 84, 67, 68)) & ~go & (Y >= sk - 6) & (Y <= ke + 2) & km, out); out[go] = sc[go]
+        if form == 'ssj3':                    # (a Super Saiyan 3 has no brows: his skin there. What of them lies right on his eyes is
+            b = Gbrow & self.inner & ~fr       #  his eyes' line, brown)
+            white = np.isin(G, (2, 118, 119, 116, 117, 189, 187))
+            white = white | ((G == 120) & (np.roll(white, 1, 1) | np.roll(white, -1, 1)))
+            eye = white & (Y >= sk + 2) & (Y <= sk + 10)
+            lid = b & ndimage.binary_dilation(eye, K3)
+            go = b & ~lid
+            sc, _ = _nearest(np.isin(out, (83, 84, 67, 68)) & ~b & (Y >= sk - 6) & (Y <= ke + 2) & km, out); out[go] = sc[go]
+            out[lid] = 208
         # specks: a few pixels of what is behind him, or of the shirt, shut in among Gotenks's hair, rolls and ears where his picture had
         # his wider face: the nearest of his hair and rolls
-        own = put | putr | fr | earm
+        own = put | putr | fr
         hr, _ = _nearest(put | putr, out)
         for cls, most in ((np.isin(out, (96, 97, 98)) & ~kbg, 6), (np.isin(out, P_DARK) & ~own & ~Gface & low & (Y < 52), 10)):
             lab, nc = _lab(cls & self.inner & ~own)
             for i in range(1, nc + 1):
                 m = lab == i
                 if m.sum() <= most and (ndimage.binary_dilation(m, K3) & own).any(): out[m] = hr[m]
+        if form != 'base':                    # (Super Saiyan, shouting: his shoulders are up beside his jaw, and where the hair was mirrored
+            fy = np.nonzero(Gface)[0]         #  in by it a line of the shirt one pixel thick was left along his jaw: that hair)
+            thin = np.isin(out, P_DARK) & ~own & ~Gface & ~Gears & low & (Y <= (int(fy.max()) if len(fy) else 63) - 2)
+            for _ in range(3):
+                n = sum(np.roll(thin, sft, ax) for sft, ax in ((1, 0), (-1, 0), (1, 1), (-1, 1)))
+                gone = thin & (n <= 1)
+                out[gone] = hr[gone]; thin &= ~gone
         # where Gotenks's hair lies right against the skin put on Gohan's temples, his skin's line
         hcore = put & ~np.isin(out, P_LINES)
         n4 = np.zeros_like(hcore); n4[1:] |= hcore[:-1]; n4[:-1] |= hcore[1:]; n4[:, 1:] |= hcore[:, :-1]; n4[:, :-1] |= hcore[:, 1:]

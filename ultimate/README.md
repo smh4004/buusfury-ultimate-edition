@@ -1224,6 +1224,23 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     is only what reaches the picture's foot (a stray purple pixel by his ear was taken for it and came out black). Against the
     form before, only the ears and what is right round them changed (137-216 pixels a picture; the face, brows, neck, shirt and
     rolls are the same pixels). Gotenks's hair: all of it above Gohan's brow line, 92-98% in the whole picture.
+  - 17:36, the owner: "You made the ears worse and the eyebrows on SSJ AND UP ARE SHIT". The ears: Gotenks's own, set by Gohan's
+    eyes, sat at a child's height (their lobes by his mouth) and stuck out; they are gone. They are Gohan's own again, where he has
+    them, whole and in front of the hair and the rolls. Found on the way: an ear was only its inside (skin colours); the brown line
+    round it was in no mask, so in every form before this one Gotenks's hair took that line wherever the hair was behind it, and in
+    the Super Saiyan pictures the line counted as Gohan's own hair and was painted out (23 of 65 pixels of it showed). No form the
+    owner saw had a whole ear. `gohan_clean` now returns the ears as their inside and their line (the test counts the line's pixels
+    in the picture: all of them), their inside in his face's light (`EAR_LIGHT`: he is drawn with them in his black hair's shade),
+    a lone dark dot in them taken out. The brows: Super Saiyan Gohan's left brow is under a lock of his hair, and the right one
+    was mirrored onto it about the middle of his eyes' whites; his brows mirror about a column 1-2 pixels from there (his face is
+    turned a little), so the mirrored half and the piece still showing made a kink; the brow's tan fill (82) and its soft tips
+    were not counted as brow, which left holes; the end of the left brow that shows beside the lock and the corner of his eye
+    under it were painted over. `_ssj_brows`: the column is fitted on the rows where the lock hides nothing, only what the lock
+    hides is mirrored, and what shows of his own left brow stays. Super Saiyan 3: the brows were taken off but for whatever
+    touched the white of an eye, which left gold bits; now all of them are his skin and what lies right on his eyes is one brown
+    line. Also: a line of the shirt one pixel thick along his jaw in the Super Saiyan shouting picture is hair. Against the form of
+    15:13 only the ears, the Super Saiyan brows and what is right round them changed (108-150 pixels a picture; nothing in the
+    middle of his face below his brows).
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

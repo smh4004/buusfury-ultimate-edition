@@ -170,28 +170,40 @@ for v in ('head', 'hair', 'recolour'):
         check('%s head, %s: %d frames, none with a hole, a stray piece or gi colours %s' % (v, f, len(notes), bad[:3]), not bad)
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
-# him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line
-# pixel for pixel, and nearly all of it over the whole picture: the rest is behind Gohan's face and shoulders and Gotenks's own ears,
-# which are in front of it as in his picture); his collar's rolls whole but for what his ears' lobes cover
+# him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
+# of it but what his ears' tops are in front of, and nearly all of it over the whole picture: the rest is behind Gohan's face, ears and
+# shoulders); his collar's rolls whole. Gohan's ears are whole: every pixel of them and of the line round them is in the picture.
+# Super Saiyan: his two brows are the same size (the left one was a broken mirror of the right).
 import numpy as np
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)
-ROWS = np.mgrid[:64, :64][0]
+ROWS, COLS = np.mgrid[:64, :64]
 for f in AG.ACTORS:
     kp = {'base': 68, 'ssj': 71, 'ssj3': 73}[f]; kraw = pics.art[kp]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
-    top = khair & (ROWS < pics._eyes(kraw, AG._rows_filled(kface))[0] - 4 - AG.LIFT[f])      # (above Gohan's brow line)
+    ke, kmid = pics._eyes(kraw, AG._rows_filled(kface))
+    top = khair & (ROWS < ke - 4 - AG.LIFT[f])      # (above Gohan's brow line)
     rolls = pics.rolls_whole(kp)
     for i, a in enumerate(pics.make('grown', f)):
+        gp = AG.PICS[f][i][0]; gc, d = pics.gohan_clean(gp)
         inner = a[pics.inner]
         left = {'pink skin': int(np.isin(inner, (37, 212, 213, 214)).sum()), "Gohan's background": int(np.isin(inner, (5, 7, 73, 74)).sum()),
                 'purple background': int((inner == 88).sum()) if f != 'base' else 0}
         check('portrait %s %d: nothing of the two pictures left over %s, the frame as the game has it' % (f, i, left),
               not any(left.values()) and (a[pics.frame] == pics.art[69][pics.frame]).all())
         same = a == kraw; share = (same & khair).sum() / khair.sum(); whole = (same & rolls).sum() / rolls.sum()
-        check("portrait %s %d: Gotenks's hair is his picture's own (all %d pixels above his brow line, %.0f%% of it in the whole picture) and "
-              "his collar's rolls are whole (%.0f%%)" % (f, i, top.sum(), 100 * share, 100 * whole),
-              bool(same[top].all()) and share >= 0.85 and whole >= 0.98)
+        check("portrait %s %d: Gotenks's hair is his picture's own (%d of %d pixels above his brow line, %.0f%% of it in the whole picture) and "
+              "his collar's rolls are whole (%.0f%%)" % (f, i, (same & top).sum(), top.sum(), 100 * share, 100 * whole),
+              (same & top).sum() >= 0.98 * top.sum() and share >= 0.85 and whole >= 0.98)
+        dy, dx = ke - d['eye'] - AG.LIFT[f], int(round(kmid - d['mid']))
+        ears = AG._shift(d['ears'], dy, dx, False) & pics.inner; line = ears & (AG._shift(d['g'], dy, dx) == 208)
+        shown = (a[line] == 208).sum()
+        check("portrait %s %d: Gohan's ears are whole: %d of the %d pixels of the line round them are in the picture" % (f, i, shown, line.sum()),
+              line.sum() >= 30 and shown >= (0.8 if f == 'ssj3' else 0.95) * line.sum())
+        if f == 'ssj':
+            b = d['brow'] & (ROWS < d['eye']); l, r = int((b & (COLS < d['mid'])).sum()), int((b & (COLS > d['mid'])).sum())
+            check("portrait %s %d: his two brows are whole: %d pixels of the left one and %d of the right above his eyes" % (f, i, l, r),
+                  min(l, r) >= 12 and abs(l - r) <= 8)
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')
