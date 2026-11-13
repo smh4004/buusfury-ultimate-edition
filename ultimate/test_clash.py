@@ -97,7 +97,13 @@ def clash(g, mash, tag):
     line = lambda b: g.mem(b + 0x20, 2)
     aligned = (lambda a, b: a[0] == b[0] or a[1] == b[1])(line(g.mem(CL)[0]), line(g.mem(CL + 4)[0]))
     g.send('keys')
+    fx, fy = g.mem(foe + 0x1A0, 2)
     while frames < 1500:
+        # Kid Buu splits in two a few seconds into a fight (the game's own behaviour). His copy walks in line with Goku and fires too,
+        # and a beam fired from between the two that are clashing hits Goku and ends the clash (Nov 13: from 8 px in front of the clash).
+        # That is play, not the clash, so here the copy stands well to one side of the first, out of line with Goku, while it lasts.
+        for e in g.mem(ENEMIES, g.mem(0x03001BB0)[0]):
+            if e != foe: g.send('poke %08X %08X' % (e + 0x1A0, fx + (96 << 8)), 'poke %08X %08X' % (e + 0x1A4, fy))
         if mash: g.send('keys A', 'run 2', 'keys', 'run 4'); frames += 6
         else: g.send('run 6'); frames += 6
         act, push = g.mem(CL + 0x18, 2)

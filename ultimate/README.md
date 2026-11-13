@@ -1122,6 +1122,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   "other" off the list: with no copy, he alone answered, the other was whatever the stack held, and its destructor was called through
   garbage. `outfit.c buu_merge` runs that method only when two or more answer, else ends as it ends after a merge (`build.py
   buu_merge_hook`). Checked: 600 steps of his fight with no bad jump, and his defeat ends the Cell Games as before (to Hercule City).
+- Nov 13, 00:37, the full suite on ae41677 (Adult Gotenks, with `test_hands` and `test_adult_gotenks` in it): 1,600 checks passed, one
+  failed, and it was the check's. `test_clash.py`'s "not mashing loses in a few seconds": the clash ended after 84 frames, not lost.
+  Traced in the game (the beam's state watched, then every hit test on Goku): Kid Buu's copy (he splits in two a few seconds into a fight,
+  as in the original game) stood between the two clashing beams, 8 pixels in front of where they met, and fired at Goku from there; his
+  beam hit Goku, which ended Goku's beam. The clash itself ran as before (the build before the hand beams, efb5da7, lost by shoving at
+  264 frames; this one shoves the same). The copy's firing is play, not the clash, so while a clash runs the test now stands the copy 96
+  pixels to the side of the first Kid Buu, out of line with Goku: both clashes pass (won in 156 frames, lost in 258).
 - Nov 12, the full suite on f0e40e9: the failures were the checks', not the game's. `test_frames.py`: Blue Gogeta's eyes (215, 216) are
   Blue's on purpose since Nov 11, Blue's brows too, and Blue's change is the base figure's (slot 10 skipped there, checked by its own
   checks). `test_gt.py`: the guest slot's picker goes Up and Down from fighter to fighter and L and R through looks (`lib/guestnav.py`), not
