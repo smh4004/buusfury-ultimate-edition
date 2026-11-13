@@ -1126,6 +1126,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     them). The orange that lights the gi in Goku's change is the gi's light there, not a shoe. Portraits: Gotenks's hair (his gold over
     Gohan's as a Super Saiyan, Gohan's gold it doesn't cover in Gotenks's nearest colour, never on the brows), the neck, then the dark
     undershirt and black vest wherever Gohan wore anything below his jaw, Gotenks's rolls on the shoulders behind the face and hair.
+  - 09:15, the owner: "The vest is disappearing still on frames and the portrait hair and vest is still messed up". Counted per frame
+    (the vest's yellow pixels): 37 of the 135 had fewer than 4, as Gohan's head covered his collar, his arms crossed over his top or he lay
+    on his side. Now his shoulders carry the padding whatever his arms do: Gohan's short dark sleeves (each whole piece of the dark by his
+    arms' skin, above his sash) are the pads, with the top's gi beside them; the chest his open gi showed (skin with his top each side of
+    it in its row) is the undershirt; from the side only the front edge of his torso is open. Left under 5 yellow pixels: his charge
+    behind its ball and his flight toward the camera, where Gohan's own body hardly shows. Portraits (`Portraits.on_gotenks`): Gohan's
+    face set into Gotenks's own picture of the same expression (Gotenks's hair, padded collar and background as he has them), Gotenks's
+    face where Gohan's doesn't cover it the nearest of his hair or background, under the jaw the undershirt.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

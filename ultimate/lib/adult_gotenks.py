@@ -353,26 +353,44 @@ def outfit_parts(src, kind, rot, headmask):
         if level is None or along[m].max() <= level: top |= m
         else: top |= m & (along < level)
     pants = gi & ~top
-    # his undershirt: the dark of Gohan's below his head that his top's gi is round (the open front, the sleeves under it at his shoulders)
+    # his shoulders: Gohan's short dark sleeves (the dark by his arms' skin, above his sash): the vest's padding sits on them, so it shows
+    # whatever his arms do (crossed over his chest, swinging)
     dark = np.isin(src, (1, 111, 112)) & ~near_head
-    under = dark & (ndimage.convolve(top.astype(int), np.ones((3, 3), int), mode='constant') >= 2)
-    torso = top | under
+    armskin = skin & ~near_head
+    upper = (along < level) if level is not None else (dist <= 8)
+    sleeve = dark & ndimage.binary_dilation(armskin, k3) & upper
+    slab_, sn_ = _lab(dark & upper)
+    sleeve = np.isin(slab_, list(set(np.unique(slab_[sleeve]).tolist()) - {0})) if sn_ else sleeve     # (the whole of each)
+    # his undershirt: the dark of Gohan's that his top's gi is round (the open front), and the chest his open gi showed (skin with his top
+    # each side of it in its row, near)
+    under = dark & ~sleeve & (ndimage.convolve(top.astype(int), np.ones((3, 3), int), mode='constant') >= 2)
+    ns_, nt = np.rot90(armskin, -rot), np.rot90(top, -rot)
+    chest_n = np.zeros_like(ns_)
+    for yy in range(ns_.shape[0]):
+        tx = np.nonzero(nt[yy])[0]
+        if len(tx) < 2: continue
+        for xx in np.nonzero(ns_[yy])[0]:
+            lft = tx[tx < xx]; rgt = tx[tx > xx]
+            if len(lft) and len(rgt) and xx - lft.max() <= 6 and rgt.min() - xx <= 6: chest_n[yy, xx] = True
+    under |= np.rot90(chest_n, rot) & upper
+    torso = top | under | sleeve
     # the padded collar: the torso's first two pixels down from its edge towards his head, over his shoulders and round the back of his
-    # neck; in front of his neck the vest is open (from the front its middle, from the side the part before his neck): black there
+    # neck, and his shoulders; in front of his neck the vest is open (from the front its middle, from the side the part before his
+    # neck): black there
     first = torso & (_depth(torso, rot) < 2)
     ns = np.rot90(src, -rot).shape                                       # across his body, his head up: the column there
     nx = np.rot90(np.tile(np.arange(ns[1]), (ns[0], 1)), rot)
-    neck = (skin | (src == LINE)) & ndimage.binary_dilation(torso, k3) & near_head & ~torso
     open_ = np.zeros_like(top)
-    if kind != 1:
-        ref = neck if neck.any() else headmask
-        xs = nx[ref]
-        if len(xs):
-            lo, hi = xs.min(), xs.max(); mid = (lo + hi) / 2; half = max(2.0, (hi - lo) / 2)
-            if kind == 0: open_ = np.abs(nx - mid) <= half
-            else:
-                open_ = (nx < mid) if kind == 2 else (nx > mid)       # (the side view faces left, its mirror right)
-    pad = first & ~open_
+    if kind != 1 and headmask.any():
+        mid = nx[headmask].mean()
+        if kind == 0: open_ = np.abs(nx - mid) <= 2.0
+        else:                                    # from the side: the front edge of his torso, row by row (the view faces left, its mirror right)
+            nt_ = np.rot90(top | under, -rot); on = np.zeros_like(nt_)
+            for yy in range(nt_.shape[0]):
+                xs_ = np.nonzero(nt_[yy])[0]
+                if len(xs_): on[yy, xs_.min() if kind == 2 else xs_.max()] = True
+            open_ = np.rot90(on, rot)
+    pad = (first & ~open_) | sleeve | (top & ndimage.binary_dilation(sleeve, k3) & ~open_)
     # boots: the shoes' pieces that touch no skin (206 shades his hands too) and his trousers' ends round them
     sh = np.isin(src, SHOES); slab, sn = _lab(sh); shoe = np.zeros_like(sh)
     for i in range(1, sn + 1):
@@ -441,7 +459,8 @@ def dress(c, src, kind, rot, headmask):
     pad = p['pad']
     c[pad] = PAD_MID
     c[pad & (p['depth'] == 0)] = PAD_LIGHT
-    c[pad & _side(src == 0, p['rot'])] = PAD_EDGE
+    below = np.rot90(np.pad(np.rot90(pad, -p['rot']), ((0, 1), (0, 0)))[1:], p['rot'])      # (the next pixel down his body is pad)
+    c[pad & ~below & (p['depth'] >= 2)] = PAD_EDGE
     return c
 
 
@@ -742,11 +761,43 @@ class Portraits:
             out[put] = src[put]
         return out
 
+    def on_gotenks(self, gp, kp, form):
+        """Gohan's face (picture gp) on Gotenks's picture kp (Nov 13, the owner on the first two tries: "the portrait hair and vest is
+        still messed up"): Gotenks's own hair round it, his padded collar on his shoulders, his background; Gohan's face and ears (each row
+        of his face from edge to edge) and his neck under his jaw; what was Gotenks's face that Gohan's doesn't cover the nearest of
+        Gotenks's hair or background (under the chin the undershirt); below the jaw all but the collar and the background the dark
+        undershirt, by the light that was there."""
+        a = self.art[gp]; kart = self.art[kp]
+        face = _rows_filled(self.face(a)); kface = _rows_filled(self.face(kart))
+        Y, X = np.mgrid[:64, :64]
+        ys, xs = np.nonzero(face); jaw = ys.max(); cx = xs[ys >= jaw - 1].mean()
+        res = kart.copy()
+        lv = np.clip((pal_lum(kart) / 255.0 * 4).astype(int), 0, 4)
+        kskin = np.isin(kart, P_SKIN) & self.inner
+        kbody = kskin & ~kface & (Y >= 40)
+        res[kbody] = np.array(P_DARK)[lv[kbody]]
+        khair = self.hair(kart, (P_HAIR + P_LAV) if form == 'base' else P_GOLD + (16, 17, 208, 1)) & ~kface
+        col, _ = _nearest((khair | np.isin(kart, BG_OF[kp])) & self.inner & ~kface, kart)
+        gap = kface & ~face
+        res[gap] = col[gap]
+        res[gap & (Y >= jaw - 4)] = 111
+        below = self.inner & (Y >= jaw - 2) & ~self.rolls(kp) & ~np.isin(kart, BG_OF[kp]) & ~face
+        res[below] = np.array(P_DARK)[np.minimum(lv[below], 2)]
+        res[face] = a[face]
+        if form != 'base': res[face & np.isin(a, (85, 86, 87, 88))] = LINE        # (Super Saiyan Gohan's purple hair lines: Gotenks's brown)
+        res[face & (Y > jaw - 3) & ~np.isin(a, P_SKIN + (1,))] = 112                 # (his collar's light under his jaw)
+        neck = np.isin(a, P_SKIN) & ~face & (np.abs(X - cx) <= NECK_HALF) & (Y > jaw - 6) & (Y <= jaw + 3) & self.inner
+        res[neck] = a[neck]
+        return res
+
     def make(self, variant, form):
         out = []
         for k, (gp, kp) in enumerate(PICS[form]):
             if variant == 'head':                  # (Gotenks's own pictures as they are: his head, his vest's padded collar)
                 out.append(self.art[GOTENKS_PICS[form][k]].copy())
+                continue
+            if variant == 'hair':
+                out.append(self.on_gotenks(gp, kp, form))
                 continue
             a = self.art[gp].copy(); face = self.face(a)
             kart = self.art[kp]; kface = self.face(kart)
@@ -782,6 +833,15 @@ class Portraits:
                 a[zone] = np.where(lav[zone], kart[zone], col[zone])
             out.append(self.dress(a, gp, ROLLS_FROM[form][k], face, ghair | put))
         return out
+
+
+def _rows_filled(m):
+    """m with each row filled from its first pixel to its last."""
+    o = m.copy()
+    for y in range(m.shape[0]):
+        xs = np.nonzero(m[y])[0]
+        if len(xs): o[y, xs.min():xs.max() + 1] = True
+    return o
 
 
 def pal_lum(a):
