@@ -283,7 +283,8 @@ for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 
         A, B = anim(actor_of(forms[name]), slot), anim(actor_of(ss), slot)
         for i, (f, g) in enumerate(zip(A or [], B or [])):
             for d in range(3):
-                a, b = image(f[d]), image(g[d])
+                gd = B[0][d] if slot == 0 and i and f[d] == A[0][d] else g[d]     # (an idle made still, build.py idle_still: against his first frame)
+                a, b = image(f[d]), image(gd)
                 if a is None or b is None or a.shape != b.shape: continue
                 ew = (b == 2) & ndimage.binary_dilation(np.isin(b, (215, 216)), np.ones((3, 3), bool))
                 blue = a != b
@@ -304,6 +305,10 @@ for name, ss, base in (('goku_ssb', 3, 0), ('goku_ssb_b', 4, 2), ('vegeta_ssb', 
                 if ub is None: continue
                 e = np.pad(np.isin(b, (215, 216, 117, 118)) | ew, 1)
                 by_eye = e[1:-1, :-2] | e[1:-1, 2:] | e[:-2, 1:-1] | e[2:, 1:-1]
+                # (nor beside Blue's brows and irises, painted over Super Saiyan's skin since Nov 11, "eyebrows and pupils match their hair":
+                # the skin next to them has blue on a side, Blue Goku's knocked-down face, slot 17 frame 1. Blue's hair is Super Saiyan's
+                # shape pixel for pixel, so blue over his skin is only ever the face's)
+                by_eye |= ndimage.binary_dilation(blue & np.isin(b, SKIN_SHADES), np.ones((3, 3), bool))
                 fc = np.pad(np.isin(b, ssb.FACE) | ew, 1)
                 drawn = np.isin(b, SKIN_SHADES) & ~same & ~by_eye & ~blue
                 gold = (drawn & ~(fc[1:-1, :-2] | fc[1:-1, 2:] | fc[:-2, 1:-1]) & (nh >= 3)) | \

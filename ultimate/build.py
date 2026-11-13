@@ -109,7 +109,7 @@ LOOK170 = os.environ.get('BFU_LOOK170', '1') != '0'      # on since the owner's 
 GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.py STYLES): the owner's pick (Nov 12, 19:04: "1c looks good use that")
 GLOW_ALPHA = (6, 10)
 GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
-CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '0') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, the owner's preview: off until he OKs it)
+CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '1') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, 21:40, the owner on the preview: "Make the beam actually come from Cell's hand too")
 # Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
 # own), 1 Super Saiyan God (crimson to orange, a gold-white core), 2 Rose (magenta to pink, as Rose's power-up aura). Nearest palette entries.
 GLOW_KINDS = (None,
@@ -2784,6 +2784,21 @@ def add_eraser(rom, clean, sym, at, art):
     ball, beam = wrath.places(clean, *wrath.beam_rows(clean))
     struct.pack_into('<16b', rom, sym['wrath_at'] - ROM_BASE, *[int(c) for v in ball + beam for c in v])
     struct.pack_into('<I', rom, sym['wrath_who'] - ROM_BASE, ROM_BASE + ACTORS_AT + 4 * NEW_ACTORS['beerus'])
+    # The enemy beam from the hand for every other figure that fires it (lib/beam_hands.py; outfit.c hand_who, hand_at)
+    import beam_hands as hands
+    made = hands.steps(clean)
+    if len(made) >= hands.MAX: sys.exit('beam_hands: more figures than outfit.c HAND_MAX')
+    for k, (name, (ball, beam, lift)) in enumerate(made.items()):
+        actor = hands.RETAIL[name] if name in hands.RETAIL else NEW_ACTORS[name]
+        struct.pack_into('<I', rom, sym['hand_who'] - ROM_BASE + 4 * k, ROM_BASE + ACTORS_AT + 4 * actor)
+        struct.pack_into('<16b', rom, sym['hand_at'] - ROM_BASE + 16 * k, *[int(c) for v in ball + beam for c in v])
+        struct.pack_into('<8b', rom, sym['hand_lift'] - ROM_BASE + 8 * k, *[int(c) for v in lift for c in v])
+        rom[sym['hand_pose'] - ROM_BASE + k] = hands.POSE.get(name, 0)
+    struct.pack_into('<I', rom, sym['hand_who'] - ROM_BASE + 4 * len(made), 0)
+    # every beam's screen place (the beam object's table, fourth entry) goes through hand_screen, which draws such a beam moved
+    BEAM_OBJ_VT, SCREEN = 0x4AEF8, 0x08020CC9
+    if ROM_BASE + BEAM_OBJ_VT + struct.unpack_from('<i', rom, BEAM_OBJ_VT + 12)[0] != SCREEN: sys.exit('the beam object\'s screen place moved')
+    struct.pack_into('<i', rom, BEAM_OBJ_VT + 12, (sym['hand_screen'] | 1) - (ROM_BASE + BEAM_OBJ_VT))
     vt = sym['absorb_vt'] - ROM_BASE
     for k in range(14):
         fn = (sym['absorb_start'] | 1) if k == 0 else ROM_BASE + POWER_UP_VT + struct.unpack_from('<i', clean, POWER_UP_VT + 4 * k)[0]
@@ -3156,7 +3171,7 @@ def main():
     open('%s/%s.bps' % (OUT, name), 'wb').write(bps.make(clean, out))
     open('%s/%s_PERSONAL_USE_ONLY.gba' % (OUT, name), 'wb').write(out)
     ss2_lists = {str(u['flag']): symbol(u['list']) - ROM_BASE for u in json.load(open('ultimate/outfits.json'))['unlocks'] if u['flag'] >= SS2_FLAG}
-    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists, 'actors': {k: actors[k] for k in ('beerus', 'whis', 'garlic_jr', 'super_garlic', 'spice', 'vinegar', 'mustard', 'salt', 'makyan')}}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
+    json.dump({'forms': index, 'first_free': hex(free), 'ss2_lists': ss2_lists, 'actors': {k: actors[k] for k in ('beerus', 'whis', 'garlic_jr', 'super_garlic', 'spice', 'vinegar', 'mustard', 'salt', 'makyan', *(n for n in __import__('beam_hands').HANDS if n in actors))}}, open('%s/%s.map.json' % (OUT, name), 'w'), indent=1)
     print('%s: %d bytes, sha1 %s, patch %d bytes, forms %s' % (name, len(out), hashlib.sha1(out).hexdigest(),
           os.path.getsize('%s/%s.bps' % (OUT, name)), index))
 

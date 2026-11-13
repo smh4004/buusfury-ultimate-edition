@@ -1067,6 +1067,29 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   out in 33 seconds and he powered down; Super Saiyan 2's ran out in about 10 and he stayed in Super Saiyan 2 with it empty, for good.
   `ss_tick`'s faster drain set an empty pool back to 1 each time (`*pool > 4 ? *pool - 3 : 1`), and the game powers down only when it
   finds 0. An empty pool stays empty now (`test_nov10.py` 2b: Super Saiyan 2 with 30 left powers down within 10 seconds).
+- Nov 12, the owner: "Perfect Cell Kamehameha frames glitched". He fights with Kid Buu's row (61), whose beam plays the figure's slot 3
+  (Kid Buu's ki blast: standing, then the arm out), and his slot 3 was LoG2's idle: he fired standing with his arms down. Now LoG2's ki
+  (animation 5) (`build.py CELL_BEAM`; the front view, whose frames are in another order than the side's, reordered by
+  `lib/sprites.py reframe_view`). 21:40, on the preview: "Make the beam actually come from Cell's hand too not the floor", "Scan all NPCs
+  too for this especially big sized ones". `lib/beam_hands.py` tells it: the enemy beam (Kid Buu's, rows 60 and 61) lays its ball and beam at
+  steps set once for Kid Buu's figure, so on everyone else who fires it it left from the waist or the feet (Perfect Cell's from his feet,
+  30 pixels under his hand). For each figure on those rows (Kid Buu, Perfect Cell, Goku Black, Rose, Uub, Majuub, and the Dojo's copies:
+  Goku, Vegeta, Gohan, Piccolo, Android 18, Pan, Broly) the ball sits on his fingertip, and he fires in his own two-handed beam's frames
+  if he has them (22:09: "Obviously don't use that beam attack for every single character who already have two handed beam attacks but
+  use it when a character doesn't like Broly or Cell etc."): the Kamehameha's (slot 18) for Goku, Gohan, Goku Black, Rose, Uub, Majuub
+  and Pan, Vegeta's beam pose (31, Final Flash's push); the others (Kid Buu, Perfect Cell, Broly, Piccolo, Android 18) the ki blast's
+  arm out. That frame is held (`outfit.c wrath_start`, `wrath_update`: `hand_who`, `hand_at`, `hand_pose`), and the beam is drawn from that fingertip (`hand_screen`, in the beam
+  object's screen-place entry, `hand_lift`) while what it hits stays where the game's did: the enemy lines his place up with the
+  player's before firing, and a big figure's hand far above his place made the beam pass over a player level with him when it was moved
+  whole. From the side the hand's height is drawn as the beam's height over the ground; from the front and back the hand used is one
+  near his middle (Perfect Cell's from the front is the fist at his belly). Beerus keeps his own (Wrath of the Gods). The other
+  figures' projectiles were scanned in the game (every Time Chamber partner, the Cell Games' first three fights, four sides each,
+  `census.py`): the story's own fighters fire from their own places, and Imperfect and Semi-Perfect Cell, on Super Buu's and Buu with
+  Gotenks's rows, from their hands and heads (Super Buu's ki blasts and antenna beam). `test_hands.py` (rigs per figure: Perfect Cell,
+  Kid Buu, Goku Black, Vegeta): drawn from the fingertip in all four facings, hits where the game's hits, in his own beam's frames or
+  the ki blast's, the arm held, the side points against the built frames; `test_wrath.py`'s Kid Buu checks follow. Broly (the Dojo's)
+  was looked at in the game the same way: from his hand every side (he knocks the player down before firing, so his rig can't show a
+  hit).
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

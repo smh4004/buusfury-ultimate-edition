@@ -2017,13 +2017,53 @@ const volatile u32 wrath_params[12] = {1};   /* volatile, as boss_tab: read at f
 const volatile u32 wrath_who[1] = {1};
 const volatile signed char wrath_at[2][4][2] = {{{1}}};
 static int wrath_mine(const u8 *e) { return *(const u32 *)(e + 0x58) == *(const u32 *)wrath_who[0]; }
+/* The enemy beam from the hand (Nov 12, the owner: "Make the beam actually come from Cell's hand too not the floor", "Scan all NPCs too
+   for this especially big sized ones"; lib/beam_hands.py tells it): the game lays the ball and the beam at steps set for Kid Buu's figure, so on
+   every other figure that fires it (Perfect Cell, the Dojo's copies, Goku Black, Uub...) it left from his waist or his feet. For each
+   figure in hand_who (where the actor table keeps its record, 0 ends the list) the ball and the beam move to his fingertip in the ki
+   blast's arm-out frame, or his own two-handed beam's (hand_pose), hands out (hand_at: steps per facing, ball then beam), and that frame
+   is held from the behaviour's second frame. */
+#define HAND_MAX 24
+#define HAND_ARM_OUT 2
+const volatile u32 hand_who[HAND_MAX] = {1};
+const volatile signed char hand_at[HAND_MAX][2][4][2] = {{{{1}}}};
+const volatile signed char hand_lift[HAND_MAX][4][2] = {{{1}}};    /* the beam drawn moved across its line: hits stay where the game's did */
+const volatile u8 hand_pose[HAND_MAX] = {1};      /* the slot he fires in (his own two-handed beam's), 0: the ki blast's the behaviour set */
+static int hand_of(const u8 *e) {
+    u32 fig = *(const u32 *)(e + 0x58);
+    int k;
+    for (k = 0; k < HAND_MAX && hand_who[k]; k++) if (fig == *(const u32 *)hand_who[k]) return k;
+    return -1;
+}
+/* The beam object's screen place (its table 0x0804AEF8, fourth entry, 0x08020CC8: its place less the camera, at +0x28 and +0x2C, which is
+   what its pieces are drawn from; what it hits goes by +0x20 and +0x24): every beam's, the player's too. An enemy's, once laid as a beam
+   (its rows no longer the ball's), from a figure in hand_who: drawn moved by hand_lift. */
+#define Beam_Screen ((int (*)(u32 *))0x08020CC9)
+int hand_screen(u32 *beam) {
+    int r = Beam_Screen(beam), k, f;
+    u8 *e = (u8 *)beam[0x50 / 4];
+    const u32 *params = (const u32 *)beam[0x40 / 4];
+    if (!IN_EWRAM(e) || e == *(u8 **)0x03001C34 || (u32)params >> 24 != 8 || beam[0x4C / 4] == params[2]) return r;
+    k = hand_of(e);
+    if (k < 0) return r;
+    f = e[0x10] & 3;
+    beam[0x28 / 4] += hand_lift[k][f][0]; beam[0x2C / 4] += hand_lift[k][f][1];
+    return r;
+}
 void wrath_start(u32 *self, u8 *e) {
     u32 *beam;
     const u32 *rows;
-    int f;
+    int f, k;
     EBeam_Start(self, e);
     beam = (u32 *)self[4];
-    if (!IN_EWRAM(beam) || !wrath_mine(e)) return;
+    if (!IN_EWRAM(beam)) return;
+    k = hand_of(e);
+    if (k >= 0) {
+        f = e[0x10] & 3; beam[0x20 / 4] += hand_at[k][0][f][0]; beam[0x24 / 4] += hand_at[k][0][f][1];
+        if (hand_pose[k]) Sprite_SetFacing(e, hand_pose[k]);
+        return;
+    }
+    if (!wrath_mine(e)) return;
     f = e[0x10] & 3;
     beam[0x20 / 4] += wrath_at[0][f][0]; beam[0x24 / 4] += wrath_at[0][f][1];
     rows = (const u32 *)wrath_params[2];
@@ -2032,9 +2072,16 @@ void wrath_start(u32 *self, u8 *e) {
     MemCopy((u8 *)0x06010000 + *(u16 *)(beam + 3) * 0x20, (const void *)rows[2], 0x40);
 }
 void wrath_update(u32 *self, u8 *e) {
-    int at = *(u16 *)(e + 0x12), f = e[0x10] & 3;
+    int at = *(u16 *)(e + 0x12), f = e[0x10] & 3, k;
     u32 *beam;
     EBeam_Update(self, e);
+    k = hand_of(e);
+    if (k >= 0) {
+        e[0x11] = at >= HAND_ARM_OUT;
+        beam = (u32 *)self[4];
+        if (at == 8 && IN_EWRAM(beam)) { beam[0x20 / 4] += hand_at[k][1][f][0]; beam[0x24 / 4] += hand_at[k][1][f][1]; }
+        return;
+    }
     if (!wrath_mine(e)) return;
     e[0x11] = at >= WRATH_ARM_OUT;
     beam = (u32 *)self[4];

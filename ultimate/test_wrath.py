@@ -14,7 +14,7 @@ In the emulator, for each way he can face: he is put in line with the player and
 - his pose is the ki blast's wind-up, then its arm out, held (never the two arm-out frames by turns);
 - it hits the player it is aimed at;
 - nothing jumps to a bad address.
-And Kid Buu's figure on the same row fires the game's own beam from the game's own place, showing the game's own frames."""
+And Kid Buu's figure on the same row fires the game's own beam, from his own hand with his arm held out since Nov 12 (lib/beam_hands.py)."""
 import json, os, struct, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, HERE + '/lib']
@@ -139,15 +139,17 @@ ball = struct.unpack_from('<I', rom, params - B + 8)[0] - B
 t0, t1 = [struct.unpack_from('<I', rom, ball + 12 * k + 8)[0] - B for k in (0, 1)]
 check('nothing shows on his finger while he winds up, then a glint', not any(rom[t0:t0 + 64]) and any(rom[t1:t1 + 256]) and not set(rom[t1:t1 + 256]) & BLUES)
 
-# --- any other enemy with this beam: the game's ---------------------------------------------------------------------------------
+# --- Kid Buu's figure on the same row: the game's beam, from his own hand (lib/beam_hands.py, Nov 12; test_hands.py checks it whole) ------
+import beam_hands as hands
 log, bad, full = fire(KIDBUU + NAME, 80, 0, 0, keep=True)
 out = [r for r in log if r['beam'] and r['count'] >= 10]
 check('Kid Buu: he fires', len(out) >= 10 and not bad, 'frames with it %d' % len(out))
 if out:
-    r = out[0]; step = struct.unpack_from('<ii', clean, wrath.ENEMY_STEPS + 48 + 8 * r['facing'])
+    r = out[0]; step = struct.unpack_from('<ii', clean, wrath.ENEMY_STEPS + 48 + 8 * r['facing']); mine = hands.steps(clean)['kid_buu'][1][r['facing']]
     check('Kid Buu: the Kamehameha\'s own table', r['params'] == GAME_PARAMS, '%08X' % r['params'])
-    check('Kid Buu: laid where the game lays it', (r['beam'][0] - r['e'][0], r['beam'][1] - r['e'][1]) == tuple(step), '%s, the game\'s %s' % ([r['beam'][0] - r['e'][0], r['beam'][1] - r['e'][1]], step))
-    check('Kid Buu: the game\'s own two frames by turns', {1, 2} <= set(q['frame'] for q in log if q['count'] >= 10))
+    check('Kid Buu: laid at the game\'s place plus his hand\'s step', (r['beam'][0] - r['e'][0], r['beam'][1] - r['e'][1]) == (step[0] + mine[0], step[1] + mine[1]),
+          '%s, the game\'s %s plus %s' % ([r['beam'][0] - r['e'][0], r['beam'][1] - r['e'][1]], step, mine))
+    check('Kid Buu: his arm held out (frame 1)', set(q['frame'] for q in log if q['count'] >= 10) == {1})
     check('Kid Buu: it hits', log[-1]['hp'] < full)
 print('%d failed' % len(fails) if fails else 'all passed')
 sys.exit(1 if fails else 0)

@@ -123,13 +123,14 @@ def near_end(rows, block, base, facing):
     return (min, max, max, min)[facing](ends)
 
 
-def places(clean, rows, block, base):
+def places(clean, rows, block, base, finger=FINGER):
     """-> (ball steps, beam steps): what to add to the game's own places, per facing (down, up, left, right), so the glint sits on his
-    fingertip and the beam's near end overlaps it by a pixel, its middle line through his hand."""
+    fingertip and the beam's near end overlaps it by a pixel, its middle line through his hand. finger: the fingertip per facing (lib/hands.py
+    gives every other figure's)."""
     game_ball = [struct.unpack_from('<ii', clean, ENEMY_STEPS + 12 * f) for f in range(4)]
     game_beam = [struct.unpack_from('<ii', clean, ENEMY_STEPS + 48 + 8 * f) for f in range(4)]
     ball, beam = [], []
-    for f, (fx, fy) in enumerate(FINGER):
+    for f, (fx, fy) in enumerate(finger):
         end = near_end(rows, block, base, f)
         if f == 0: at = (int(fx + 0.5), int(fy) - 1 - end); tip = (int(fx + 0.5), int(fy) + 1)
         elif f == 1: at = (int(fx + 0.5), int(fy) + 1 - end); tip = (int(fx + 0.5), int(fy) - 1)
