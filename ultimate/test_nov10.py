@@ -42,6 +42,14 @@ ss = [p for f, p in zip(forms, pool) if f == 4]; ss2 = [p for f, p in zip(forms,
 rate = lambda p: (p[1] - p[-1]) / max(len(p) - 2, 1)
 print('   pool per second: Super Saiyan %.1f, Super Saiyan 2 %.1f' % (rate(ss), rate(ss2)))
 check('Super Saiyan 2 drains its pool about 4x as fast as Super Saiyan', len(ss) > 4 and len(ss2) > 4 and 3 < rate(ss2) / max(rate(ss), 0.1) < 5)
+# 2b. Nov 12 ("SSJ2 ki drain still seems bugged"): with the pool run out he powers down, as Super Saiyan does (it was set back to 1 each
+# time it emptied, so he stayed in Super Saiyan 2 with an empty bar). The pool left at 30 in Super Saiyan 2: empty in about 3 seconds.
+L2 = T.setup([7, 20, 35, 22], None, (0,)) + press() + press() + ['mem %08X 1' % (R + 0x14), 'poke8 %08X 1E' % (R + 0x1E), 'poke8 %08X 00' % (R + 0x1F)]
+L2 += [v for _ in range(10) for v in T.AWAY + ['run 60', 'mem %08X 1' % (R + 0x14), 'mem %08X 1' % (R + 0x1C)]]
+o2 = T.run(L2, 'ss2_out')
+f2 = [w[0] & 255 for w in words(o2, R + 0x14)]; p2 = [w[0] >> 16 for w in words(o2, R + 0x1C)]
+print('   Super Saiyan 2 with 30 left: forms %s, pool %s' % (f2, p2))
+check('Super Saiyan 2 powers down when its pool runs out (no Super Saiyan 2 with an empty bar)', len(f2) > 8 and f2[0] == 76 and f2[-1] != 76 and 76 not in f2[-4:])
 m = [w[0] for w in words(o, MASTERY)]
 check('Super Saiyan 2 trains its own mastery (Goku\'s byte 1): %s' % [(x >> 8) & 255 for x in m], len(m) == 2 and (m[1] >> 8 & 255) > (m[0] >> 8 & 255))
 D = T.D

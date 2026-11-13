@@ -3,6 +3,7 @@
   python3 ultimate/test_transform.py [rom] [work dir]
 The skill changes form, the screen flashes white and comes back, attacks work and the form goes back; lays out what it looks like."""
 import json, os, re, subprocess, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import guestnav     # the guest slot's keys (Nov 12)
 from PIL import Image
 ROM = sys.argv[1] if len(sys.argv) > 1 else 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba'
 D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='tf'); os.makedirs(D, exist_ok=True)
@@ -28,7 +29,7 @@ for who, downs, base, sup, skill in (('13', 2, 'android13', 'super13', 30), ('17
             if 'bad pc' in l or 'guard' in l.lower() and 'reject' in l.lower(): bad[0] = True
             if l.startswith('mem %08x' % a): return [int(x, 16) for x in l.split(':')[1].split()]
     form = lambda: mem(R + 0x14)[0] & 0xFF
-    send('guardon 0x09000000', *route); send('tap A 60', 'tap A 60', 'run 30', *['tap RIGHT 40'] * 5, *['tap DOWN 40'] * downs, 'tap A 200', 'run 60')
+    send('guardon 0x09000000', *route); send('tap A 60', 'tap A 60', 'run 30', *['tap RIGHT 40'] * 5, *guestnav.keys(base), 'tap A 200', 'run 60')
     check('%s: picked as the base form' % who, form() == forms[base])
     rec = mem(R, 26); skills = [(rec[3] >> 8 * i) & 255 for i in (1, 2, 3)] + [rec[4] & 255, rec[4] >> 8 & 255]
     check('%s: the skill is on the list' % who, skill in skills)

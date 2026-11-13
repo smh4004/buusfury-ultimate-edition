@@ -947,6 +947,109 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     look's ki blast and Kamehameha hit and its Masenko goes, in base, Super Saiyan and 2, with his beam pose held. `test_build.py`: both
     looks chosen with his moves and going Super Saiyan; Super Saiyan 2 in both; the armor's transform loop for both looks; an old save
     with Gohan in the armor. `test_slots.py` 7b: the two looks share one fighter's progress, apart from Pan's.
+- Nov 12, the owner (17:12): "add Future Trunks and saiyan armor future trunks". Trunks's Saiyan armor (forms 63-64, the LoG2 figures) is
+  Future Trunks's second look now (kid Trunks never wore it): owner 8, his name (UI 1545) and portraits, his moves (`outfit.c trunks`), his
+  bench group (3: the same fighter's progress, `outfits.json` "bench"). Trunks's outfit list loses it; a save with Trunks in it puts him in
+  his first open look (`old_armor`, `out_of_armor`: as Gohan's). Opened by the Cell Games' prize (flag 874). Tests: `test_build.py` (the
+  armor's guest loop, its chain, the old save), `test_slots.py` 7c (one fighter's progress, moves [5, 7, 20, 4, 11, 38]).
+- Nov 12, the owner (17:12): "add skill and transformation mastery and skill swap for guests if you can but only lore accurate stuff".
+  - Transformation mastery (`outfit.c guest_tiers`, `mastery_at`; `build.py GUEST_MASTERY`): the Saiyan transformations the guests have in
+    the series, each fighter's own byte in the bench's spare field (zero in every bench saved before): Future Trunks's Super Saiyan (both
+    looks), Teen Gohan's Super Saiyan and 2 (both looks), Goku Black's Rose (his Super Saiyan's tier). Trained, shown and drained as the
+    party's (Level 2 at 100, Level 3 at 250; the Gravity Band doubles it; the hidden-potential wish adds 75 to these too). Not Pan's Super
+    Saiyan or the Kaioken some guests carry (neither is in the series), nor Majuub, Super 13 or 17, Max Power or Broly's Full Power (not a
+    Super Saiyan's transformation he trains: a look).
+  - Skill levels (`guest_levels`, `guest_move_level`): a guest's moves that have levels (their row's +0 isn't 255; ki blasts have none, as
+    the party's) go up with his level as the party's do: the steps the level-up script gives the party's move of that name, else 100 and
+    150. Never down (a bench saved before keeps what it had).
+  - Skill swap: every guest's moves, lore-accurate, are six or fewer, so each holds everything he knows and there is nothing to swap; the
+    Skills tab's SELECT works for the party as before.
+- Nov 12, the owner (17:12): "SSJ4 Gogeta and Potara Vegito and let's also implement the Potara mechanic now because I have 2 more
+  character ideas after", then (18:56) "Fusion dance is already a skill so can we make a separate Potara skill because I want to create
+  some new fusions for other chars" (the list of Nov 11: "Vegito as a Potara fusion opened by all four Trials", "Super Saiyan 4 Gogeta as
+  a fusion of Super Saiyan 4 Goku and Vegeta").
+  - The Potara (skill 50, the Fusion Dance's icon in gold): Goku and Vegeta learn it when all four Trials are won (flag 895). Used in a
+    fight with the other in the party and selectable (not in Super 13's fight): a flash, and Vegito plays (record 6, his look 284 as the
+    story's scene sets it) for an hour of his fighting (Dragon Ball Super: the Potara's limit for mortals), through the game's own fusion
+    native (0xA8) from an event list of the mod's (`potara_list`; read through a volatile pointer: the compiler had folded the {1} the
+    build later fills, and the first try ran garbage as a script). His three forms have the fusion bit (flags bit 3: the HUD's timer).
+    Vegito's figures play with the plain fighter's update, which doesn't count a fusion's time, so `potara_tick` counts it as the fusion
+    update (sub_0800E15C) does, once a frame while he plays, and at 0 runs global script 14, which splits him. Global script 503 took
+    Gogeta out by name: it takes out whoever plays (`FUSION_END` edit). `fusion_end` treats Vegito first (a debug build joins him with no
+    limit: only one whose +2 names his dancers counts); Gogeta as a fighter of his own stays in the party meanwhile (`live_fusion`).
+    `potara_pairs` and `POTARA_PAIRS` take more pairs (noted: the owner's Adult Gotenks, GT Goten and Trunks's dance, and a kid Goten and
+    Trunks Potara fusion, from his references).
+  - The Fusion Dance (skill 12, the game's own): Goku and Vegeta learn it after the ending (Goku's is his book's seventeenth place: books
+    have 24 places now, the record's 16 bits and 8 more per character in the bench's spare field, `KNOWN2`). Global script 13 has their
+    branch (unused in the original), its button game and all. As a Super Saiyan 4 with the other knowing it (`fusion_can` lets the dance
+    go from the Super Saiyan 3 class then), done right: Super Saiyan 4 Gogeta (`dance_use`, `fusion_native` on 0xA8), a third of the
+    dance's time (GT: his power burned through it); otherwise Gogeta, or the fat or thin one, as ever.
+  - Gogeta as a fighter of his own keeps his progress: the dance writes his record (the fusion's health, ki, experience, stats and best
+    gear), so his own goes to the bench's last group first (`fused_stash`, his form in a spare byte) and comes back when he is his own
+    fighter again (`fused_restore` in `gogeta_keep`). Guests now have 47 groups (`bench_groups`).
+  - Goku's book: his fourteenth place, the story's locked Super Saiyan (21), is the Potara; 21 is held only while the story locks his Super
+    Saiyan and the story swaps it back itself, so the Skills tab leaves it in its slot.
+- Nov 12, the owner (19:06-19:07): "make sure kid trunks doesn't have saiyan armor future trunks anymore as an outfit, same with adult gohan
+  and teen gohan saiyan armor version, limit it to the future trunks character and the teen gohan character and wire in a better way to
+  switch outfits and don't use a skill either for guest characters since up and down obviously changes the guest character not the
+  outfit", "Do this for Pan too with her outfits so she doesn't have like 4 characters just for each outfit", "Only keep Brapan Bulma+Pan
+  fusion separate". The armors are only Teen Gohan's and Future Trunks's (since 9793b62: Trunks's and Gohan's lists have none, and an old
+  save's Gohan or Trunks in one goes back to his first open look). On Switch Character the guest slot now has fighters and looks
+  (`outfit.c cycle`, `look`): a fighter is a bench group (Broly and Full Power Broly; Pan's five looks; Teen Gohan's purple gi and armor;
+  Future Trunks and his armor; Brapan her own); Up and Down go from fighter to fighter, in the order of each one's first look in the
+  list, to his first open look; L and R go through his own looks; "L/R: Outfit" shows under his name when he has more than one look
+  open. Party characters: Up and Down as before (L and R the same). Tests walk the guest slot with `lib/guestnav.py`.
+- Nov 12, Super Saiyan Blue's look (#170) is on (`BFU_LOOK170=0` builds without): God's red eyes, Blue's pupils and brows, the cyan aura,
+  Blue's bolts, and the glow the owner picked at 19:04 ("1c looks good use that"): `lib/ssb_glow.py` draws a flame round him (32x64, 8
+  frames, its outer rim and a lighter inner line, tongues that sway over his head and licks running up his sides, open at his feet) and a
+  see-through band of light three pixels inside it, a second sprite the GBA blends over the stage (`outfit.c GLOW_BAND`, 6/16 of it over
+  10/16 of the stage). Fight areas keep their own blending in BLDCNT (the Bomber's: 0x1041, BG0 first, sprites second, EVA 12 EVB 0, so
+  the band came out solid): while the glow is up the four layers and backdrop are second targets and no layer is a first one, and the
+  area's own setting comes back when it goes (not during a fade or flash: BLDCNT's brightness modes). The six Blue figures relocked
+  (their faces: BFU_RELOCK, the owner's request of Nov 11).
+- Nov 12, 19:35-19:42, the owner on the glow in the game ("Show transforming and also walking/running with the SSB aura and draft a SSG
+  version too maybe for Goku", "Maybe a pink for Goke Black Rose form too"), then "Auras all look good to lock in after those fixes": the
+  glow has three kinds (`outfit.c glow_kind`, `GLOW_KINDS`): Blue's, Super Saiyan God's (crimson to orange, a gold-white core) and Rose's
+  (magenta to pink, as Rose's power-up aura), each with its own frames and see-through band colour (`build.py GLOW_KINDS`, the nearest
+  palette entries; `glow_band_at`). On by default; `BFU_GLOW_MORE=0` builds Blue's alone.
+- Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a smoother transition". A power-up into a
+  glowing form (Blue, Super Saiyan God, Rose) starts that form's glow from its own start (`outfit.c glow_begin`, after the power-up's aura
+  has its sprite memory; with no room left the glow comes with the form, as before). It comes in over the power-up: nothing for 20
+  frames, then the flame shown on more and more of every 16 frames for 64 frames (spread out: at half, every other frame), then all the
+  time; the see-through band comes with the form. While the power-up plays the fighter's input code doesn't run, so the glow's own draw
+  moves it (`glow_frame`). Blending it in with BLDALPHA was tried first: the fighter and the power-up's aura faded with it (the power-up
+  sets the blend registers for its flash), so the glow leaves them alone until the form arrives. A power-up cut short drops it.
+- Nov 12, the Fusion Dance as Super Saiyan 4 never gave Super Saiyan 4 Gogeta: `dance_use` only starts global script 13, which plays the
+  dance and its button game over seconds and calls the fusion native at its end, and the "Super Saiyan 4 dance" mark was cleared as soon
+  as the script started. Now it is noted for the native (`DANCE_SSJ4`, `DANCE_AT`, good for a minute, only after the ending) and taken
+  there. The same timing kept Gogeta's own look wrong: the native stashed his progress after the script had already put the outcome's
+  Gogeta in his record, so a wrong dance left the debug build's Gogeta the fat one for good. His own form is noted when the dance starts
+  (`DANCE_FORM`) and stashed with his progress. `test_fusion.py`: section 7 presses the button game's moves one at a time and sets a right
+  dance's outcome at the native (it used to wait for a breakpoint the game never reached, and read "not hit" as a hit: the test hung);
+  section 2 checks Gogeta's look after a wrong dance.
+- Nov 12, 19:42, the owner: "Gokus hair turns SSJ3 in the SSB transformation if you can fix that, and also change the Vegeta and Gogeta SSB
+  transformation pose and make them not raise their hands but do the normal pose". Blue's change (slot 10) was the Super Saiyan figure's
+  own: Goku's is the change into Super Saiyan 3 (his hair grows), Vegeta's his power-up, arms up (`_powerup`). Now
+  (`lib/sprites.py change_slot`, `build.py SSB_CHANGE`) it is the base figure's change into Super Saiyan, the pose every Super Saiyan
+  change has, with the hair blue: BF's change draws frame 1 with his black hair and frames 2-9 gold in the same pose, so the hair is found
+  against frame 1 (`lib/ssb.py piece_unders`, `tint_piece`, Blue's own rule). Then his Blue stance. Armour Vegeta's from LoG2's change
+  (gold frames 6-10, against the black-haired 0). Gogeta's figure has no change of its own: his power-up's crouch, fists at his sides, ten
+  times, then his stance (`ssb.gogeta_frames`; it was the crouch twice and the shout, arms up, eight times). No gold left in any of them
+  (read from the ROM). The six Blue figures relocked (the owner's request).
+- Nov 12, 19:42 and 19:54, the owner: "noticed SSJ2 Teen Gohan idle pose his hands are raised up instead of down, if you can fix that to
+  standard", "Make sure both Teen Gohan outfits get that fix". The Saiyan armor's Super Saiyan 2 (LoG2's r55) stands with his arms out
+  and his hands up at his hips. Its stance is now the armor's Super Saiyan stance (r56, arms down) with r55's own head for the frame
+  (`teen.armor2`, `armor_ss2_idle`: placed by the face, within a pixel of where the records put it; the first head's gold and its
+  outline gone where the second has none; checked for gold left over, body changed and holes). The purple gi's Super Saiyan 2 already
+  stood with his arms down (`teen.ss2`: r55's head on the Super Saiyan frame), checked in the game.
+- Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
+  and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
+  else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
+  nothing on that map above 629. `test_dragon.py` flies as Broly and checks no sprite's tiles take in the marker's.
+- Nov 12, the owner: "SSJ2 ki drain still seems bugged". Measured in a fight as played (no pokes, Goku's 90 EP): Super Saiyan's bar ran
+  out in 33 seconds and he powered down; Super Saiyan 2's ran out in about 10 and he stayed in Super Saiyan 2 with it empty, for good.
+  `ss_tick`'s faster drain set an empty pool back to 1 each time (`*pool > 4 ? *pool - 3 : 1`), and the game powers down only when it
+  finds 0. An empty pool stays empty now (`test_nov10.py` 2b: Super Saiyan 2 with 30 left powers down within 10 seconds).
 - Nov 11, 21:13-22:10, the full suite on 978966a: 36 of its 37 tests with no failure (1,303 checks passed). `test_moves.py` failed one check, "the Super Dragon
   Fist hits in Super Saiyan 4", and it was the check: the Bomber it hits is given 9,000 health and the move takes 10,690, so he died and
   the test read whatever took his place in memory (a huge negative number; an older build happened to leave 0 there, which passed). The

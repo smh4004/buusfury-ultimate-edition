@@ -74,6 +74,41 @@ def base_under(rom, ss, base):
     return {k: v[1] for k, v in out.items()}
 
 
+def piece_unders(rom, fp, ref):
+    """Blue's change (Nov 12, the owner: "Gokus hair turns SSJ3 in the SSB transformation", "make them not raise their hands but do the
+    normal pose"): the base figure's own change (slot 10) has the Super Saiyan frames, and before them the same pose with his black hair.
+    {piece index: the pixels of frame `ref` (that black-haired frame) under the piece} for each piece of frame `fp` (file offsets), found
+    as base_under finds them."""
+    import goku_black
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    canvas = np.zeros((64 + 2 * O, 64 + 2 * O), np.uint8)
+    for x, y, t, flip in _pieces(rom, ref):
+        if flip: t = t[:, ::-1]
+        h, w = t.shape; c = canvas[O + y:O + y + h, O + x:O + x + w]; m = t[:c.shape[0], :c.shape[1]] != 0
+        c[m] = t[:c.shape[0], :c.shape[1]][m]
+    out = {}
+    for i in range(u(fp)):
+        o = fp + 4 + 16 * i; x, y, w, h = struct.unpack_from('<bbBB', rom, o)
+        if not 0 < u(o + 12) - BASE < len(rom) or not w or not h: continue
+        t = goku_black.tiles(rom, u(o + 12) - BASE, w, h); flip = bool(struct.unpack_from('<H', rom, o + 10)[0] & 0x1000)
+        body = (t != 0) & ~np.isin(t, NOT_BODY); best = None
+        for dy, dx in sorted(((dy, dx) for dy in range(-SHIFT, SHIFT + 1) for dx in range(-SHIFT, SHIFT + 1)), key=lambda d: abs(d[0]) + abs(d[1])):
+            under = canvas[O + y + dy:O + y + dy + h, O + x + dx:O + x + dx + w]
+            under = under[:, ::-1] if flip else under
+            score = ((under == t) & body).sum() / max(1, body.sum())
+            if best is None or score > best[0]: best = (score, under.copy())
+        out[i] = best[1]
+    return out
+
+
+def tint_piece(img, under, to, sides=False, eyes=False, iris=IRIS):
+    """One piece's hair blue against `under` (tint's rule for a piece whose base pixels are known)."""
+    hair = hair_mask(img, under, list(to), sides)
+    out = img.copy()
+    for k, v in to.items(): out[hair & (img == k)] = v
+    return face(img, out, under, to, iris) if eyes else out
+
+
 def eye_whites(img):
     """The whites of the eyes: white (2, also the hair's brightest) beside the green of an eye (Nov 10, the owner: "Fix some of SSB Goku
     and vegetas face pixels being blue": the hair rules took them, and the face pixels near them, for hair)."""
@@ -273,8 +308,9 @@ def actor_frames(rom, actor):
 
 def gogeta_frames(rom, to, lengths=None, eyes=False):
     """{slot: [[canvas, ...] for views]} of Blue Gogeta: actor 93's frames (goku_black.actor_frames canvases) with his hair blue. `to` is
-    {Goku gold index: blue index} (build.SSB_HAIR through the indexer). His change (slot 10) is his power-up's (slot 13) two poses,
-    the crouch twice and the shout eight times, then his stance: a retail change's 11 frames."""
+    {Goku gold index: blue index} (build.SSB_HAIR through the indexer). His change (slot 10): his figure has none of its own, so his
+    power-up's (slot 13) crouch, fists at his sides, ten times, then his stance: a retail change's 11 frames (until Nov 12 the crouch twice
+    and the shout, arms up, eight times)."""
     frames = actor_frames(rom, GOGETA)
     lut = {g: to[k] for g, k in GOGETA_GOLD.items()}
     lut.update({k: to[k] for k in (202, 201, 16)})
@@ -286,5 +322,5 @@ def gogeta_frames(rom, to, lengths=None, eyes=False):
     for s, src in GOGETA_FILL.items():
         if s not in out: out[s] = out[src]
     p13, p0 = out[13], out[0]
-    out[10] = [[p13[v][0]] * 2 + [p13[v][1]] * 8 + [p0[v][0]] for v in range(3)]
-    return out
+    out[10] = [[p13[v][0]] * 10 + [p0[v][0]] for v in range(3)]       # the crouch, fists at his sides, ten times, then his stance (Nov 12,
+    return out                                                           # the owner: "not raise their hands"; it had the shout, arms up)

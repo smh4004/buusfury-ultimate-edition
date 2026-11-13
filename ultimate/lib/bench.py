@@ -16,6 +16,11 @@ USED = RAM + 16                          # a bit per group
 FLAGS2 = RAM + 24                        # more flags 32-63
 MASTERY = RAM + 28                       # 22 bytes: one per (character, tier), then Goku's Kamehameha count
 ENTRIES = RAM + 64                       # 48 entries of 22 bytes
+SPARE = RAM + 50                         # 14 bytes: the guests' mastery (outfit.c guest_tiers, build.py GUEST_MASTERY), then at 13 Gogeta's form + 1
+GUEST_MASTERY = SPARE                    # Future Trunks's Super Saiyan, Teen Gohan's Super Saiyan and 2, Goku Black's Rose (Nov 12)
+KNOWN2 = SPARE + 4                       # 8 bytes, one per character: their skill books' places 16-23 (Goku's Fusion Dance is his 17th)
+STASH_FORM = SPARE + 13                  # while a dance has Gogeta's record, his own form + 1 (his progress in the last entry: outfit.c fused_stash)
+STASH_GROUP = GROUPS - 1
 ENTRY = 22
 
 

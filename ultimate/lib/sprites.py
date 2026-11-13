@@ -292,6 +292,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         if 'tint_of' in a:                                 # a recoloured copy of an actor (built first): Kaioken's red
             src = a['tint_of']; src = table[src] if isinstance(src, int) else table[ids[src]]
             rec = (viewed_actor if a.get('by_view') else tinted_actor)(ins, rom, src - BASE, a['tint'])     # by_view: the tint sees the view
+            if 'change' in a: change_slot(ins, rom, rec, a['change'], table[a['change']['actor']] if isinstance(a['change']['actor'], int) else table[ids[a['change']['actor']]])
             for slot, frm in a.get('fill', {}).items():    # a slot the copy's behaviour may play that its figure never had: another of its own
                 if int(slot) < rec[0] and not struct.unpack_from('<I', rec, 0x54 + 4 * int(slot))[0]:
                     struct.pack_into('<I', rec, 0x54 + 4 * int(slot), struct.unpack_from('<I', rec, 0x54 + 4 * frm)[0])
@@ -597,6 +598,36 @@ def tinted_actor(ins, rom, rec_at, remap):
             anims[ap] = ins.put(struct.pack('<I', k) + struct.pack('<%dI' % len(ptrs), *ptrs))
         struct.pack_into('<I', rec, 0x54 + 4 * s, anims[ap])
     return rec
+
+
+def change_slot(ins, rom, rec, ch, base_at):
+    """Super Saiyan Blue's change (slot 10 of the record `rec`; Nov 12, the owner: "Gokus hair turns SSJ3 in the SSB transformation", and
+    for Vegeta "do the normal pose"): the base figure's own change (`base_at`'s slot 10), its frames ch['seq'] (a number: that frame of the
+    change, 'stance': the record's own stance) with each piece through ch['tint'](piece, the pixels of change frame ch['ref'] under it)."""
+    import ssb
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    bap = u(base_at - BASE + 0x54 + 40) - BASE; sap = struct.unpack_from('<I', rec, 0x54)[0] - BASE
+    made = {}
+    def frame(fp, ref):
+        if fp in made: return made[fp]
+        unders = ssb.piece_unders(rom, fp, ref)
+        k = u(fp); body = bytearray(rom[fp:fp + 4 + 16 * k])
+        for j in range(k):
+            w, h = body[4 + 16 * j + 2], body[4 + 16 * j + 3]; tp = u(fp + 4 + 16 * j + 12) - BASE
+            t, size = u(tp), u(tp + 4)
+            raw = rom[tp + 8:tp + 8 + size] if t == 0 else bytes(decompress_stream(rom, tp + 8, size)[0])
+            img = np.frombuffer(bytes(raw[:w * h]), np.uint8).reshape(h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+            data = np.asarray(ch['tint'](img, unders.get(j)), np.uint8).reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
+            struct.pack_into('<I', body, 4 + 16 * j + 12, ins.put(struct.pack('<II', 0, len(data)) + data))
+        made[fp] = ins.put(bytes(body))
+        return made[fp]
+    ptrs = []
+    for f in ch['seq']:
+        for d in range(4):
+            if f == 'stance': ptrs.append(u(sap + 4 + 4 * d)); continue
+            ptrs.append(frame(u(bap + 4 + 16 * f + 4 * d) - BASE, u(bap + 4 + 16 * ch['ref'] + 4 * d) - BASE))
+    struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', len(ch['seq'])) + struct.pack('<%dI' % len(ptrs), *ptrs)))
 
 
 def viewed_actor(ins, rom, rec_at, fn):

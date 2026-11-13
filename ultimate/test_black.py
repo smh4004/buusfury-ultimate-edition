@@ -3,6 +3,7 @@
   python3 ultimate/test_black.py [rom] [work dir]
 Picks him, walks, uses each move, becomes Rose and back; lays the screens out in sheets to look at."""
 import json, os, subprocess, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')); import guestnav     # the guest slot's keys (Nov 12)
 from PIL import Image
 ROM = sys.argv[1] if len(sys.argv) > 1 else 'ultimate/out/BFU_debug_PERSONAL_USE_ONLY.gba'
 D = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='black'); os.makedirs(D, exist_ok=True)
@@ -44,7 +45,7 @@ def use(skill, hold=10, then=40, tag=None, sheet='moves', shots=1, gap=12, tap=F
     if tap: send('keys')                         # a blast flies when B is let go
     for i in range(shots): snap(sheet, '%s %d' % (tag or skill, i)); send('run %d' % gap)
     send('keys', 'run %d' % then)
-send('guardon 0x09000000', *route); send('tap A 60', 'tap A 60', 'run 30', *['tap RIGHT 40'] * 5, *['tap DOWN 40'] * GUESTS.index('goku_black'), 'run 30'); snap('picker', 'black'); send('tap UP 40', 'run 30'); snap('picker', 'hercule'); send('tap DOWN 40', 'run 30', 'tap A 200', 'run 60')
+send('guardon 0x09000000', *route); send('tap A 60', 'tap A 60', 'run 30', *['tap RIGHT 40'] * 5, *guestnav.keys('goku_black'), 'run 30'); snap('picker', 'black'); send('tap UP 40', 'run 30'); snap('picker', 'hercule'); send('tap DOWN 40', 'run 30', 'tap A 200', 'run 60')
 check('picked Goku Black', form() == forms['goku_black'])
 rec = mem(R, 26); skills = [(rec[3] >> 8 * i) & 255 for i in (1, 2, 3)] + [rec[4] & 255, rec[4] >> 8 & 255]
 check('his moves: blast, Instant Transmission, Black Kamehameha, Rose', skills[:4] == [7, 14, BLACK_KAME_SKILL, ROSE_SKILL] and rec[3] & 255 == 4)

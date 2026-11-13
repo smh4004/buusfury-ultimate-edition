@@ -14,6 +14,7 @@ forms = json.load(open(OUT + '/BFU_debug_zone.map.json'))['forms']
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
 import bench as BN                                   # the guest bench (lib/bench.py)
+import guestnav                                      # the guest slot's keys (lib/guestnav.py)
 G = 0x03001068; RECS = 0x03001560; REC = 0x68; R8 = RECS + 8 * REC; GEN_AT = 0x4F1; BENCH = BN.RAM; BENCH_OFFSET = BN.V2_OFFSET
 fails = []
 def check(name, ok):
@@ -69,7 +70,10 @@ OPEN = ['broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'krillin',
         'trunks_armor']                  # Future Trunks's Saiyan armor (874)
 OPEN_V1 = ['broly', 'broly_fp', 'android13', 'piccolo', 'tien', 'yamcha', 'pikkon', 'hercule']       # what the build before version 2 had open
 def go(a, b, open_=OPEN):
-    """Down presses from guest a to guest b, round the list."""
+    """From guest look a to look b (Nov 12: Up and Down from fighter to fighter, L and R through his looks: lib/guestnav.py)."""
+    return guestnav.keys(b, start=a, open_=open_, wait=30)
+def go_old(a, b, open_=OPEN):
+    """Down presses from guest a to guest b, round the list, as the builds before Nov 12's evening did it (the old ROMs below)."""
     return DOWN((open_.index(b) - open_.index(a)) % len(open_))
 ORDER = ['broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'android17', 'android18', 'krillin', 'videl', 'majin_buu', 'super_janemba', 'kid_buu']
 
@@ -127,7 +131,7 @@ check('picking without changing outfit swaps nothing', a['gen'] == 0 and a['out'
 check('and the save stays clean', set(open(sav, 'rb').read()[0x1A20:]) == {255})
 base_stats = a
 
-s1 = hub + poke_rec(exp=111111, stat=11, gear=ROW, hp=77) + GUEST + DOWN(3) + CONFIRM + state('b')
+s1 = hub + poke_rec(exp=111111, stat=11, gear=ROW, hp=77) + GUEST + go('broly', 'piccolo') + CONFIRM + state('b')
 out = fresh(s1); b = read('b')
 check('first swap: Piccolo on', 'bad pc' not in out and b['form'] == forms['piccolo'])
 check('first swap: level and stats start from the guest who was out', b['exp'] == 111111 and b['stat'] == 11)
@@ -144,23 +148,23 @@ check('the bench reached the save, in game 1\'s own sector of the flash', head[0
 check('other games\' benches and the end of the save are untouched, and nothing where version 2 kept it',
       set(f[BN.sector(0) + BN.SIZE:]) == {255} and set(eeprom(sav)[BENCH_OFFSET:0x2000]) == {255})
 
-s2 = talk_at(s1, *zone26.HUB_AT) + poke_rec(exp=222222, stat=22, hp=88) + GUEST + UP(3) + CONFIRM + state('c')
+s2 = talk_at(s1, *zone26.HUB_AT) + poke_rec(exp=222222, stat=22, hp=88) + GUEST + go('piccolo', 'broly') + CONFIRM + state('c')
 out = fresh(s2); c = read('c')
 check('back to Broly: his own progress returns, rested', 'bad pc' not in out and c['form'] == forms['broly'] and c['exp'] == 111111 and c['stat'] == 11 and c['hp'] == c['maxhp'] and c['gear'][SLOT] == ROW and c['bag'] == (ROW | 9 << 28,))
-s3 = talk_at(s2, *zone26.HUB_AT) + GUEST + DOWN(1) + CONFIRM + state('e')
+s3 = talk_at(s2, *zone26.HUB_AT) + GUEST + go('broly', 'broly_fp') + CONFIRM + state('e')
 out = fresh(s3); e = read('e')
 check('Full Power is still Broly', 'bad pc' not in out and e['form'] == forms['broly_fp'] and e['exp'] == 111111 and e['gen'] == c['gen'] and e['gear'][SLOT] == ROW)
-s4 = talk_at(s3, *zone26.HUB_AT) + GUEST + DOWN(2) + CANCEL + state('f')
+s4 = talk_at(s3, *zone26.HUB_AT) + GUEST + go('broly_fp', 'piccolo') + CANCEL + state('f')
 out = fresh(s4); f = read('f')
 check('B leaves everything alone', 'bad pc' not in out and f['form'] == forms['broly_fp'] and f['exp'] == 111111 and f['gen'] == c['gen'])
-s5 = talk_at(s4, *zone26.HUB_AT) + GUEST + DOWN(2) + CONFIRM + state('h')
+s5 = talk_at(s4, *zone26.HUB_AT) + GUEST + go('broly_fp', 'piccolo') + CONFIRM + state('h')
 out = fresh(s5); h = read('h')
 check('Piccolo\'s progress is his', 'bad pc' not in out and h['form'] == forms['piccolo'] and h['exp'] == 222222 and h['stat'] == 22 and h['hp'] == h['maxhp'] and h['gear'] == EMPTY and h['bag'] == (ROW,))
 # Only the guest who is out wears anything, so one piece worn by two fighters goes on whichever of them comes out, and is never in two places.
-g1 = talk_at(s5, *zone26.HUB_AT) + wear(ROW) + GUEST + UP(3) + CONFIRM + state('j')
+g1 = talk_at(s5, *zone26.HUB_AT) + wear(ROW) + GUEST + go('piccolo', 'broly') + CONFIRM + state('j')
 out = fresh(g1); j = read('j')
 check('shared gear goes on the fighter who comes out', 'bad pc' not in out and j['form'] == forms['broly'] and j['gear'][SLOT] == ROW and j['bag'] == (ROW | 9 << 28,))
-g2 = talk_at(g1, *zone26.HUB_AT) + GUEST + DOWN(3) + CONFIRM + state('k')
+g2 = talk_at(g1, *zone26.HUB_AT) + GUEST + go('broly', 'piccolo') + CONFIRM + state('k')
 out = fresh(g2); k = read('k')
 check('and moves with the next swap', 'bad pc' not in out and k['form'] == forms['piccolo'] and k['gear'][SLOT] == ROW and k['bag'] == (ROW | 9 << 28,))
 walk = s5 + ['keys RIGHT', 'run 30', 'keys', 'tap A 8', 'run 30', 'shot piccolo_walks'] + state('w')
@@ -175,7 +179,7 @@ def from_save(lines, src=None):
 BOOT = ['run 600', 'tap START 60', 'tap START 60', 'tap A 90', 'tap A 120', 'tap A 200', 'tap A 200', 'run 300']
 out = from_save(BOOT + state('r')); r = read('r')
 check('reload: Piccolo as saved', 'bad pc' not in out and r['form'] == forms['piccolo'] and r['exp'] == h['exp'] and r['gen'] == h['gen'])
-shutil.copy(sav, after); back = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + UP(3) + CONFIRM + state('i')
+shutil.copy(sav, after); back = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + go('piccolo', 'broly') + CONFIRM + state('i')
 out = from_save(back); i = read('i')
 check('reload: Broly comes back from the save', 'bad pc' not in out and i['form'] == forms['broly'] and i['exp'] == 111111 and i['stat'] == 11 and i['gear'][SLOT] == ROW and i['bag'] == (ROW | 9 << 28,))
 
@@ -183,13 +187,13 @@ check('reload: Broly comes back from the save', 'bad pc' not in out and i['form'
 # newer and full of nonsense: the next swap must read the save's bench, not this.
 bad = []
 for k in range(4): bad.append('poke %08X %08X' % (BENCH + 4 + k * 4, 0x00123456 + k))
-shutil.copy(sav, after); s6 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + bad + GUEST + UP(3) + CONFIRM + state('n')
+shutil.copy(sav, after); s6 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + bad + GUEST + go('piccolo', 'broly') + CONFIRM + state('n')
 out = from_save(s6); n = read('n')
 check('a stale bench in memory is ignored', 'bad pc' not in out and n['exp'] == 111111 and n['gear'][SLOT] == ROW)
 
 # 6. Damage: a corrupt bench is an empty bench, not a crash, and nothing else in the save changes.
 broken = d + '/broken.sav'; raw = bytearray(open(sav, 'rb').read()); raw[BN.sector(0) + 40] ^= 0x55; open(broken, 'wb').write(raw)      # any byte of the bench will do
-shutil.copy(broken, after); s7 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + UP(3) + CONFIRM + state('q')
+shutil.copy(broken, after); s7 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + go('piccolo', 'broly') + CONFIRM + state('q')
 out = from_save(s7, broken); q = read('q')
 check('a damaged bench starts empty', 'bad pc' not in out and q['form'] == forms['broly'] and q['exp'] == h['exp'] and q['gear'] == EMPTY)
 
@@ -197,14 +201,14 @@ check('a damaged bench starts empty', 'bad pc' not in out and q['form'] == forms
 t1 = hub + poke_rec(exp=500016, stat=9, gear=ROW) + GUEST + go('broly', 'tien') + CONFIRM + state('t1')
 out = fresh(t1); a = read('t1')
 check('small: Tien on, and gear back in the bag', 'bad pc' not in out and a['form'] == forms['tien'] and a['bag'] == (ROW,))
-t2 = talk_at(t1, *zone26.HUB_AT) + poke_rec(exp=600000, stat=31) + GUEST + DOWN(3) + CONFIRM + state('t2')
+t2 = talk_at(t1, *zone26.HUB_AT) + poke_rec(exp=600000, stat=31) + GUEST + go('tien', 'hercule') + CONFIRM + state('t2')
 out = fresh(t2); a = read('t2')
 check('small: Hercule on, level with the guest who was out', 'bad pc' not in out and a['form'] == forms['hercule'] and a['exp'] == 600000)
-t3 = talk_at(t2, *zone26.HUB_AT) + poke_rec(exp=700000, stat=41, hp=5) + ['poke8 %08X 3C' % (BENCH + 12)] + GUEST + UP(3) + CONFIRM + state('t3') + ['dump m %08X 4' % BN.FLAGS]
+t3 = talk_at(t2, *zone26.HUB_AT) + poke_rec(exp=700000, stat=41, hp=5) + ['poke8 %08X 3C' % (BENCH + 12)] + GUEST + go('hercule', 'tien') + CONFIRM + state('t3') + ['dump m %08X 4' % BN.FLAGS]
 out = fresh(t3); a = read('t3')
 check('small: back to Tien, his own progress, rested', 'bad pc' not in out and a['form'] == forms['tien'] and a['exp'] == 600000 and a['stat'] == 31 and a['hp'] == a['maxhp'])
 check('the save stops where it should: one bench, in its sector', set(open(sav, 'rb').read()[BN.sector(0) + BN.SIZE:]) == {255} and set(eeprom(sav)[BENCH_OFFSET:0x2000]) == {255})
-shutil.copy(sav, after); t4 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + DOWN(3) + CONFIRM + state('t4') + ['dump m %08X 4' % BN.FLAGS]
+shutil.copy(sav, after); t4 = talk_at(BOOT, *zone26.HUB_AT, sav=after) + GUEST + go('tien', 'hercule') + CONFIRM + state('t4') + ['dump m %08X 4' % BN.FLAGS]
 out = from_save(t4); a = read('t4')
 check('small: Hercule comes back from the save', 'bad pc' not in out and a['form'] == forms['hercule'] and a['exp'] == 700000 and a['stat'] == 41)
 check('the saved flags come back too', open(d + '/m.bin', 'rb').read()[0] == 0x3C)
@@ -262,9 +266,9 @@ if OLD_SLOT:
         if os.path.exists(sav): os.remove(sav)
         return run(lines, sav, OLD_SLOT)
     maxhp = lambda v: ['poke8 %08X %02X' % (R8 + 0x18, v & 255), 'poke8 %08X %02X' % (R8 + 0x19, v >> 8)]
-    m1 = hub + poke_rec(exp=333333, stat=33, gear=ROW) + maxhp(345) + ['poke8 %08X %02X' % (R8 + 0x2E + i, v) for i, v in enumerate((3, 3, 2, 2, 1, 1))] + TO_GUEST + go('broly', 'piccolo', OPEN_V1) + CONFIRM
-    m2 = talk_at(m1, *zone26.HUB_AT) + poke_rec(exp=444448, stat=44) + TO_GUEST + go('piccolo', 'tien', OPEN_V1) + CONFIRM
-    m3 = talk_at(m2, *zone26.HUB_AT) + poke_rec(exp=555552, stat=55) + TO_GUEST + go('tien', 'yamcha', OPEN_V1) + CONFIRM + state('m3')
+    m1 = hub + poke_rec(exp=333333, stat=33, gear=ROW) + maxhp(345) + ['poke8 %08X %02X' % (R8 + 0x2E + i, v) for i, v in enumerate((3, 3, 2, 2, 1, 1))] + TO_GUEST + go_old('broly', 'piccolo', OPEN_V1) + CONFIRM
+    m2 = talk_at(m1, *zone26.HUB_AT) + poke_rec(exp=444448, stat=44) + TO_GUEST + go_old('piccolo', 'tien', OPEN_V1) + CONFIRM
+    m3 = talk_at(m2, *zone26.HUB_AT) + poke_rec(exp=555552, stat=55) + TO_GUEST + go_old('tien', 'yamcha', OPEN_V1) + CONFIRM + state('m3')
     out = old(m3); a = read('m3')
     check('old build: Yamcha out after Piccolo and Tien', 'bad pc' not in out and a['form'] == forms['yamcha'])
     check('old build saved a version 1 bench', struct.unpack_from('<I', eeprom(sav), BENCH_OFFSET)[0] == BN.V1_MAGIC)
@@ -293,9 +297,9 @@ if OLD_V2:
         if os.path.exists(sav): os.remove(sav)
         return run(lines, sav, OLD_V2)
     V2_MASTERY = 0x0203F000 + 20 + 20 * 22                     # version 2 in memory: its last group's 22 bytes
-    w1 = hub + poke_rec(exp=313131, stat=13, gear=ROW) + GUEST + go('broly', 'piccolo') + CONFIRM
-    w2 = talk_at(w1, *zone26.HUB_AT) + poke_rec(exp=424242, stat=24) + GUEST + go('piccolo', 'goku_black') + CONFIRM
-    w3 = talk_at(w2, *zone26.HUB_AT) + poke_rec(exp=535353, stat=35) + ['poke8 %08X FA' % V2_MASTERY, 'poke8 %08X 07' % (V2_MASTERY + 21)] + GUEST + go('goku_black', 'roshi') + CONFIRM + state('w3')
+    w1 = hub + poke_rec(exp=313131, stat=13, gear=ROW) + GUEST + go_old('broly', 'piccolo') + CONFIRM
+    w2 = talk_at(w1, *zone26.HUB_AT) + poke_rec(exp=424242, stat=24) + GUEST + go_old('piccolo', 'goku_black') + CONFIRM
+    w3 = talk_at(w2, *zone26.HUB_AT) + poke_rec(exp=535353, stat=35) + ['poke8 %08X FA' % V2_MASTERY, 'poke8 %08X 07' % (V2_MASTERY + 21)] + GUEST + go_old('goku_black', 'roshi') + CONFIRM + state('w3')
     out = old2(w3); a = read('w3')
     check('Nov 12 build: Roshi out after Piccolo and Goku Black', 'bad pc' not in out and a['form'] == forms['roshi'])
     check('Nov 12 build saved a version 2 bench in the first 8 KB', struct.unpack_from('<I', eeprom(sav), BENCH_OFFSET)[0] == BN.V2_MAGIC)

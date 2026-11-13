@@ -535,6 +535,56 @@ def made(form):
             raise Off('Teen Gohan %s, animation %d direction %d frame %d: not the side view mirrored in the purple record' % (form, k, d, f))
         return px[:, ::-1], (16 - w - x, y, w, h)
     return source
+# The Saiyan armor's Super Saiyan 2 stance (Nov 12, the owner: "noticed SSJ2 Teen Gohan idle pose his hands are raised up instead of
+# down, if you can fix that to standard"): r55's idle stands with his arms out and the hands up at his hips; the armor's Super Saiyan
+# (r56) stands with them down. The Super Saiyan stance with r55's own head for the frame: placed on it by the face (skin and eyes), the
+# first head's gold gone, the second head's gold, its outline, face and eyes (what hangs together with its gold above the shoulders) on.
+def head_only(c):
+    """The head of an armor frame: its gold and the face and outline that hang together with it, no lower than 7 rows under the gold."""
+    gold = GOLDC[c]
+    if not gold.any(): return gold
+    gy = np.where(gold.any(1))[0]; near = np.zeros(c.shape, bool); near[:gy.max() + 7] = True
+    h = F.flood(gold, CORE[c] & near, True)
+    return h | F.ringed(NEUTRAL[c] & ~h, h)
+def armor_ss2_idle(d, f):
+    """Frame f, view d of the armor's Super Saiyan 2 stance. -> canvas. Off if it can't be made right."""
+    s1, s2_raw = get('S1', 0, d, f), get('S2', 0, d, f)
+    if s1 is None or s2_raw is None: raise Off('no frame')
+    # By the face: the two records draw it a little differently (r55's is shouting), so the offset whose skin and eyes agree most, and
+    # it must be within a pixel of where the records put it (they place their frames alike). From behind, no face: where they put it.
+    o, eq, meet, nxt = F.witness(s1, np.where(head_only(s2_raw), s2_raw, 0), F.cls(SKIN_S, EYES_S), 2)
+    if meet < 8: o = (0, 0)
+    elif abs(o[0]) > 1 or abs(o[1]) > 1 or eq <= nxt: raise Off("r55's head doesn't sit on r56's stance (%+d%+d, %d of %d, next %d)" % (*o, eq, meet, nxt))
+    s2 = F.shift(s2_raw, *o); h1, h2 = head_only(s1), head_only(s2)
+    out = s1.copy()
+    out[h1 & ~h2 & (GOLDC | BROWN)[s1]] = 0           # the first head's hair (gold, and its brown outline) where the second has none
+    out[h2] = s2[h2]
+    bad = []
+    if (GOLDC[out] & ~h2).sum(): bad.append('%d pixels of the first head\'s gold are left' % (GOLDC[out] & ~h2).sum())
+    lost = (s1 != 0) & ~(h1 | h2) & (out != s1)
+    if lost.sum(): bad.append('%d pixels of the body changed' % lost.sum())
+    new_holes = F.holes(out) & ~F.holes(s1) & ~F.holes(s2)
+    if new_holes.sum(): bad.append('%d holes' % new_holes.sum())
+    if bad: raise Off('Teen Gohan armor Super Saiyan 2 stance, view %d frame %d: %s' % (d, f, '; '.join(bad)))
+    return out
+BROWN = F.cls(BROWN_S)
+def armor2():
+    """sprites.log2_anim's frame source for the armor's Super Saiyan 2 figure (actors.json gohan_armor_ss2_art): its stance (r55's
+    animation 0) made by armor_ss2_idle, in r55's own box for the frame (moved to take the head in); every other frame r55's own (None)."""
+    def source(rec, k, d, f):
+        if rec != REC['S2'] or k != 0: return None
+        nv = 1 if one_view('S2', 0) else 3
+        v = min(d, nv - 1); box = L.raw(REC['S2'], 0, v, f)[:4]
+        px, (x, y, w, h) = cut(armor_ss2_idle(v, f), box)
+        a2, a = (L.raw(REC['S2'], 0, e, f)[5] & 0x10000000 for e in (v, d))
+        if v == d or nv == 1:
+            if a: raise Off('Teen Gohan armor Super Saiyan 2 stance, direction %d frame %d: r55 mirrors it' % (d, f))
+            return px, (x, y, w, h)
+        r2, r3 = L.raw(REC['S2'], 0, v, f), L.raw(REC['S2'], 0, d, f)
+        if d != 3 or a2 or not a or not np.array_equal(r3[4], r2[4][:, ::-1]) or (r3[0], r3[1]) != (16 - r2[2] - r2[0], r2[1]):
+            raise Off('Teen Gohan armor Super Saiyan 2 stance, direction %d frame %d: not the side view mirrored in r55' % (d, f))
+        return px[:, ::-1], (16 - w - x, y, w, h)
+    return source
 if __name__ == '__main__':
     import os
     from PIL import Image, ImageDraw

@@ -6,6 +6,8 @@ typedef unsigned char u8; typedef unsigned short u16; typedef unsigned int u32;
 #define KEYS_NEW (*(volatile u16 *)0x03003304)
 #define KEY_UP 0x40
 #define KEY_DOWN 0x80
+#define KEY_R 0x100
+#define KEY_L 0x200
 #define RECORDS ((u8 *)0x03001560)
 #define RECORD_SIZE 0x68
 #define FORM_OF(c) (RECORDS[(c) * RECORD_SIZE + 0x14])
@@ -786,6 +788,7 @@ static void arena_keep(void) {
 }
 static void crackle(void);
 static void glow_tick(void);
+static void potara_tick(void);
 static void bossbar_tick(void);
 void *player_input(void) {
     u16 *keys = (u16 *)0x03003300;
@@ -793,6 +796,7 @@ void *player_input(void) {
     arena_keep();
     crackle();
     glow_tick();
+    potara_tick();
     bossbar_tick();
     if (FRAMES % 120 == 0) pouch_heal();
     keys = quick_wheel(keys);
@@ -818,30 +822,82 @@ static void snapshot(void *obj) {
     SNAP_OWNER = (u32)obj ^ SNAP_MAGIC;
 }
 
-static void cycle(void *obj, int dir) {
-    int sel = *field(obj, OBJ_SELECTED), c = *field(obj, OBJ_LIST + sel * 8), i, at = -1, n, first, cur;
-    void *sprite = (void *)*field(obj, OBJ_LIST + 4 + sel * 8);
-    if (c < 0 || c > 8) return;
-    first = outfit_index[c][0]; n = outfit_index[c][1]; cur = FORM_OF(c);
+static void wear(void *obj, int c, const struct outfit *o) {
+    void *sprite = (void *)*field(obj, OBJ_LIST + 4 + *field(obj, OBJ_SELECTED) * 8);
+    snapshot(obj);
+    /* back to the look the screen opened on: its own variant (Goku's halo while he is dead is form 2, the "also" of his gi) */
+    FORM_OF(c) = (o->also != 255 && SNAP_FORMS[c] == o->also && c != 8) ? o->also : o->form;
+    guest_sync();
+    Sprite_SetCharacter(sprite, Form_Sprite((void *)(form_table + FORM_OF(c) * 24)));
+    Sprite_SetFacing(sprite, 1);
+    Sprite_SetBehaviour(sprite, (void *)0x03001B58);
+    PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
+}
+static int worn_at(int c) {                    /* the outfit (its place in c's list) c wears, or -1 (transformed, or a story form) */
+    int first = outfit_index[c][0], n = outfit_index[c][1], i, at = -1, cur = FORM_OF(c);
     for (i = 0; i < n; i++) if (outfit_table[first + i].form == cur || outfit_table[first + i].also == cur) at = i;
-    if (at < 0 || n < 2) return;       /* transformed or story form: leave it alone */
+    return at;
+}
+/* The guest slot (Nov 12, the owner: "wire in a better way to switch outfits ... since up and down obviously changes the guest character
+   not the outfit", "Do this for Pan too with her outfits so she doesn't have like 4 characters just for each outfit", "Only keep Brapan
+   Bulma+Pan fusion separate"): its list holds every look of every guest; a fighter is a bench group (bench_group: Pan's five looks, Teen
+   Gohan's two, Future Trunks's two, Broly and Full Power Broly; Brapan has one of her own). Up and Down go from fighter to fighter, in
+   the order of each one's first look in the list, to his first open look; L and R go through his own looks. */
+static int guest_first_open(int g) {
+    int first = outfit_index[8][0], n = outfit_index[8][1], i;
+    for (i = 0; i < n && i < (int)sizeof bench_group; i++) if (bench_group[i] == g && outfit_open(&outfit_table[first + i])) return i;
+    return -1;
+}
+static int guest_looks(int g) {                /* how many of fighter g's looks are open */
+    int first = outfit_index[8][0], n = outfit_index[8][1], i, k = 0;
+    for (i = 0; i < n && i < (int)sizeof bench_group; i++) if (bench_group[i] == g && outfit_open(&outfit_table[first + i])) k++;
+    return k;
+}
+static int group_starts(int j) {               /* is outfit j its fighter's first look in the list? */
+    int i;
+    for (i = 0; i < j; i++) if (bench_group[i] == bench_group[j]) return 0;
+    return 1;
+}
+static void cycle(void *obj, int dir) {                 /* Up and Down: the next outfit; the guest's next fighter */
+    int sel = *field(obj, OBJ_SELECTED), c = *field(obj, OBJ_LIST + sel * 8), i, at, n, first;
+    if (c < 0 || c > 8) return;
+    first = outfit_index[c][0]; n = outfit_index[c][1];
+    if ((at = worn_at(c)) < 0 || n < 2) return;       /* transformed or story form: leave it alone */
+    if (c == 8 && n <= (int)sizeof bench_group) {
+        int g0 = bench_group[at], f0;
+        for (f0 = 0; bench_group[f0] != g0; f0++) ;
+        for (i = 1; i < n; i++) {
+            int j = (f0 + dir * i + n * 2) % n, k;
+            if (bench_group[j] == g0 || !group_starts(j) || (k = guest_first_open(bench_group[j])) < 0) continue;
+            wear(obj, c, &outfit_table[first + k]);
+            return;
+        }
+        return;
+    }
     for (i = 1; i < n; i++) {
         const struct outfit *o = &outfit_table[first + (at + dir * i + n * 2) % n];
         if (!outfit_open(o)) continue;
-        snapshot(obj);
-        /* back to the look the screen opened on: its own variant (Goku's halo while he is dead is form 2, the "also" of his gi) */
-        FORM_OF(c) = (o->also != 255 && SNAP_FORMS[c] == o->also && c != 8) ? o->also : o->form;
-        guest_sync();
-        Sprite_SetCharacter(sprite, Form_Sprite((void *)(form_table + FORM_OF(c) * 24)));
-        Sprite_SetFacing(sprite, 1);
-        Sprite_SetBehaviour(sprite, (void *)0x03001B58);
-        PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
+        wear(obj, c, o);
+        return;
+    }
+}
+static void look(void *obj, int dir) {                  /* L and R: the guest's next look (another character's next outfit, as Up and Down) */
+    int sel = *field(obj, OBJ_SELECTED), c = *field(obj, OBJ_LIST + sel * 8), i, at, n, first;
+    if (c != 8) { cycle(obj, dir); return; }
+    first = outfit_index[c][0]; n = outfit_index[c][1];
+    if ((at = worn_at(c)) < 0 || n > (int)sizeof bench_group) return;
+    for (i = 1; i < n; i++) {
+        int j = (at + dir * i + n * 2) % n;
+        if (bench_group[j] != bench_group[at] || !outfit_open(&outfit_table[first + j])) continue;
+        wear(obj, c, &outfit_table[first + j]);
         return;
     }
 }
 
 #define LABEL_OWNER (*(u32 *)0x0203FF30)
 #define LABEL_WIDGET (*(u32 **)0x0203FF34)
+#define HINT_OWNER (*(u32 *)0x0203FB18)
+#define HINT_WIDGET (*(u32 **)0x0203FB14)
 #define NewText ((u32 *(*)(void *, void *, int, int, const u16 *, int, int, void *))0x08014125)
 #define AddWidget ((void (*)(void *, void *))0x0800664F)
 static const u16 no_name[] = {0};
@@ -864,6 +920,16 @@ static void update_label(void *obj) {
     if ((const u16 *)LABEL_WIDGET[5] != name) {
         LABEL_WIDGET[5] = (u32)name;
         *field(obj, 0x110) = 0;
+    }
+    {   /* under the guest's name, when his fighter has more than one look open: how to change it */
+        int at = c == 8 ? worn_at(8) : -1;
+        const u16 *hint = at >= 0 && at < (int)sizeof bench_group && guest_looks(bench_group[at]) > 1 ? (const u16 *)L"L/R: Outfit" : no_name;
+        if (HINT_OWNER != ((u32)obj ^ SNAP_MAGIC)) {
+            HINT_WIDGET = NewText(0, obj, 0x78, 0x7E, no_name, 5, 1, (void *)FONT);
+            AddWidget(obj, HINT_WIDGET);
+            HINT_OWNER = (u32)obj ^ SNAP_MAGIC;
+        }
+        if ((const u16 *)HINT_WIDGET[5] != hint) { HINT_WIDGET[5] = (u32)hint; *field(obj, 0x110) = 0; }
     }
 }
 
@@ -941,6 +1007,8 @@ int picker_update(void *obj) {
     if (first && OUT_FIGHTER) bench_settle(FORM_OF(8));    /* restore_borrowed may have put a different guest on */
     if (KEYS_NEW & KEY_UP) cycle(obj, -1);
     else if (KEYS_NEW & KEY_DOWN) cycle(obj, 1);
+    else if (KEYS_NEW & KEY_L) look(obj, -1);
+    else if (KEYS_NEW & KEY_R) look(obj, 1);
     update_label(obj);
     r = orig_update(obj);
     scroll_row(obj, first);
@@ -949,7 +1017,7 @@ int picker_update(void *obj) {
 }
 
 int picker_input(void *obj, void *widget, int id, int extra) {
-    if (id == 0 || id == 1) LABEL_OWNER = 0;
+    if (id == 0 || id == 1) LABEL_OWNER = HINT_OWNER = 0;
     if ((id == 0 || id == 1) && SNAP_OWNER == ((u32)obj ^ SNAP_MAGIC)) {
         if (id == 1) { int i; for (i = 0; i < 9; i++) FORM_OF(i) = SNAP_FORMS[i]; guest_sync(); }
         else bench_settle(SNAP_FORMS[8]);
@@ -1383,9 +1451,22 @@ static void tinted_start(u32 *state, void *sprite, const u32 *aura_field, const 
     state[3] = (u32)spark;
     ListAdd(ACTORS, spark);
 }
-void rose_start(u32 *state, void *sprite) { tinted_start(state, sprite, rose_aura_field, rose_aura_other); }
-void ssj4_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssj4_aura_field, ssj4_aura_other); }
-void ssb_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssb_aura_field, ssb_aura_other); }
+void glow_begin(int kind);
+static int is_ssg(int form);
+#define XFORM (*(volatile u8 *)0x0203FFBC)            /* form + 1 the next power-up ends in, or 0 */
+void rose_start(u32 *state, void *sprite) {
+    tinted_start(state, sprite, rose_aura_field, rose_aura_other);
+#ifdef GLOW_MORE
+    glow_begin(2);
+#endif
+}
+void ssj4_start(u32 *state, void *sprite) {
+    tinted_start(state, sprite, ssj4_aura_field, ssj4_aura_other);
+#ifdef GLOW_MORE
+    if (XFORM && is_ssg(XFORM - 1)) glow_begin(1);
+#endif
+}
+void ssb_start(u32 *state, void *sprite) { tinted_start(state, sprite, ssb_aura_field, ssb_aura_other); glow_begin(0); }
 void rose_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) {
         u32 *state = Alloc(0x10);
@@ -1868,9 +1949,16 @@ void dragon_use(u8 *record, void *sprite) {
 /* The Fusion Dance (skill 12) can't be used in Super 13's fight (Nov 11, the owner: "make the Super 13 fight specifically only startable
    and maybe only playable as Goku"): its finish is Goku's Spirit Bomb. Zone 26's areas 15 to 18: Android 13, his change, Super 13, the finish. */
 #define FusionCan ((int (*)(u8 *))0x0801A169)
+static int gogeta_dance(const u8 *record, int me);
 int fusion_can(u8 *record) {
     u16 at = *(volatile u16 *)0x0300197C;
+    int me = *(u8 *)0x03001068;
     if ((at & 0xFF) == 26 && (at >> 8) >= 15 && (at >> 8) <= 18) return 0;
+    if (me == 0 || me == 4) {                   /* Goku and Vegeta (Nov 12): the other must be ready; as a Super Saiyan 4 too, if he knows it */
+        int d = gogeta_dance(record, me);
+        if (d < 0 || (is_ssj4(record[0x14]) && !d)) return 0;
+        if (d == 1) return !*(volatile u32 *)0x03002C04 && IN_COMBAT;      /* (the original's check refuses the Super Saiyan 3 class) */
+    }
     return FusionCan(record);
 }
 #define KameCan ((int (*)(u8 *))0x0801A335)
@@ -2218,9 +2306,11 @@ void ssg_use(u8 *record, void *sprite) {
    pause menu's Skills tab swaps one in with SELECT. Skills earned by play (Kaioken, Galick Gun, each tier, the post-game moves, mastery)
    are learned by skills_sync. Retail moves' levels come with the character's level (the level-up script, 0x0877C9E8), so a move swapped
    back in takes the level that gives; a transformation's level is its mastery (mastery bytes in the bench's last group). */
-extern const u8 skill_book[8][16], level_steps[][4];
+#define BOOK 24                    /* places in a book: the record's 16 bits (+0x22), then 8 more per character in the bench (KNOWN2, Nov 12) */
+extern const u8 skill_book[8][BOOK], level_steps[][4];
 static int ss2_open(const u8 *record, int owner);
 #define KNOWN(rec) (*(u16 *)((rec) + 0x22))
+#define KNOWN2 (BENCH.spare + 4)               /* places 16-23: one byte per character (Goku's Fusion Dance, his seventeenth) */
 #define MAX_HELD 6         /* skills a record holds: +0x0D..+0x12. +0x13 is the equipment's flags byte (Recalculate, 0x08013C67, rewrites it), not a seventh skill */
 #define GetLevel ((int (*)(u8 *))0x080135D3)
 #define G_FLAGS ((void *)0x03001068)
@@ -2229,7 +2319,7 @@ static u8 *rec_of(int c) { return RECORDS + c * RECORD_SIZE; }
 static int book_at(int c, int skill) {
     int i;
     if (c > 7) return -1;
-    for (i = 0; i < 16; i++) if (skill_book[c][i] == skill) return i;
+    for (i = 0; i < BOOK; i++) if (skill_book[c][i] == skill) return i;
     return -1;
 }
 static int slot_of(const u8 *rec, int skill) {
@@ -2237,23 +2327,65 @@ static int slot_of(const u8 *rec, int skill) {
     for (i = 0; i < rec[0x0C]; i++) if (rec[0x0D + i] == skill) return i;
     return -1;
 }
-static int knows(int c, int skill) { int b = book_at(c, skill); return b >= 0 && KNOWN(rec_of(c)) >> b & 1; }
+static int known_at(int c, int b) {
+    if (b < 16) return KNOWN(rec_of(c)) >> b & 1;
+    bench_mine(0);
+    return KNOWN2[c] >> (b - 16) & 1;
+}
+static void known_put(int c, int b, int on) {
+    if (b < 16) { if (on) KNOWN(rec_of(c)) |= 1 << b; else KNOWN(rec_of(c)) &= ~(1 << b); return; }
+    if (known_at(c, b) == on) return;
+    bench_mine(1);
+    if (on) KNOWN2[c] |= 1 << (b - 16); else KNOWN2[c] &= ~(1 << (b - 16));
+    bench_bump();
+}
+static int knows(int c, int skill) { int b = book_at(c, skill); return b >= 0 && known_at(c, b); }
 static void set_known(int c, int skill, int on) {
     int b = book_at(c, skill);
     if (b < 0) return;
-    if (on) KNOWN(rec_of(c)) |= 1 << b; else KNOWN(rec_of(c)) &= ~(1 << b);
+    known_put(c, b, on);
 }
 /* the tiers whose level is mastery, and where each character's byte is */
 static const u8 tier_skill[6] = {20, 35, 22, 36, 44, 37};      /* SS, SS2, SS3, SS4, Blue, Kaioken */
 static const signed char mastery_slot[8][6] = {{0, 1, 2, 3, 4, 5}, {6, 7, -1, -1, -1, -1}, {8, -1, -1, -1, -1, -1}, {9, 10, -1, -1, -1, -1},
                                       {11, 12, -1, 13, 14, -1}, {15, -1, 16, -1, -1, -1}, {17, 18, -1, -1, -1, -1}, {19, -1, -1, -1, 20, -1}};
 #define KAME_COUNT (MASTERY[21])
-static int tier_of(int skill) { int i; for (i = 0; i < 6; i++) if (tier_skill[i] == skill) return i; return -1; }
+static int tier_of(int skill) {
+    int i;
+    for (i = 0; i < 6; i++) if (tier_skill[i] == skill) return i;
+    return skill == ROSE_SKILL ? 0 : -1;          /* (Goku Black's Rose: Super Saiyan's tier, a guest's) */
+}
+/* The guests' transformation mastery (Nov 12, the owner: "add skill and transformation mastery and skill swap for guests if you can but
+   only lore accurate stuff"): the Saiyan transformations the guests have in the series, each fighter's own (his bench group: both of Teen
+   Gohan's looks share his, as Future Trunks's do): Teen Gohan's Super Saiyan and 2, Future Trunks's Super Saiyan, Goku Black's Rose.
+   Not Pan's Super Saiyan, nor the Kaioken some guests carry (neither is in the series), nor Majuub, Super 13 or 17 or Max Power (not a
+   Super Saiyan's). Trained and shown as the party's are; the bytes are the bench's spare ones (zero in every bench saved so far). */
+static const u8 guest_tiers[][2] = {GUEST_TIERS};         /* bench group, tier: byte k of GUEST_MASTERY */
+#define GUEST_MASTERY (BENCH.spare)
+typedef char guest_tiers_fit[sizeof guest_tiers / sizeof *guest_tiers <= 4 ? 1 : -1];      /* spare: 0-3 these, 4-11 the books' places 16-23 (KNOWN2), 13 Gogeta's stashed form */
+static int group_of(int form);
+static u8 *mastery_at(int c, int t) {           /* the mastery byte of character c's tier t, or 0 (doesn't read the bench) */
+    int g, k;
+    if (t < 0) return 0;
+    if (c <= 7) return mastery_slot[c][t] < 0 ? 0 : &MASTERY[mastery_slot[c][t]];
+    if (c != 8 || (g = group_of(FORM_OF(8))) < 0) return 0;
+    for (k = 0; k < (int)(sizeof guest_tiers / sizeof *guest_tiers); k++) if (guest_tiers[k][0] == g && guest_tiers[k][1] == t) return &GUEST_MASTERY[k];
+    return 0;
+}
 int mastery_level(int c, int skill) {          /* 0, 1, 2: shown as Level 1-3 */
-    int t = tier_of(skill), m;
-    if (t < 0 || c > 7 || (m = mastery_slot[c][t]) < 0) return 0;
+    u8 *m = mastery_at(c, tier_of(skill));
+    if (!m) return 0;
     bench_mine(0);
-    return MASTERY[m] >= MASTERY_L3 ? 2 : MASTERY[m] >= MASTERY_L2 ? 1 : 0;
+    return *m >= MASTERY_L3 ? 2 : *m >= MASTERY_L2 ? 1 : 0;
+}
+/* A guest's moves level with him as the party's do with them (Nov 12, the same request): a move that has levels (its row's +0 isn't 255:
+   not the ki blasts, as the party's) takes the steps the level-up script gives the party's move of that name, else 100 and 150
+   (Kamehameha's); a move the story gives at Level 2 (Energy Punch, Big Bang) goes up at 75. */
+static int guest_move_level(const u8 *rec, int skill) {
+    int lv = GetLevel((u8 *)rec), i, l2 = 100, l3 = 150;
+    for (i = 0; level_steps[i][0] != 255; i++)
+        if (level_steps[i][1] == skill) { l2 = level_steps[i][2] ? level_steps[i][2] : 75; l3 = level_steps[i][3]; break; }
+    return (lv >= l2) + (lv >= l3);
 }
 static int derived_level(int c, int skill) {    /* a move's level from the character's level, as the level-up script grants it */
     int lv = GetLevel(rec_of(c)), i;
@@ -2316,13 +2448,26 @@ static int gogeta_open(void) {                 /* is any of Gogeta's looks unloc
    fusion_end puts that right the way the game's script does: a fused fighter who isn't the one playing leaves and his dancers come
    back; one who is playing with no time limit gets one frame, so the game ends his fusion itself. `now` (Super 13's door and finish):
    the one playing ends too. -> 1 if a fusion was ended. Only after the ending: the story has fusions of its own, with no limit. */
-static const u8 fusions[][3] = {{7, 0, 4}, {5, 2, 3}};       /* the fused fighter, his two dancers */
+static const u8 fusions[][3] = {{6, 0, 4}, {7, 0, 4}, {5, 2, 3}};       /* the fused fighter, his two dancers (Vegito: the Potara, Nov 12; before
+                                                                          Gogeta, who is a fighter of his own after the ending: a stuck Vegito is the fusion to end) */
+static int holds(const u8 *f, int k) {        /* does fused fighter f's record name these dancers (native 0xA8 writes their owners in +2)? */
+    int a = fusions[k][1], b = fusions[k][2];
+    return f[2] == (a | b << 4) || f[2] == (b | a << 4);
+}
+static int live_fusion(int k) {               /* another fused fighter with the same dancers, in the party with a time: the dancers are his */
+    int j;
+    for (j = 0; j < (int)(sizeof fusions / sizeof *fusions); j++)
+        if (j != k && fusions[j][1] == fusions[k][1] && fusions[j][2] == fusions[k][2] && (REC(fusions[j][0])[0] & 1) && *(int *)(REC(fusions[j][0]) + 8) >= 0) return 1;
+    return 0;
+}
 int fusion_end(int now) {
     int k, did = 0, me = *(u8 *)0x03001068;
     if (!GetFlag(G_FLAGS, 149)) return 0;
     for (k = 0; k < (int)(sizeof fusions / sizeof *fusions); k++) {
         u8 *f = REC(fusions[k][0]), *a = REC(fusions[k][1]), *b = REC(fusions[k][2]);
         if (!(f[0] & 1) || ((a[0] & 1) && (b[0] & 1))) continue;       /* not fused: he isn't in the party, or both dancers are */
+        if (*(int *)(f + 8) < 0 && live_fusion(k)) continue;        /* Gogeta as himself while the Potara's Vegito has the dancers (Nov 12) */
+        if (fusions[k][0] == 6 && !holds(f, k)) continue;            /* Vegito never Potara'd with these two (a debug build joins him) */
         if (me == fusions[k][0] && !now) {
             if (*(int *)(f + 8) < 0) *(int *)(f + 8) = 1;
             continue;
@@ -2335,13 +2480,150 @@ int fusion_end(int now) {
 }
 /* Gogeta as a fighter of his own (a look of his unlocked, after the ending): in the party with no time limit. Not while a Fusion Dance's
    Gogeta is out (his dancers aren't in the party): that one keeps his clock, and joins as himself once it has run out (story_sync). */
+static void fused_restore(u8 *g);
 void gogeta_keep(void) {
     fusion_end(0);
     if (GetFlag(G_FLAGS, 149) && gogeta_open() >= 0 && (REC(0)[0] & 1) && (REC(4)[0] & 1)) {
         u8 *g = REC(7);
+        fused_restore(g);
         *(int *)(g + 8) = -1;
         if (g[0x0C] >= 5) g[0] |= 1;
     }
+}
+/* Fusion for Goku and Vegeta (Nov 12, the owner: "SSJ4 Gogeta and Potara Vegito and let's also implement the Potara mechanic now because I
+   have 2 more character ideas after", then "Fusion dance is already a skill so can we make a separate Potara skill because I want to create
+   some new fusions for other chars"; the list of Nov 11: "Vegito as a Potara fusion opened by all four Trials", "Super Saiyan 4 Gogeta
+   as a fusion of Super Saiyan 4 Goku and Vegeta").
+   - The Potara (POTARA_SKILL, its own skill), learned by Goku and Vegeta once all four Trials are won (TRIAL_ALL), used in a fight with
+     the other one in the party and selectable (not in Super 13's fight, as the dance): a flash, and Vegito (record 6) plays for an hour
+     of his play (the Potara's limit for mortals: Dragon Ball Super), potara_list (build.py), the game's own fusion native as the story's
+     Potara scene uses it. His forms count it down as Gogeta's (build.py sets the fusion bit, flags bit 3, on them: the HUD shows his
+     time), and at 0 the game's own script splits him (global script 503 now takes out whoever plays, not Gogeta by name: build.py).
+     fusion_end treats him as Gogeta. potara_pairs (and build.py POTARA_PAIRS) take more pairs: a pair is a fused record and two dancers.
+   - The Fusion Dance (skill 12, the game's own), learned by Goku and Vegeta after the ending: global script 13 has their branch, unused
+     in the original (only Goten and Trunks ever learn the dance), its button game and all. As a Super Saiyan 4, with the other knowing
+     Super Saiyan 4 (the dance is no Super Saiyan 3 class move otherwise: fusion_can), done right it gives Super Saiyan 4 Gogeta
+     (fusion_native) for a third of the dance's time (Gogeta Super Saiyan 4 burned through his fusion faster: GT); otherwise Gogeta,
+     or the fat or thin one, as ever.
+   Gogeta as a fighter of his own (a look of his open) keeps his progress: before the dance writes his record (the fusion's health, ki,
+   experience, stats and gear), his own goes to the bench's last group (fused_stash), and comes back when he is his own fighter again
+   (fused_restore, gogeta_keep). */
+#define FusionUse ((void (*)(u8 *))0x0801A19F)
+#define NativeA8 ((void (*)(int *))0x08002EE3)
+#define ScriptRun ((void *(*)(void *, const void *, void *))0x08004099)
+#define FUSION_OFF (*(volatile u32 *)0x03002C04)        /* (the Fusion Dance's own check: no fusing while it is set) */
+/* A dance's memo for its fusion native (Nov 12): the dance (dance_use) only starts global script 13, which plays the dance and its
+   button game over seconds and calls native 0xA8 at its end, after the script has put the outcome's Gogeta in record 7 (0x9D: Gogeta,
+   or the fat or thin one). So what fusion_native needs is noted when the dance starts, and taken there: whether it is a Super Saiyan 4
+   dance, and Gogeta's own form while he is a fighter of his own (stashed with his progress: his record's form is the fusion's by then;
+   a failed dance left him the fat Gogeta for good). Good for a minute (DANCE_AT). */
+#define DANCE_SSJ4 (*(volatile u8 *)0x0203FB10)          /* 1: a Super Saiyan 4 dance */
+#define DANCE_FORM (*(volatile u8 *)0x0203FB11)          /* Gogeta's own form + 1, or 0 */
+#define DANCE_AT (*(volatile u16 *)0x0203FB12)           /* when (the frame counter's low half) */
+#define STASH_GROUP (GROUPS - 1)
+#define STASH_FORM (BENCH.spare[13])                     /* Gogeta's own form + 1 while the bench holds his progress, else 0 */
+#define FORM_GOGETA 41                                  /* the dance's Gogeta (script 13: 0x9D(7, 102)); 42 and 43 the fat and thin */
+struct potara { u8 fused, a, b; };
+static const struct potara potara_pairs[] = {{6, 0, 4}};
+const u32 potara_list[1] = {1};                          /* build.py: one event list per pair, the scene (a flash, the fusion, he plays) */
+static int potara_pair(int me) {
+    int k;
+    for (k = 0; k < (int)(sizeof potara_pairs / sizeof *potara_pairs); k++) if (potara_pairs[k].a == me || potara_pairs[k].b == me) return k;
+    return -1;
+}
+static int partner_of(int me) { int k = potara_pair(me); return k < 0 ? -1 : potara_pairs[k].a == me ? potara_pairs[k].b : potara_pairs[k].a; }
+static int ready(int c) { return c >= 0 && (REC(c)[0] & 3) == 3; }          /* in the party and selectable */
+static int s13_rooms(void) { u16 at = *(volatile u16 *)0x0300197C; return (at & 0xFF) == 26 && (at >> 8) >= 15 && (at >> 8) <= 18; }
+int potara_can(u8 *record) {
+    int me = *(u8 *)0x03001068, k = potara_pair(me);
+    u8 *f;
+    if (FUSION_OFF || !IN_COMBAT || record != REC(me) || k < 0 || !ready(partner_of(me)) || s13_rooms()) return 0;
+    f = REC(potara_pairs[k].fused);
+    return !(f[0] & 1) || *(int *)(f + 8) < 0;          /* (a debug build has Vegito in the party, with no limit) */
+}
+void potara_use(u8 *record, void *sprite) {
+    int k = potara_pair(*(u8 *)0x03001068);
+    u32 state[0x1B];
+    if (k >= 0) ScriptRun(state, (const void *)((const volatile u32 *)potara_list)[k], 0);     /* (volatile: build.py fills the table after the compiler saw {1}) */
+}
+/* Goku's and Vegeta's dance: with the other ready, and not while a danced Gogeta is out; as a Super Saiyan 4, the other knowing it. */
+static int gogeta_dance(const u8 *record, int me) {
+    int partner = me == 0 ? 4 : me == 4 ? 0 : -1;
+    if (partner < 0 || !ready(partner) || ((REC(7)[0] & 1) && *(int *)(REC(7) + 8) >= 0)) return -1;
+    return is_ssj4(record[0x14]) ? knows(partner, SS4_SKILL) : 0;          /* -> 1 Super Saiyan 4, 0 not, -1 no dance */
+}
+/* The Potara's clock. Gogeta's and Gotenks's figures play with the fusion fighter's update, which counts a fusion's time down and at 0 runs
+   global script 14 (sub_0800E15C); Vegito's figures play with the plain fighter's, the fusion bit on his forms or not (seen: an hour
+   on his clock that never moved). So this counts it as that update does, once a frame while he plays (and not in a frame the game counted
+   it itself), and at 0 runs script 14 the same way, with who started it. Called from the fighter's input each frame (player_input). */
+struct pclock { u32 frame; int last; };
+#define PCLOCK (*(volatile struct pclock *)0x0203FB1C)
+static void potara_tick(void) {
+    int me = *(u8 *)0x03001068, k;
+    u8 *f;
+    for (k = 0; k < (int)(sizeof potara_pairs / sizeof *potara_pairs); k++) if (potara_pairs[k].fused == me) break;
+    if (k == (int)(sizeof potara_pairs / sizeof *potara_pairs)) { PCLOCK.last = -2; return; }      /* (in the field too, as the fusion update counts) */
+    f = REC(me);
+    if (PCLOCK.frame == FRAMES) return;
+    PCLOCK.frame = FRAMES;
+    if (*(int *)(f + 8) > 0 && *(int *)(f + 8) == PCLOCK.last) *(int *)(f + 8) -= 1;     /* (unchanged since last frame: nobody else counts it) */
+    PCLOCK.last = *(int *)(f + 8);
+    if (*(int *)(f + 8) == 0 && *(short *)(f + 0x16) != 0) {
+        u32 state[0x1B], args[4] = {*(u16 *)(f + 2) >> 8, 0, 0, 0};
+        PCLOCK.last = -2;
+        ScriptRun(state, (const void *)0x0877D028, args);           /* global script 14: the fusion is over */
+    }
+}
+void dance_use(u8 *record, void *sprite) {
+    u8 *g = REC(7);
+    DANCE_SSJ4 = gogeta_dance(record, *(u8 *)0x03001068) == 1;
+    DANCE_FORM = GetFlag(G_FLAGS, 149) && (g[0] & 1) && *(int *)(g + 8) < 0 ? g[0x14] + 1 : 0;
+    DANCE_AT = FRAMES;
+    FusionUse(record);
+}
+/* Gogeta's own progress while a dance has his record: the bench's last group (an entry as a guest's) and his form in a spare byte. */
+static void fused_stash(u8 *g) {
+    struct entry *e = &BENCH.e[STASH_GROUP]; int i;
+    bench_mine(1);
+    for (i = 0; i < 4; i++) e->gear[i] = *(const u32 *)(g + 0x3C + i * 4);
+    bytes_copy(e->maxhp, g + 0x18, 2); bytes_copy(e->maxki, g + 0x1C, 2);
+    bytes_copy(e->exp, g + 0x24, 4); bytes_copy(e->stats, g + 0x28, 4);
+    e->unspent = g[0x2C]; levels_pack(e->levels, g + 0x2E);
+    STASH_FORM = g[0x14] + 1;
+    bench_bump();
+}
+static void fused_restore(u8 *g) {
+    struct entry *e = &BENCH.e[STASH_GROUP]; int i;
+    bench_mine(0);
+    if (!STASH_FORM) return;
+    for (i = 0; i < 4; i++) *(u32 *)(g + 0x3C + i * 4) = e->gear[i];
+    bytes_copy(g + 0x18, e->maxhp, 2); bytes_copy(g + 0x1C, e->maxki, 2);
+    bytes_copy(g + 0x24, e->exp, 4); bytes_copy(g + 0x28, e->stats, 4);
+    g[0x2C] = e->unspent; levels_unpack(g + 0x2E, e->levels);
+    g[0x14] = STASH_FORM - 1;
+    bytes_zero((u8 *)e, sizeof *e);
+    STASH_FORM = 0;
+    bench_bump();
+    Recalculate(g);
+    *(u16 *)(g + 0x16) = *(u16 *)(g + 0x18);
+    *(u16 *)(g + 0x1A) = *(u16 *)(g + 0x1C);
+}
+/* Script native 0xA8 (the fusion: fused, who started it, the two dancers, time in seconds or -1): ours first keeps Gogeta's own progress, and
+   turns a Super Saiyan 4 dance's Gogeta into Super Saiyan 4 Gogeta with a third of the time. */
+void fusion_native(int *sp) {
+    int n = *sp, fused = sp[n - 4], fresh = GetFlag(G_FLAGS, 149) && (u16)((u16)FRAMES - DANCE_AT) < 3600;     /* (only after the ending: the story's
+                                                                          own Gogeta never danced through dance_use, and work RAM isn't cleared at boot) */
+    u8 *g = REC(7);
+    if (fused == 7 && GetFlag(G_FLAGS, 149) && (g[0] & 1) && *(int *)(g + 8) < 0) {
+        fused_stash(g);
+        if (fresh && DANCE_FORM) { STASH_FORM = DANCE_FORM; bench_bump(); }        /* his own form, not the one the script gave his record */
+    }
+    if (fused == 7 && fresh && DANCE_SSJ4 && FORM_OF(7) == FORM_GOGETA) {
+        FORM_OF(7) = FORM_GOGETA_SSJ4;
+        if (sp[n] > 0) sp[n] = (sp[n] + 2) / 3;
+    }
+    if (fused == 7) DANCE_SSJ4 = DANCE_FORM = 0;
+    NativeA8(sp);
 }
 static void story_sync(int post) {
     int i;
@@ -2392,7 +2674,7 @@ const u8 shelved_skills[] = SHELVED_SKILLS;
 const u8 shelved_forms[][2] = SHELVED_FORMS;
 static void shelved_fix(int c, u8 *rec) {
     int i, k, n = 0, pick = 0;
-    for (k = 0; k < 16; k++) if (skill_book[c][k] == 255) KNOWN(rec) &= ~(1 << k);
+    for (k = 0; k < BOOK; k++) if (skill_book[c][k] == 255) known_put(c, k, 0);
     if (old_armor(c, rec[0x14]) && c != *(u8 *)0x03001068) out_of_armor(c);     /* (the fighter in play: the Switch screen does it) */
     for (k = 0; k < (int)(sizeof shelved_forms / sizeof shelved_forms[0]); k++)
         if (rec[0x14] == shelved_forms[k][0]) rec[0x14] = shelved_forms[k][1];
@@ -2408,10 +2690,33 @@ static void shelved_fix(int c, u8 *rec) {
     rec[0x0C] = n;
     rec[0x15] = pick;                 /* the skill he had selected, where it is now; the first if it was one of the shelved */
 }
+/* The guest's held skills' levels: a transformation with mastery shows it; a move goes up with his level (never down: a bench saved
+   before this keeps what it had). His power-ups that aren't moves (Majuub, Super 13 and 17, Max Power, a tier with no mastery) stay as they are. */
+static const u8 guest_powers[] = {SUPER13_SKILL, SUPER17_SKILL, MAJUUB_SKILL, MAX_POWER_SKILL};
+static void guest_levels(void) {
+    u8 *rec = rec_of(8);
+    int i, k, s, lv, power;
+    for (i = 0; i < rec[0x0C] && i < MAX_HELD; i++) {
+        s = rec[0x0D + i]; power = tier_of(s) >= 0;
+        for (k = 0; k < (int)sizeof guest_powers; k++) if (s == guest_powers[k]) power = 1;
+        if (power) {
+            if (!mastery_at(8, tier_of(s))) continue;
+            lv = mastery_level(8, s);
+        } else {
+            const u8 *row = *(const u8 * const *)0x08013618 + 24 * s;        /* the skill table (build.py moves it): +0 the top level, 255 for none */
+            if (row[0] == 255) continue;
+            lv = guest_move_level(rec, s);
+            if (lv > row[0]) lv = row[0];
+            if (lv < rec[0x2E + 2 * i]) continue;
+        }
+        rec[0x2E + 2 * i] = rec[0x2F + 2 * i] = lv;
+    }
+}
 void skills_sync(int c) {
     u8 *rec;
     int i, post = GetFlag(G_FLAGS, 149), gt = more_flag(MORE_GT_FLAG);
     story_sync(post);
+    if (c == 8) { guest_levels(); return; }
     if (c > 7) return;
     rec = rec_of(c);
     shelved_fix(c, rec);
@@ -2422,6 +2727,12 @@ void skills_sync(int c) {
     }
     if (book_at(c, 35) >= 0 && (knows(c, 20) || slot_of(rec, 20) >= 0) && ss2_open(rec, c) && !knows(c, 35) && slot_of(rec, 35) < 0)
         set_known(c, 35, 1);            /* Super Saiyan 2 comes through the Super Saiyan skill (ss_use): known, in the book, no slot taken */
+    if (c == 0 || c == 4) {             /* the Potara: all four Trials won (its book place for Goku was the story's locked Super Saiyan's: a bit set there goes) */
+        int trials = GetFlag(G_FLAGS, TRIAL_ALL);
+        if (!trials && slot_of(rec, POTARA_SKILL) < 0) set_known(c, POTARA_SKILL, 0);
+        learn(c, POTARA_SKILL, trials);
+        learn(c, DANCE_SKILL, post);    /* the Fusion Dance: after the ending (Goku learned it in the other world and taught it; Vegeta danced with him) */
+    }
     if (c == 0) {
         learn(c, KAIOKEN_SKILL, 1);
         learn(c, 36, gt); learn(c, TENX_SKILL, gt); learn(c, DRAGON4_SKILL, gt);
@@ -2444,7 +2755,7 @@ void skills_sync(int c) {
 static int can_swap(int c) {                          /* does he know a skill he isn't holding? */
     u8 *rec = rec_of(c);
     int b;
-    for (b = 0; b < 16; b++) if (skill_book[c][b] != 255 && KNOWN(rec) >> b & 1 && slot_of(rec, skill_book[c][b]) < 0) return 1;
+    for (b = 0; b < BOOK; b++) if (skill_book[c][b] != 255 && known_at(c, b) && slot_of(rec, skill_book[c][b]) < 0) return 1;
     return 0;
 }
 /* the Skills tab (vtable 0x0804B024): SELECT swaps the chosen skill for the next one the fighter knows but isn't holding */
@@ -2453,9 +2764,10 @@ void skills_swap(int c, int at) {
     int i, b0, cur;
     if (c > 7 || at < 0 || at >= rec[0x0C]) return;
     cur = rec[0x0D + at]; b0 = book_at(c, cur);
-    for (i = 1; i <= 16; i++) {
-        int b = ((b0 < 0 ? -1 : b0) + i) & 15, s = skill_book[c][b];
-        if (s == 255 || !(KNOWN(rec) >> b & 1) || slot_of(rec, s) >= 0) continue;
+    if (b0 < 0 && cur == 21) return;              /* the story's locked Super Saiyan, out of Goku's book (Nov 12): it stays until the story swaps it back */
+    for (i = 1; i <= BOOK; i++) {
+        int b = ((b0 < 0 ? -1 : b0) + i) % BOOK, s = skill_book[c][b];
+        if (s == 255 || !known_at(c, b) || slot_of(rec, s) >= 0) continue;
         set_known(c, cur, 1);
         equip(c, rec, at, s);
         return;
@@ -2549,10 +2861,14 @@ int ss_tick(u8 *rec) {
     if (mastery_skip(rec)) return 1;
     /* Super Saiyan 2 drains 4x as fast as Super Saiyan (Nov 10, the owner: "the SSJ2 ki drain seems to be nonexistent"; measured: it drained
        Super Saiyan's pool at Super Saiyan's rate, 1023 units at about 2.7 a second, over six minutes; Super Saiyan 3's pool lasts about 35
-       seconds). Three more units with each one the game takes: about a minute and a half, less what mastery saves (the units it skips). */
+       seconds). Three more units with each one the game takes: about a minute and a half, less what mastery saves (the units it skips).
+       An empty pool stays empty (Nov 12, the owner: "SSJ2 ki drain still seems bugged"; measured: the bar ran out in about 10 seconds and he
+       stayed in Super Saiyan 2 with it empty, for good: this set an empty pool back to 1 every time, so the game, which powers down when it
+       finds the pool at 0, never found it there). */
     if (is_ss2(rec[0x14])) {
         u16 *pool = (u16 *)(rec + 0x1E);
-        *pool = *pool > 4 ? *pool - 3 : 1;
+        if (*pool > 4) *pool -= 3;
+        else if (*pool > 1) *pool = 1;
     }
     return 0;
 }
@@ -2574,24 +2890,27 @@ static int form_tier(int form) {
     return -1;
 }
 static int mastery_train(u8 *rec, int every) {        /* -> 1 to skip this drain unit */
-    int c = *(u8 *)0x03001068, t = form_tier(rec[0x14]), m, lv;
-    if (c > 7 || t < 0 || (m = mastery_slot[c][t]) < 0) return 0;
+    int c = *(u8 *)0x03001068, t = form_tier(rec[0x14]), lv;
+    u8 *m = mastery_at(c, t);                         /* (a guest's too: mastery_at) */
+    if (!m) return 0;
     if (wearing(rec, GEAR_GRAVITY)) every = (every + 1) / 2;     /* the Gravity Band: twice as fast */
     MASTERY_TICK++;
-    if (MASTERY_TICK % every == 0 && MASTERY[m] < 255) {
+    bench_mine(0);
+    if (MASTERY_TICK % every == 0 && *m < 255) {
         lv = mastery_level(c, tier_skill[t]);
-        bench_mine(1); MASTERY[m]++;
+        bench_mine(1); (*m)++;
         if (mastery_level(c, tier_skill[t]) != lv) PlaySound((void *)0x03003E5C, (void *)SOUND_MOVE, 0x40, 0);
     }
     lv = mastery_level(c, tier_skill[t]);
     return MASTERY_TICK % 5 < lv;
 }
 static int mastery_skip(u8 *rec) { return mastery_train(rec, 10); }
-/* The wish for hidden potential: every party member's transformations gain 75 mastery (MASTERY_L2 is 100, MASTERY_L3 250). */
+/* The wish for hidden potential: every party member's transformations gain 75 mastery (MASTERY_L2 is 100, MASTERY_L3 250), the guests' too. */
 void wish_potential(void) {
     int i;
     bench_mine(1);
     for (i = 0; i < 21; i++) MASTERY[i] = MASTERY[i] > 255 - 75 ? 255 : MASTERY[i] + 75;
+    for (i = 0; i < (int)(sizeof guest_tiers / sizeof *guest_tiers); i++) GUEST_MASTERY[i] = GUEST_MASTERY[i] > 255 - 75 ? 255 : GUEST_MASTERY[i] + 75;
 }
 /* Uub becomes Majuub with Super Saiyan's mechanics, but without the gold aura (Android 13's power-up); Majuub changes back as a Super Saiyan does. */
 extern const int absorb_vt[14];
@@ -2672,31 +2991,84 @@ static void crackle(void) {
     if (!bolt_room(BOLT_BYTES)) return;
     { void *spark = NewSpark(0, pos, set + 12 * ((h >> 20) % 3), 4, 0x6000, BOLT_BYTES, 0x38); if (spark) ListAdd(ACTORS, spark); }
 }
-/* Super Saiyan Blue's glow (Nov 12, the owner: "a subtle blue aura post transformation too to go with the lightning"): while a Blue form plays
-   in a fight, a thin ring of flames round the fighter, the outer shades of Blue's aura (build.py glow_frames, three frames), drawn by an
-   actor of its own as the Spirit Bomb's orb is (bomb_*): 1 KB of sprite memory, taken only when a free block holds it (never another
-   sprite's), given back when the form ends, the fight ends or the area changes (the actor list's own clear calls glow_destroy). */
+/* Super Saiyan Blue's glow (Nov 12, the owner: "a subtle blue aura post transformation too to go with the lightning", then "make it look
+   more flame like or another effect not just the same aura outline", "more majestic/godlike"): while a Blue form plays in a fight, a
+   flame of light round the fighter, drawn by lib/ssb_glow.py (the style build.py GLOW_STYLE picks: GLOW_FRAMES frames of 32x64, one each
+   GLOW_STEP game frames), behind him, drawn by an actor of its own as the Spirit Bomb's orb is (bomb_*): 2 KB of sprite memory, taken
+   only when a free block holds it (never another sprite's), given back when the form ends, the fight ends or the area changes (the
+   actor list's own clear calls glow_destroy). */
 #ifdef LOOK170
-const u32 glow_frames[3] = {1};
-struct glow { u8 *actor; int loaded; };
+/* GLOW_MORE (Nov 12 19:35, the owner: "draft a SSG version too maybe for Goku", "maybe a pink for Goku Black Rose form too"; 19:42 on the
+   drafts in the game: "Auras all look good to lock in"): the same glow in Super Saiyan God's reds (kind 1) and Rose's pinks (kind 2), each
+   with its own frames and band colour. On by default (build.py BFU_GLOW_MORE=0 builds Blue's alone). */
+#ifdef GLOW_MORE
+#define GLOW_KINDS 3
+#else
+#define GLOW_KINDS 1
+#endif
+const u32 glow_frames[GLOW_KINDS][GLOW_FRAMES] = {{1}};
+struct glow { u8 *actor; short loaded; u16 cnt_was, alpha_was; u8 blending, kind; u16 rise; u8 fade; };
 #define GL (*(struct glow *)0x0203FB00)
-#define GLOW_BYTES 0x400
+typedef char glow_fits[sizeof(struct glow) <= 16 ? 1 : -1];
+#define RIM_BYTES 0x800                  /* 32x64, 8 bpp */
+#ifdef GLOW_BAND
+/* 1c (the owner's pick, 19:04): the see-through band inside the flame, a second 32x64 sprite (4 bpp, one colour: palette bank GLOW_BAND
+   >> 4, colour GLOW_BAND & 15) the GBA blends over the stage behind him, GLOW_ALPHA of it to the rest. A semi-transparent sprite blends
+   with BLDCNT's second targets at BLDALPHA's mix, and fight areas keep their own there (the Bomber's: 0x1041, BG0 over sprites at 12/16
+   and 0 of them: the band came out solid). While the glow is up the stage's four layers and backdrop are the second targets, no layer a
+   first one (the area's own blend waits; seen in the Bomber's area: nothing on screen but the band changed), and the mix is the band's;
+   what was there comes back when the glow goes. Not while the screen fades or flashes (BLDCNT's brightness modes): then the band is
+   solid for those frames. */
+const u32 glow_band[GLOW_KINDS][GLOW_FRAMES] = {{1}};
+const u8 glow_band_at[GLOW_KINDS] = {1};          /* each kind's band colour: its palette bank << 4 | its place in it (build.py) */
+#define GLOW_BYTES (RIM_BYTES + 0x400)
+#define REG_BLDCNT (*(volatile u16 *)0x04000050)
+#define REG_BLDALPHA (*(volatile u16 *)0x04000052)
+#define GLOW_CNT 0x2F40                  /* alpha mode, no first targets (the band, semi-transparent, is one by itself), BG0-3 and the backdrop second */
+static void glow_blend(int on) {
+    u16 cnt = REG_BLDCNT;
+    if (on) {
+        if ((cnt >> 6 & 3) >= 2) return;
+        if (GL.blending != 1) { GL.cnt_was = cnt; GL.alpha_was = REG_BLDALPHA; GL.blending = 1; }
+        else if (cnt != GLOW_CNT) GL.cnt_was = cnt;          /* the area changed its own since: that is what comes back */
+        REG_BLDCNT = GLOW_CNT; REG_BLDALPHA = GLOW_ALPHA;
+    } else {
+        if (GL.blending == 1 && cnt == GLOW_CNT) { REG_BLDCNT = GL.cnt_was; REG_BLDALPHA = GL.alpha_was; }
+        GL.blending = 0;
+    }
+}
+#else
+#define GLOW_BYTES RIM_BYTES
+static void glow_blend(int on) {}
+#endif
 const int glow_vt[14] = {1};      /* the Spirit Bomb orb's table with glow_destroy and glow_draw_oam (build.py) */
 void glow_destroy(u8 *actor, int free_it) {
     OBJ_FREE(ACTOR_LIST, *(u16 *)(actor + 0xC));
     if (GL.actor == actor) GL.actor = 0;
     if (free_it) FreeMem(actor);
 }
+static void glow_frame(void);
+static const u8 glow_spread[16] = {0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15};     /* 0-15 with their bits turned round */
 int glow_draw_oam(u8 *actor, u32 **cursor) {
     u8 *me = *(u8 **)0x03001C34;
     int box[4], x, y;
     if (actor != GL.actor || !IN_EWRAM(me)) return 1;
+    if (GL.rise) glow_frame();                                          /* (powering up: the fighter's input doesn't run) */
+    if (!GL.fade) return 1;
     SpriteBox(box, me);
-    x = ((box[0] + box[2]) >> 1) - SCREEN_X - 16; y = ((box[1] + box[3]) >> 1) + 1 - SCREEN_Y - 31;    /* where the power-up's aura stands */
-    if (x <= -32 || x >= 240 || y <= -32 || y >= 160) return 1;
-    (*cursor)[0] = 0x80002000 | (x & 0x1FF) << 16 | (y & 0xFF);
+    x = ((box[0] + box[2]) >> 1) - SCREEN_X - 16; y = ((box[1] + box[3]) >> 1) - SCREEN_Y - 59;     /* its bottom row a pixel under his feet */
+    if (x <= -32 || x >= 240 || y <= -64 || y >= 160) return 1;
+    if (GL.fade < 16 && glow_spread[FRAMES & 15] >= GL.fade) return 1;  /* fading in: shown in `fade` of every 16 frames, spread out (half: every
+                                                                           other frame), so it looks see-through, not blinking (no blending: see glow_frame) */
+    (*cursor)[0] = 0xC000A000 | (x & 0x1FF) << 16 | (y & 0xFF);        /* 32x64 (tall, size 3), 256 colours */
     (*cursor)[1] = (*(u16 *)(actor + 0xC) & 0x3FF) | 2 << 10;
     *cursor += 2;
+#ifdef GLOW_BAND
+    if (GL.rise) return 1;                                              /* (the band comes with the form) */
+    (*cursor)[0] = 0xC0008400 | (x & 0x1FF) << 16 | (y & 0xFF);        /* the band: semi-transparent, 16 colours */
+    (*cursor)[1] = ((*(u16 *)(actor + 0xC) + RIM_BYTES / 32) & 0x3FF) | 2 << 10 | (((const volatile u8 *)glow_band_at)[GL.kind] >> 4) << 12;
+    *cursor += 2;
+#endif
     return 1;
 }
 static int glow_listed(void) {                /* is GL.actor on the actor list? (work RAM isn't cleared at boot: never trust it otherwise) */
@@ -2708,27 +3080,94 @@ static int glow_listed(void) {                /* is GL.actor on the actor list? 
     }
     return 0;
 }
+static int glow_kind(int form) {
+    if (is_ssb(form) || form == FORM_GOGETA_SSB_FORM) return 0;
+#ifdef GLOW_MORE
+    if (is_ssg(form)) return 1;
+    if (form == FORM_ROSE) return 2;
+#endif
+    return -1;
+}
+/* The glow comes in during the power-up (Nov 12, 20:10, the owner: "Can you have the aura come in during the power up so it looks like a
+   smoother transition"). A power-up into a glowing form (Blue's state; Super Saiyan 4's going to a God form; Rose's) starts the glow of
+   the form it goes to as it starts (glow_begin, from its start: after the power-up's own aura, which keeps first claim on sprite memory;
+   no room, and the glow comes when the form does, as before), and it fades in: nothing for RISE_FROM frames, then the rim shown in
+   more and more of every 16 frames over RISE_LEN frames (on screen: brighter and brighter; blending it with BLDALPHA faded the fighter
+   and the power-up's aura as well, the power-up sets the blend registers for its flash), then the band with the form. The power-up lasts about 96 frames (Blue's from Super Saiyan, measured). While it plays the fighter's input (player_input,
+   glow_tick) doesn't run: the glow's own draw (every frame) moves the fade and the flame (glow_frame). A power-up cut short ends it
+   (glow_tick, once the fighter's input runs again). */
+#define RISE_FROM 20
+#define RISE_LEN 64
+static int glow_rise(u8 *me) {                /* the kind of glow a power-up under way goes to, or -1 */
+    u32 *state = IN_EWRAM(me) ? *(u32 **)(me + 0x14) : 0;
+    if (!IN_EWRAM(state)) return -1;
+    if (state[0] == (u32)ssb_vt) return 0;
+#ifdef GLOW_MORE
+    if (state[0] == (u32)ssj4_vt && XFORM && is_ssg(XFORM - 1)) return 1;
+    if (state[0] == (u32)rose_vt) return 2;
+#endif
+    return -1;
+}
+static void glow_check(void) {                /* GL.actor only if it is still the glow on the actor list */
+    if (GL.actor && (!IN_EWRAM(GL.actor) || *(const u32 *)GL.actor != (u32)glow_vt || !glow_listed())) { GL.actor = 0; GL.blending = 0; }     /* (a new area set its own) */
+    if (!GL.actor && GL.blending > 1) GL.blending = 0;          /* (work RAM isn't cleared at boot) */
+}
+static int glow_make(void) {                  /* the glow's actor, if it can have one (sprite memory free for it) */
+    u32 *a; int tile, i;
+    glow_check();
+    if (GL.actor) return 1;
+    if (!bolt_room(GLOW_BYTES) || !(a = Alloc(0x20))) return 0;
+    for (i = 0; i < 8; i++) a[i] = 0;
+    tile = OBJ_ALLOC(ACTOR_LIST, GLOW_BYTES);
+    if (tile == -1) { FreeMem(a); return 0; }
+    a[0] = (u32)glow_vt; *((u8 *)a + 8) = 0x38;
+    *(u16 *)((u8 *)a + 0xC) = tile; *(u16 *)((u8 *)a + 0xE) = GLOW_BYTES;
+    GL.actor = (u8 *)a; GL.loaded = -1;
+    Actor_Add(ACTOR_LIST, a);
+    return 1;
+}
+static void glow_frame(void) {                /* the fade, the flame's frame and the blend, every frame the glow is up */
+    int frame;
+    if (GL.rise) {
+        int t = (u16)((u16)FRAMES - GL.rise);
+        GL.fade = t < RISE_FROM ? 0 : t >= RISE_FROM + RISE_LEN ? 16 : (t - RISE_FROM) * 16 / RISE_LEN;
+    }
+    else GL.fade = 16;
+    frame = (FRAMES / GLOW_STEP) % GLOW_FRAMES;
+    if (GL.loaded != frame) {
+        MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_frames[GL.kind][frame], RIM_BYTES);
+#ifdef GLOW_BAND
+        MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20 + RIM_BYTES, (void *)glow_band[GL.kind][frame], 0x400);
+#endif
+        GL.loaded = frame;
+    }
+    if (!GL.rise) glow_blend(1);              /* (not while it comes in: the power-up's flash sets the blend registers too; turned over to the
+                                                 band's then, every sprite on screen faded with the rim) */
+}
+void glow_begin(int kind) {                   /* a power-up into a glowing form starts (its start, after its own aura) */
+    u8 *me = *(u8 **)0x03001C34;
+    if (!COMBAT_ON || !IN_EWRAM(me) || AURA_MODE > 1 || !glow_make()) return;
+    GL.kind = kind; GL.loaded = -1; GL.rise = (u16)FRAMES | 1; GL.fade = 0;
+}
 static void glow_tick(void) {
     u8 *rec = RECORDS + *(u8 *)0x03001068 * RECORD_SIZE, *me = *(u8 **)0x03001C34;
-    int form = rec[0x14], want = COMBAT_ON && IN_EWRAM(me) && AURA_MODE <= 1 && (is_ssb(form) || form == FORM_GOGETA_SSB_FORM), frame;
-    if (GL.actor && (!IN_EWRAM(GL.actor) || *(const u32 *)GL.actor != (u32)glow_vt || !glow_listed())) GL.actor = 0;
-    if (!want) { if (GL.actor) BOMB_LIST_REMOVE(ACTOR_LIST, GL.actor); GL.actor = 0; return; }
-    if (!GL.actor) {
-        u32 *a; int tile, i;
-        if (!bolt_room(GLOW_BYTES) || !(a = Alloc(0x20))) return;
-        for (i = 0; i < 8; i++) a[i] = 0;
-        tile = OBJ_ALLOC(ACTOR_LIST, GLOW_BYTES);
-        if (tile == -1) { FreeMem(a); return; }
-        a[0] = (u32)glow_vt; *((u8 *)a + 8) = 0x38;
-        *(u16 *)((u8 *)a + 0xC) = tile; *(u16 *)((u8 *)a + 0xE) = GLOW_BYTES;
-        GL.actor = (u8 *)a; GL.loaded = -1;
-        Actor_Add(ACTOR_LIST, a);
+    int form = rec[0x14], kind = glow_kind(form), want;
+    glow_check();
+    if (kind >= 0) GL.rise = 0;
+    else if (GL.actor && GL.rise && glow_rise(me) == GL.kind) kind = GL.kind;      /* still powering up */
+    want = COMBAT_ON && IN_EWRAM(me) && AURA_MODE <= 1 && kind >= 0;
+    if (!want) {
+        glow_check();
+        if (GL.actor) BOMB_LIST_REMOVE(ACTOR_LIST, GL.actor);
+        GL.actor = 0; GL.rise = 0; glow_blend(0); return;
     }
-    frame = (FRAMES >> 3) % 3;
-    if (GL.loaded != frame) { MemCopy((u8 *)OBJ_TILES + *(u16 *)(GL.actor + 0xC) * 0x20, (void *)glow_frames[frame], GLOW_BYTES); GL.loaded = frame; }
+    if (!glow_make()) return;
+    if (GL.kind != kind) { GL.kind = kind; GL.loaded = -1; }
+    glow_frame();
 }
 #else
 static void glow_tick(void) {}
+void glow_begin(int kind) {}
 #endif
 void majuub_use(u8 *record, void *sprite) {
     if (!(form_table[record[0x14] * 24] & 1)) power_up(sprite, absorb_vt);
@@ -2999,9 +3438,12 @@ void combat_hook(void *defender, int *hit) {
 /* Markers on the flight map's mini-map (Nov 9; Black Star Odyssey's, bso/maps/worldmap_markers.py): every named place on Earth's map (0:50)
    gets a yellow diamond. The mini-map object's draw (vtable 0x0804D8A0 +0x10, 0x08027A75) draws the red player arrow; this runs it and adds
    one 8x8 8bpp sprite per place, copying the marker to OBJ tile 300. On Buu's Fury's map the controls bar takes tiles 86-213 (Black Star
-   Odyssey's tile 150 is in it), two more sprites 206-241, the arrow 242; 300 is free (read from OAM in flight). build.py fills map_marks. */
+   Odyssey's tile 150 is in it), two more sprites 206-241, the arrow 242, the flying figure from 244 (32x32, or 64x64 to 371: Broly, Full
+   Power Broly, Super 13), its shadow 564. The marker took 300 until Nov 12, inside a big figure: drawn over his own pixels every frame, he
+   flickered in flight (the owner: "world map flickers"). Now the last two of sprite memory's 1024 (read from OAM in flight: nothing above
+   629). build.py fills map_marks. */
 extern const u8 map_marks[][2];
-#define MARK_TILE 300
+#define MARK_TILE 1022
 extern const int map_mark_count;
 static const char mark_shape[8][9] = {"...K....", "..KYK...", ".KYYYK..", "KYYWYYK.", ".KYYYK..", "..KYK...", "...K....", "........"};
 int minimap_draw(void *self, u32 *ctx) {

@@ -15,6 +15,7 @@ d = sys.argv[3] if len(sys.argv) > 3 else tempfile.mkdtemp(prefix='flash'); os.m
 sys.path[:0] = ['ultimate', 'ultimate/lib', 'tools/scripts']
 import zone26
 import bench as BN                                   # the guest bench (lib/bench.py)
+import guestnav                                      # the guest slot's keys (lib/guestnav.py)
 FL = FDIR + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'; EE = EDIR + '/BFU_debug_zone_PERSONAL_USE_ONLY.gba'
 forms = json.load(open(FDIR + '/BFU_debug_zone.map.json'))['forms']
 LR = ['python3', 'tools/harness/lr_harness.py']
@@ -63,15 +64,17 @@ def swap_save(emu, rom=FL, tag=''):
     """New game, Broly out with 111111 exp, swap to Piccolo and save. -> (save file, state)"""
     hub = talk_at(emu, home + FLAGS, 96, 328, rom=rom)
     hub = talk_at(emu, hub + ['run 200'], *zone26.HUB_AT, rom=rom)
-    s1 = hub + ['poke %08X %08X' % (R8 + 0x24, 111111), 'poke8 %08X %02X' % (R8 + 0x28, 11)] + GUEST + DOWN(3) + CONFIRM + ['shot swap_%s%s' % (emu, tag)] + state('b')
+    to_piccolo = guestnav.keys('piccolo', start='broly', wait=30) if rom == FL else DOWN(3)     # (the Nov 12 EEPROM build: Down through every look)
+    s1 = hub + ['poke %08X %08X' % (R8 + 0x24, 111111), 'poke8 %08X %02X' % (R8 + 0x28, 11)] + GUEST + to_piccolo + CONFIRM + ['shot swap_%s%s' % (emu, tag)] + state('b')
     sav = '%s/%s%s.sav' % (d, emu, tag)
     if os.path.exists(sav): os.remove(sav)
     out = run(emu, s1, sav, rom)
     return sav, read('b'), out
 
-def reload(emu, src, tag, was='piccolo', move=UP(3), now='broly'):
+def reload(emu, src, tag, was='piccolo', move=None, now='broly'):
     """Boot from the save, load the game (`was` out), swap (`now` from the bench) and save again."""
     sav = '%s/re_%s.sav' % (d, tag); shutil.copy(src, sav)
+    move = move or guestnav.keys(now, start=was, wait=30)
     back = talk_at(emu, BOOT + state('r'), *zone26.HUB_AT, sav=sav) + GUEST + move + CONFIRM + ['shot back_%s' % tag] + state('i')
     shutil.copy(src, sav)
     out = run(emu, back, sav)
@@ -99,10 +102,10 @@ for emu in ('mgba', 'vbam', 'delta', 'gpsp'):
     check('mGBA save in %s: loads (Piccolo out), Broly back from the bench' % emu, ok)
     check('mGBA save in %s: saved again (%d KB)' % (emu, SIZE[emu] >> 10), saved_ok(emu, sav))
     if emu != 'mgba':
-        sav2, ok, r, i = reload('mgba', sav, '%s_back_to_mgba' % emu, 'broly', DOWN(3), 'piccolo')
+        sav2, ok, r, i = reload('mgba', sav, '%s_back_to_mgba' % emu, 'broly', None, 'piccolo')
         check('and that %s save in mGBA: Broly out, Piccolo back from the bench' % emu, ok)
 for emu in ('delta',):                 # a save Delta's core wrote, back in it
-    sav, ok, r, i = reload(emu, d + '/re_mgba_to_delta.sav', 'delta_to_%s' % emu, 'broly', DOWN(3), 'piccolo')
+    sav, ok, r, i = reload(emu, d + '/re_mgba_to_delta.sav', 'delta_to_%s' % emu, 'broly', None, 'piccolo')
     check('Delta save in %s: loads (Broly out), Piccolo back from the bench' % emu, ok and saved_ok(emu, sav))
 # an old 8 KB EEPROM save (the EEPROM build, mGBA)
 old, b, out = swap_save('mgba', EE, '_eeprom')

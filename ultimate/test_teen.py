@@ -112,5 +112,41 @@ for look in ('teen_gohan', 'gohan_armor'):
               all(v[1] == want and not v[2] for v in res.values()) and res['blast'][0] > 0 and res['kame'][0] > 0)
         check('%s %s: the Kamehameha shows his beam pose while held' % (look, tier), beam is not None and beam in poses)
     del T.base[k_]
+# 3. As the guest (Nov 12, the owner: "add skill and transformation mastery and skill swap for guests if you can but only lore accurate
+#    stuff"): in the debug build, Teen Gohan picked on the Switch screen at the start (the guest slot, then his fighter: lib/guestnav.py)
+#    plays, with a fight's flag set. His Super Saiyan trains his own mastery byte (the bench's spare field: lib/bench.py GUEST_MASTERY, Teen
+#    Gohan's Super Saiyan second), not Goku's; at Level 3 it shows on the skill and drains slower; his moves level with him (his
+#    Kamehameha and Masenko at the top level, Level 3, as the party's at 150 and 125; ki blasts have no levels).
+import bench as BN, guestnav, subprocess
+ZROM = os.path.join(os.path.dirname(ROM), 'BFU_debug_PERSONAL_USE_ONLY.gba')        # (the plain debug build opens the Switch screen after the intro)
+R8 = R + 8 * 0x68; G = 0x03001068; COMBAT = 0x03001988
+START = open('tools/harness/long.txt').read().split('\n')[1:93]
+def guest_run(name, mastery, frames, exp=None, skills=(7, 20)):
+    L = ['guardon 0x09000000'] + START + ['tap A 60', 'tap A 60', 'run 30'] + ['tap RIGHT 40'] * 5 + guestnav.keys('teen_gohan') + ['tap A 200', 'run 60']
+    L += ['poke8 %08X %02X' % (R8 + 0x0C, len(skills))] + ['poke8 %08X %02X' % (R8 + 0x0D + i, v) for i, v in enumerate(skills)]
+    L += ['poke %08X 00000001' % COMBAT, 'run 4'] + BN.ON + ['poke8 %08X %02X' % (BN.GUEST_MASTERY + 1, mastery), 'poke8 %08X 00' % BN.MASTERY]
+    if exp is not None: L += ['poke %08X %08X' % (R8 + 0x24, exp)]
+    L += ['run 140', 'poke8 %08X 01' % (R8 + 0x15), 'poke8 %08X FF' % (R8 + 0x1A), 'poke8 %08X 03' % (R8 + 0x1B), 'keys B', 'run 2', 'keys', 'run 200']
+    L += ['poke8 %08X FF' % (R8 + 0x1E), 'poke8 %08X 03' % (R8 + 0x1F), 'mem %08X 26' % R8, 'mem %08X 4' % BN.GUEST_MASTERY, 'mem %08X 1' % BN.MASTERY]
+    L += ['run 30', 'poke %08X 00000001' % COMBAT] * (frames // 30) + ['mem %08X 26' % R8, 'mem %08X 4' % BN.GUEST_MASTERY, 'mem %08X 1' % BN.MASTERY, 'mem %08X 1' % G, 'shot %s' % name]
+    open(D + '/%s.txt' % name, 'w').write('\n'.join(L) + '\n')
+    o = subprocess.run(['tools/harness/harness', ZROM, D + '/%s.txt' % name, D], capture_output=True, text=True, timeout=900).stdout
+    w = lambda a: [[int(v, 16) for v in l.split(':')[1].split()] for l in o.splitlines() if l.startswith('mem %08x' % a)]
+    rec = [b''.join(x.to_bytes(4, 'little') for x in r) for r in w(R8)[-2:]]
+    gm = [b''.join(x.to_bytes(4, 'little') for x in r) for r in w(BN.GUEST_MASTERY)[-2:]]
+    return rec, gm, [r[0] & 255 for r in w(BN.MASTERY)[-2:]], w(G)[-1][0] & 255, 'bad pc' in o
+zforms = json.load(open(ZROM.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
+rec, gm, goku, me, bad = guest_run('guest_mastery', 0, 1200)
+print('   as the guest: playing %d, form %d, his Super Saiyan mastery %d -> %d, Goku\'s %s' % (me, rec[-1][0x14], gm[0][1], gm[-1][1], goku))
+check('as the guest, Teen Gohan\'s Super Saiyan trains his own mastery, not Goku\'s', me == 8 and rec[0][0x14] == zforms['teen_gohan_ss'] and gm[-1][1] > gm[0][1] and goku == [0, 0] and not bad)
+rec0, _, _, _, _ = guest_run('guest_drain0', 0, 450)
+rec3, gm3, _, _, bad3 = guest_run('guest_drain3', 250, 450)
+d0 = struct.unpack_from('<H', rec0[0], 0x1E)[0] - struct.unpack_from('<H', rec0[1], 0x1E)[0]; d3 = struct.unpack_from('<H', rec3[0], 0x1E)[0] - struct.unpack_from('<H', rec3[1], 0x1E)[0]
+print('   his Super Saiyan bar drained %d unmastered, %d at Level 3; the skill\'s level byte %d' % (d0, d3, rec3[-1][0x2E + 2]))
+check('mastered, his Super Saiyan shows Level 3 and drains about 3/5 as fast', rec3[-1][0x2E + 2] == 2 and d0 > 6 and 0.45 < d3 / d0 < 0.75 and not bad3)
+recl, _, _, _, badl = guest_run('guest_levels', 0, 120, exp=0x7FFFFFFF, skills=(7, 20, 15, 17))
+print('   at the top level his moves\' levels: %s' % list(recl[-1][0x2E:0x2E + 2 * recl[-1][0x0C]:2]))
+check('his moves level with him: at the top level his Kamehameha and Masenko are Level 3; ki blasts have no levels (as the party\'s)',
+      recl[-1][0x2E + 4] == 2 and recl[-1][0x2E + 6] == 2 and recl[-1][0x2E] == 0 and not badl)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

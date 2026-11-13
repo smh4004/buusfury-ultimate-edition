@@ -71,7 +71,10 @@ FP_SKILL = 47                    # Full Power (Nov 9): Mystic Gohan only, from h
 SHELVED_SKILLS = (48, 49)
 SHELVED_FORMS = ('kid_goku', 'vegeta_gt', 'vegeta_gt_tank')     # forms 159, 160, 161 in the Nov 9 build, in this order
 SHELVED_FIRST_FORM = 159
-SKILL_IDS_END = 50               # one past the last skill row (checked once the table is built)
+POTARA_SKILL, DANCE_SKILL = 50, 12      # the Potara (Nov 12: its own skill, for more fusions to come; Goku and Vegeta, all four Trials won), the Fusion Dance (retail; Goku and Vegeta after the ending): outfit.c potara_*, dance_use
+POTARA_PAIRS = ((6, 0, 4),)     # (fused, dancer, dancer): outfit.c potara_pairs
+POTARA_LOOK, POTARA_SECONDS = 284, 3600     # Vegito's look (native 0x9D, as the story's Potara scene sets it); an hour (Dragon Ball Super: the Potara's limit for mortals)
+SKILL_IDS_END = 51               # one past the last skill row (checked once the table is built)
 MYSTIC_FLAG = 860                # outfits.json: the Elder Kai's scene gives Gohan the orange gi (outfit 110)
 CELL_UNLOCKS = (873, 874, 875, 879)    # outfits.json: the Cell Games' prize opens the Saiyan armor (Gohan, Trunks, Vegeta) and Future Trunks
 # Post-game gear (Nov 9): rows past the game's 162, each working on the new moves (outfit.c reads them). (row, name, text, base row for the
@@ -102,7 +105,17 @@ SSG_HAIR = ((120, 32, 64), (200, 32, 64))         # his hair: edge and fill (cri
 # Nov 11 (the owner, 19:26 and 19:49): Super Saiyan God's eyes red as his hair; Super Saiyan Blue's pupils and brows the hair's blues, a
 # light cyan aura (Super Saiyan's gold shade for shade, SSB_AURA), and Super Saiyan 2's bolts toned down in Blue's colours (SSB_BOLTS,
 # outfit.c crackle). Built with BFU_LOOK170=1 until the owner approves the preview.
-LOOK170 = bool(os.environ.get('BFU_LOOK170'))
+LOOK170 = os.environ.get('BFU_LOOK170', '1') != '0'      # on since the owner's pick of the glow (Nov 12, 19:04); BFU_LOOK170=0 builds without
+GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.py STYLES): the owner's pick (Nov 12, 19:04: "1c looks good use that")
+GLOW_ALPHA = (6, 10)
+GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
+# Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
+# own), 1 Super Saiyan God (crimson to orange, a gold-white core), 2 Rose (magenta to pink, as Rose's power-up aura). Nearest palette entries.
+GLOW_KINDS = (None,
+              {11: (136, 16, 24), 1: (200, 32, 32), 6: (232, 64, 40), 2: (248, 104, 56), 13: (248, 136, 80), 5: (248, 176, 112), 3: (248, 216, 168),
+               12: (248, 232, 200), 4: (248, 248, 248), 14: (248, 96, 48)},
+              {11: (120, 16, 88), 1: (192, 40, 136), 6: (224, 64, 168), 2: (248, 104, 200), 13: (248, 136, 216), 5: (248, 176, 232), 3: (248, 208, 240),
+               12: (248, 232, 248), 4: (248, 248, 248), 14: (248, 104, 200)})                                # 1c's see-through band: 6/16 of it over 10/16 of the stage (outfit.c GLOW_ALPHA)
 SSB_AURA = {(248, 168, 0): (48, 176, 232), (248, 208, 0): (96, 232, 248), (248, 248, 0): (160, 248, 248), (248, 248, 144): (208, 248, 248), (248, 248, 216): (232, 248, 248)}
 SSB_BOLTS = ((32, 128, 248), (200, 248, 248))     # glow, core
 # Full Power Mystic: Gohan's orange-gi form -> (its form, owner, its figure: the orange gi's). Rows after Super Saiyan God's.
@@ -112,6 +125,10 @@ FP_BOLTS = ((176, 200, 248), (248, 248, 248))     # the crackle's lightning: a c
 SSB_LOOKS = {'goku_ssb': (3, 5, 0, 109, 0), 'goku_ssb_b': (4, 6, 0, 110, 2), 'vegeta_ssb': (28, 5, 4, 273, 26), 'vegeta_ssb_b': (29, 5, 4, 274, 27),
              'vegeta_armor_ssb': ('vegeta_armor_ss', 5, 4, 'vegeta_armor_ss', 'vegeta_armor')}     # name: (its Super Saiyan form, row copied, owner, actor, base form)
 SSB_FORMS = tuple((v[0], k) for k, v in SSB_LOOKS.items())
+# Blue's change (lib/sprites.py change_slot): name -> (the base form whose figure's change it takes, its frames, the black-haired frame)
+_SSB_SEQ = [2, 2, 3, 4, 5, 6, 7, 8, 9, 9, 'stance']
+SSB_CHANGE = {'goku_ssb': (0, _SSB_SEQ, 1), 'goku_ssb_b': (2, _SSB_SEQ, 1), 'vegeta_ssb': (26, _SSB_SEQ, 1), 'vegeta_ssb_b': (27, _SSB_SEQ, 1),
+              'vegeta_armor_ssb': ('vegeta_armor', [6, 7, 8, 9, 10, 6, 7, 8, 9, 10, 'stance'], 0)}     # (LoG2's change: black 0-2, gold 6-10)
 # The blue: Super Saiyan's hair ramp (BF indices) -> DBS Gogeta's Blue tones (gogeta.py's sheet, flattened), lightest as his lightest
 SSB_HAIR = {16: (24, 64, 160), 202: (24, 128, 240), 201: (69, 199, 246), 28: (86, 246, 246), 29: (200, 248, 248), 2: (200, 248, 248),
             246: (200, 248, 248)}     # (246: Vegeta's palest gold, Nov 10: it stayed yellow)
@@ -242,8 +259,12 @@ SUPER_KAME_USES = 100               # Kamehameha uses at its top level (and afte
 MASTERY_L2, MASTERY_L3 = 100, 250   # a transformation's mastery units (outfit.c ss_tick / ssj4_refill) for its Level 2 and 3
 # (literal ids: test_build.py reads this with ast.literal_eval; 47 is FP_SKILL. Goku's 5, Dragon Fist Explosion as a Super Saiyan 3, fills his
 # sixteenth and last place: the known-skills word has 16 bits.)
-SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 21, 46, 5), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
-              3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
+# (Nov 12: Goku's fourteenth place, the story's locked Super Saiyan (21), is the Potara (50) now: 21 is held only while the story locks his
+# Super Saiyan and the story swaps it back itself; outfit.c skills_swap keeps it in its slot. A book has 24 places since: the record's 16
+# known bits, then 8 more per character in the bench (outfit.c KNOWN2): Goku's Fusion Dance (12) is his seventeenth.)
+BOOK_PLACES = 24
+SKILL_BOOK = {0: (7, 15, 43, 14, 20, 35, 22, 36, 44, 37, 19, 39, 41, 50, 46, 5, 12), 1: (7, 20, 35, 6, 17, 18, 26, 21, 47), 2: (7, 20, 16, 8, 12, 21),
+              3: (7, 20, 35, 4, 11, 12, 21), 4: (7, 20, 35, 36, 44, 10, 2, 38, 40, 21, 50, 12), 5: (7, 20, 22, 13, 23, 21), 6: (7, 20, 35, 1, 9, 21),
               7: (7, 3, 5, 20, 44)}
 # A move's level by the character's level (Player_GetLevel, 50-200), as the level-up script 0x0877C9E8 grants them: (character, skill,
 # level for Level 2 or 0 = from the start (a story grant), level for Level 3). The new beams follow the move they're built on.
@@ -275,6 +296,7 @@ NEW_MOVES = (('eraser', ERASER_SKILL, (2.95, 2.85, 2.45), 'Eraser Cannon', 'Pres
 SUPER_BLUE_SKILL = 44            # Super Saiyan Blue (Nov 9: its own row; retail stub 21 stays the story's locked Super Saiyan)
 OLD_SUPER_BLUE = 21              # where it was before: saves holding it are moved on (outfit.c skills_sync)
 BROLY_DEFEAT = 'assets/scripts/gUnknown_0879321C.evt'
+FUSION_END = 'assets/scripts/gUnknown_0879A4CC.evt'     # global script 503: a fusion's time is up
 DEBUG_NATIVE = 0xDB              # debug builds only: "save to slot 1". No script calls 0xDB (equipment uses 0xDF-0xE8 and 0xF5, the death script 0xF7)
 OUT = os.environ.get('BFU_OUT', 'ultimate/out')
 SAIYAMAN = [(10, 14), (15, 'saiyaman_from_green'), (13, 'saiyaman_from_orange'), ('gohan_gt', 'saiyaman_from_gt'), ('gohan_gt_noglasses', 'saiyaman_from_gt_ng'),
@@ -1360,6 +1382,9 @@ def add_actors(rom, clean):
         return source
     for k, a in cfg.items():
         if isinstance(a, dict) and isinstance(a.get('log2_source'), str): a['log2_source'] = checked(teen.made(a['log2_source']))
+    # The Saiyan armor's Super Saiyan 2 stance: the Super Saiyan stance (arms down) with r55's head (Nov 12, the owner: "SSJ2 Teen Gohan idle
+    # pose his hands are raised up instead of down, if you can fix that to standard"; teen.armor2)
+    cfg['gohan_armor_ss2_art']['log2_source'] = checked(teen.armor2())
     pal = np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3)
     usable = [i for i in range(1, 256) if i not in artclean.MENU_SLOTS]
     cfg['super13'] = {'proto_actor': 230}
@@ -1450,6 +1475,15 @@ def add_actors(rom, clean):
         under = struct.unpack_from('<H', clean, FORMS + FORM_SIZE * base + 0x0E)[0] - 9 if isinstance(src, int) and isinstance(base, int) else None
         cfg[n] = {'tint_of': src, 'tint': ssb.tint(clean, src, under, to, sides=n.startswith('goku'), eyes=LOOK170,
                                                    iris=ssb.LOG2_IRIS if src == 'vegeta_armor_ss' else ssb.IRIS), 'high': True}   # (his sideburns)
+        # His change (slot 10): his Super Saiyan change's own pose, the hair blue (Nov 12, the owner: "Gokus hair turns SSJ3 in the SSB
+        # transformation", "change the Vegeta and Gogeta SSB transformation pose and make them not raise their hands but do the normal pose").
+        # Goku's Super Saiyan figure's change was the one into Super Saiyan 3 (the hair grows); Vegeta's was his power-up, arms up. The base
+        # figure's change (BF's: black hair in frame 1, then the Super Saiyan frames 2-9 in the same pose) with the hair found against frame 1.
+        if n in SSB_CHANGE:
+            act, seq, ref = SSB_CHANGE[n]
+            act = struct.unpack_from('<H', clean, FORMS + FORM_SIZE * act + 0x0E)[0] - 9 if isinstance(act, int) else act
+            cfg[n]['change'] = {'actor': act, 'seq': seq, 'ref': ref,
+                                'tint': (lambda sides, iris: lambda img, under: ssb.tint_piece(img, under, to, sides, LOOK170, iris))(n.startswith('goku'), ssb.LOG2_IRIS if src == 'vegeta_armor_ss' else ssb.IRIS)}
     red = kaioken_remap(pal, one)
     for n, (_, _, src) in KAIOKEN.items():
         cfg[n + '_kaioken'] = {'tint_of': src, 'tint': red, 'high': True}
@@ -1475,7 +1509,7 @@ def add_actors(rom, clean):
     # Full Power Mystic: the orange gi's own figure (actor 101) under its own id; its lightning is the crackle (outfit.c), its power-up the orange gi's (_powerup)
     for n, (_, _, src) in FP_LOOKS.items():
         cfg[n] = {'same_as': src}
-    cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'trunks_armor_ss', 'future_trunks_ss', 'gohan_armor_ss2_art', 'vegeta_ssb', 'vegeta_ssb_b', 'vegeta_armor_ssb',
+    cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', *FP_LOOKS, 273, 274, 261, 276, 'vegeta_armor_ss', 'trunks_armor_ss', 'future_trunks_ss', 'gohan_armor_ss2_art',
                       'gohan_gt_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
                                           # was the base's change, so into 2 he went back to black hair and glasses first (test_frames 14)
     cfg['broly_player'] = {'template': 29}       # the playable Broly's own copy of the story's figure: his slot 18 is the Eraser Cannon's pose (fighter_poses), the boss keeps his. Last: scripts name the ids before it
@@ -1530,7 +1564,8 @@ def fighter_poses(rom, ids, at):
         struct.pack_into('<I', rom, rec + 0x54 + 4 * slot, put(struct.pack('<I', len(frames)) + b''.join(struct.pack('<4I', *f) for f in frames)))
     front = lambda f: [f[0]] * 4
     for fig, nxt, down in LOG2_CHANGES:
-        if fig in LOG2_OWN_CHANGE:
+        if fig in SSB_CHANGE: pass                          # Blue's change: his Super Saiyan change's pose, blue (sprites.change_slot)
+        elif fig in LOG2_OWN_CHANGE:
             ten = anim(rec_of(fig), 10)
             if not ten: sys.exit('%s: no LoG2 change' % fig)
             set_slot(fig, 10, [front(ten[i * len(ten) // 11]) for i in range(11)])     # 11 frames, as a retail power-up
@@ -1661,6 +1696,11 @@ def patch_forms(rom, clean, cfg, actors):
             if not struct.unpack_from('<I', rom, rec + 0x54 + 44)[0]:
                 print('form %d: slot 11 was empty' % f)
                 struct.pack_into('<I', rom, rec + 0x54 + 44, struct.unpack_from('<I', rom, rec + 0x54)[0])
+    # Vegito's forms count a fusion's time down and show it (flags bit 3, as Gogeta's and Gotenks's: the fusion classes' tick, the HUD's
+    # timer), for the Potara (Nov 12, outfit.c potara_use). The story's Vegito has no limit (-1), which neither counts nor shows.
+    for f in (39, 40, index['vegito_ss2']):
+        if rows[FORM_SIZE * f + 0x0C] != 6: sys.exit('form %d is not Vegito\'s' % f)
+        rows[FORM_SIZE * f] |= 8
     if len(rows) // FORM_SIZE > 255:
         sys.exit('too many forms: 255 is the "none" marker')
     rom[SPACE:SPACE + len(rows)] = rows
@@ -1704,6 +1744,10 @@ def symbol(name):
 
 BENCH_OLD = ('broly', 'broly_fp', 'android13', 'piccolo', 'future_trunks', 'android17', 'android18', 'krillin', 'videl', 'majin_buu', 'super_janemba', 'kid_buu', 'tien', 'yamcha', 'pikkon', 'hercule')
 BENCH_GROUPS = 48                # outfit.c's GROUPS: fighters the save can keep progress for (bench version 3, Nov 12: the flash save)
+# The guests' transformation mastery (outfit.c guest_tiers, Nov 12): (a guest outfit, tier: 0 Super Saiyan's, 1 Super Saiyan 2's), the
+# fighter's own byte in the bench's spare field, in this order (saves keep them by place: add new ones at the end). Only the Saiyan
+# transformations each has in the series: Goku Black's Rose is his Super Saiyan's tier.
+GUEST_MASTERY = (('future_trunks', 0), ('teen_gohan', 0), ('teen_gohan', 1), ('goku_black', 0))
 
 
 def bench_groups(guests):
@@ -1717,8 +1761,8 @@ def bench_groups(guests):
         key = o.get('bench', o['form'])
         if key not in shared: shared[key] = max(out) + 1
         out.append(shared[key])
-    if max(out) >= BENCH_GROUPS:
-        sys.exit('more guests than the save has room for (%d)' % BENCH_GROUPS)
+    if max(out) >= BENCH_GROUPS - 1:            # (the last group keeps Gogeta's own progress while a dance has his record: outfit.c fused_stash)
+        sys.exit('more guests than the save has room for (%d)' % (BENCH_GROUPS - 1))
     src = open('ultimate/src/outfit.c').read(); body = src[src.index('static void guest_sync'):]; body = body[:body.index('u8 *r =')]
     for name, count in re.findall(r'(\w+)\[\] = \{(\d+),', body):
         if int(count) > 5:
@@ -1744,6 +1788,14 @@ def map_marks(clean):
     return seen
 
 
+def glow_band_colour(clean, colour=None):
+    """1c's band colour (lib/ssb_glow.py COLOURS[14]) as the palette entry nearest it that a 16-colour sprite can use (not the first of its
+    bank, which is see-through): the band's sprite takes that entry's bank, and draws with its place in it."""
+    import ssb_glow
+    pal = np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3)
+    return indexer([i for i in range(1, 256) if i not in artclean.MENU_SLOTS and i & 15], pal)(np.array(colour or ssb_glow.COLOURS[14]))
+
+
 def add_outfits(rom, clean, at, art):
     """Compile the outfit code with its table at `at`, then point the Switch Character screen's vtable at it."""
     cfg = json.load(open('ultimate/outfits.json'))['characters']
@@ -1762,7 +1814,8 @@ def add_outfits(rom, clean, at, art):
     c += 'const u8 ssj4_bar[0x500] = {%s};\n' % ','.join(map(str, ssj4_bar(rom)))
     c += 'const u8 kk_bar[0x500] = {%s};\n' % ','.join(map(str, kk_bar(rom, clean)))
     c += 'const u8 map_marks[][2] = {%s};\nconst int map_mark_count = %d;\n' % (','.join('{%d,%d}' % m for m in map_marks(clean)), len(map_marks(clean)))
-    c += 'const u8 skill_book[8][16] = {%s};\n' % ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (16 - len(SKILL_BOOK[k]))) for k in range(8))
+    if max(len(b) for b in SKILL_BOOK.values()) > BOOK_PLACES: sys.exit('a skill book has more than %d places' % BOOK_PLACES)
+    c += 'const u8 skill_book[8][%d] = {%s};\n' % (BOOK_PLACES, ','.join('{%s}' % ','.join(str(v) for v in SKILL_BOOK[k] + (255,) * (BOOK_PLACES - len(SKILL_BOOK[k]))) for k in range(8)))
     c += 'const u8 level_steps[][4] = {%s{255,255,255,255}};\n' % ''.join('{%d,%d,%d,%d},' % t for t in LEVEL_STEPS)
     c += 'const u8 kaioken_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base if isinstance(base, int) else fm[base], fm[n + '_kaioken']) for n, (base, _, _) in KAIOKEN.items())
     c += 'const u8 ssg_map[][2] = {%s{255,255}};\n' % ''.join('{%d,%d},' % (base, fm[n]) for n, (base, _, _) in SSG_LOOKS.items())
@@ -1771,7 +1824,11 @@ def add_outfits(rom, clean, at, art):
     open(d + '/o.c', 'w').write(c)
     import zone26
     groups = bench_groups(cfg['8'])
-    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), *(['-DFLASH_SAVE'] if FLASH_SAVE else []), *(['-DLOOK170'] if LOOK170 else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DSS2_SKILL=%d' % SS2_SKILL, '-DGOGETA_FLAG=%d' % json.load(open('ultimate/outfits.json'))['characters']['7'][0]['flag'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DTEEN_FORMS=%s' % ','.join(str(fm[n]) for n in TEEN_FORMS), '-DFT_ARMOR=%s' % ','.join(str(fm[n]) for n in FT_ARMOR), '-DFORM_SAIYAMAN_ARMOR=%d' % fm['saiyaman_from_armor'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
+    GLOW_BAND_COLOUR = glow_band_colour(clean)
+    gnames = [o['form'] for o in cfg['8']]
+    guest_tiers = ','.join('{%d,%d}' % (groups[gnames.index(n)], t) for n, t in GUEST_MASTERY)
+    if len(GUEST_MASTERY) > 4: sys.exit('the bench keeps four guest mastery bytes (its spare 0-3)')
+    flags = ['-mthumb', '-mcpu=arm7tdmi', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-fshort-wchar', '-DHEAP_WORDS=0x%X' % HEAP_WORDS, '-DERASER_SKILL=%d' % ERASER_SKILL, '-DBOMBER_SKILL=%d' % BOMBER_SKILL, '-DBEAM_SKILL=%d' % BEAM_SKILL, '-DWAVE_SKILL=%d' % WAVE_SKILL, '-DSUPER13_SKILL=%d' % SUPER13_SKILL, '-DSUPER17_SKILL=%d' % SUPER17_SKILL, '-DBLITZ_SKILL=%d' % BLITZ_SKILL, '-DFORM_KID_BUU=%d' % fm['kid_buu'], '-DSHELVED_SKILLS={%s}' % ','.join(map(str, SHELVED_SKILLS)), '-DSHELVED_FORMS={%s}' % ','.join('{%d,%d}' % (fm['shelved_ape_' + n], fm[n]) for n in SHELVED_FORMS), '-DFORM_MAJIN_BUU=%d' % fm['majin_buu'], '-DFORM_JANEMBA=%d' % fm['super_janemba'], '-DDISC_SKILL=%d' % DISC_SKILL, '-DFORM_ANDROID17=%d' % fm['android17'], '-DFORM_ANDROID18=%d' % fm['android18'], '-DFORM_KRILLIN=%d' % fm['krillin'], '-DFORM_VIDEL=%d' % fm['videl'], *(['-DDEBUG_OPEN'] if '--debug' in sys.argv else []), *(['-DFLASH_SAVE'] if FLASH_SAVE else []), *(['-DLOOK170'] if LOOK170 else []), *(['-DGLOW_MORE'] if GLOW_MORE else []), '-DGLOW_FRAMES=8', '-DGLOW_STEP=%d' % __import__('ssb_glow').STEP.get(GLOW_STYLE, 4), *(['-DGLOW_BAND=%d' % GLOW_BAND_COLOUR, '-DGLOW_ALPHA=0x%X' % (GLOW_ALPHA[0] | GLOW_ALPHA[1] << 8)] if GLOW_STYLE in __import__('ssb_glow').BANDS else []), '-DTIER_ROOMS=%s' % zone26.tier_rooms(), '-DENDLESS_STEP=%d' % zone26.ENDLESS_STEP, '-DENDLESS_CAP=%d' % zone26.ENDLESS_CAP, '-DFORM_TIEN=%d' % fm['tien'], '-DFORM_BLACK=%d' % fm['goku_black'], '-DFORM_ROSE=%d' % fm['goku_rose'], '-DFORM_PAN=%d' % fm['pan'], '-DFORM_PAN_LAST=%d' % fm['pan_brapan'], '-DFORM_UUB=%d' % fm['uub'], '-DFORM_MAJUUB=%d' % fm['majuub'], '-DFORM_GOGETA_SSJ4=%d' % fm['gogeta_ssj4'], '-DFORM_GOGETA_DBS_SS=%d' % fm['gogeta_dbs_ss'], '-DSSB_SKILL=%d' % SUPER_BLUE_SKILL, '-DKAIOKEN_SKILL=%d' % KAIOKEN_SKILL, '-DSSG_SKILL=%d' % SSG_SKILL, '-DFP_SKILL=%d' % FP_SKILL, '-DMYSTIC_FLAG=%d' % MYSTIC_FLAG, '-DMORE_BOG_DONE=%d' % zone26.MORE_BOG_DONE, '-DSTATS_REF=0x%X' % zone26.STATS_REFS[0], '-DSTATS_ROWS=%d' % zone26.STATS_COUNT, '-DPHASE1_ROW=%d' % zone26.PHASE1_ROW, '-DBOSS_ROW=%d' % zone26.BOSS_ROW, '-DARENA_ROOMS=0x%X' % zone26.arena_rooms(), '-DSTORY_UNLOCKS={%s}' % ','.join(str(u['flag']) for u in json.load(open('ultimate/outfits.json'))['unlocks']), '-DSTORY_MARKS={%s}' % ','.join('{%d,%d}' % m for m in STORY_MARKS), '-DMORE_BOG_FIGHT=%d' % zone26.bog.MORE_BOG_FIGHT, '-DMORE_GJ_DONE=%d' % zone26.garlic.GJ_DONE, '-DMORE_BOG_RITUAL=%d' % zone26.bog.MORE_BOG_RITUAL, '-DSOLAR_SKILL=%d' % SOLAR_FLARE_SKILL, '-DMAX_POWER_SKILL=%d' % MAX_POWER_SKILL, '-DGEAR_POTARA=%d' % GEAR_POTARA, '-DGEAR_GRAVITY=%d' % GEAR_GRAVITY, '-DGEAR_SHADES=%d' % GEAR_SHADES, '-DGEAR_POUCH=%d' % GEAR_POUCH, '-DFORM_ROSHI=%d' % fm['roshi'], '-DSS2_SKILL=%d' % SS2_SKILL, '-DGOGETA_FLAG=%d' % json.load(open('ultimate/outfits.json'))['characters']['7'][0]['flag'], '-DFORM_ROSHI_MAX=%d' % fm['roshi_max'], '-DTENX_SKILL=%d' % TENX_SKILL, '-DDRAGON4_SKILL=%d' % DRAGON4_SKILL, '-DFINAL_SHINE_SKILL=%d' % FINAL_SHINE_SKILL, '-DGALICK_SKILL=%d' % GALICK_SKILL, '-DSUPER_KAME_SKILL=%d' % SUPER_KAME_SKILL, '-DSUPER_KAME_USES=%d' % SUPER_KAME_USES, '-DMASTERY_L2=%d' % MASTERY_L2, '-DMASTERY_L3=%d' % MASTERY_L3, '-DMORE_GT_FLAG=%d' % zone26.MORE_GT, '-DMAJUUB_SKILL=%d' % MAJUUB_SKILL, '-DROSE_SKILL=%d' % ROSE_SKILL, '-DBLACK_KAME_SKILL=%d' % BLACK_KAME_SKILL, '-DBENCH_GROUP_LIST=%s' % ','.join(map(str, groups)), '-DGUEST_TIERS=%s' % guest_tiers, '-DPOTARA_SKILL=%d' % POTARA_SKILL, '-DDANCE_SKILL=%d' % DANCE_SKILL, '-DTRIAL_ALL=%d' % zone26.TRIAL_ALL, '-DSS4_SKILL=%d' % SS4_SKILL, '-DFORM_YAMCHA=%d' % fm['yamcha'], '-DFORM_PIKKON=%d' % fm['pikkon'], '-DFORM_HERCULE=%d' % fm['hercule'], '-DFORM_FUTURE_TRUNKS=%d' % fm['future_trunks'], '-DTEEN_FORMS=%s' % ','.join(str(fm[n]) for n in TEEN_FORMS), '-DFT_ARMOR=%s' % ','.join(str(fm[n]) for n in FT_ARMOR), '-DFORM_SAIYAMAN_ARMOR=%d' % fm['saiyaman_from_armor'], '-DSS2_FLAG=%d' % SS2_FLAG, '-DTOUR_PICK_FLAG=%d' % zone26.TOUR_PICKS, '-DFORM_BROLY=%d' % fm['broly'], '-DFORM_FP=%d' % fm['broly_fp'], '-DFORM_PICCOLO=%d' % fm['piccolo'], '-DFORM_A13=%d' % fm['android13'], '-DBALL_AREAS={%s}' % ','.join(str(b[1] << 8 | b[0]) for b in zone26.BALLS), '-DFORM_S13=%d' % fm['super13'], '-DFORM_S17=%d' % fm['super17'], '-DSOUND_MOVE=0x%X' % symbol('gUnknown_0831947C'), '-DFONT=0x%X' % symbol('gUnknown_0807012C'), '-DMELEE_RECTS=0x083C344C', '-DSOUND_HIT=0x%X' % symbol('gUnknown_083192A8')]
     syms = ['-Wl,--defsym=form_table=0x%X' % (ROM_BASE + SPACE), '-Wl,-Ttext=0x%X' % (ROM_BASE + at), '-Wl,-e,picker_update', '-Wl,--no-warn-rwx-segments']
     lib = subprocess.run(['arm-none-eabi-gcc', '-mthumb', '-mcpu=arm7tdmi', '-print-libgcc-file-name'], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run(['arm-none-eabi-gcc'] + flags + syms + [d + '/o.c', lib, '-o', d + '/o.elf'], check=True)
@@ -1822,9 +1879,36 @@ def add_outfits(rom, clean, at, art):
     for n, name in mine.items(): struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
     for n, name in ((zone26.LADDER, 'ladder'), (zone26.MORE_PUT, 'more_put'), (zone26.WISH_NATIVE, 'wish_power')):     # retail natives no script calls
         struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
-    for n, name, was in ((0xA4, 'skill_add', 0x08002AB7), (0xA5, 'skill_remove', 0x08002AE5), (0xA6, 'skill_replace', 0x08002B13)):    # the skill book keeps in step
+    for n, name, was in ((0xA4, 'skill_add', 0x08002AB7), (0xA5, 'skill_remove', 0x08002AE5), (0xA6, 'skill_replace', 0x08002B13),    # the skill book keeps in step
+                         (0xA8, 'fusion_native', 0x08002EE3)):      # the fusion: Gogeta's own progress kept, Super Saiyan 4 Gogeta (Nov 12)
         if struct.unpack_from('<I', rom, tab + 4 * n)[0] != was: sys.exit('native 0x%X changed' % n)
         struct.pack_into('<I', rom, tab + 4 * n, sym[name] | 1)
+    # The Potara's scene (outfit.c potara_use, one event list per pair): a flash, the fused fighter's look (as the story's Potara scene
+    # sets Vegito's), the game's fusion native (him, who started it, the two of them, his time), he plays, and the flash fades.
+    import bfscript
+    if POTARA_PAIRS != ((6, 0, 4),): sys.exit('outfit.c potara_pairs: keep it as POTARA_PAIRS')
+    potara_at = tab + 1024                # (add_eraser's space starts after them)
+    for k, (fused, a, b) in enumerate(POTARA_PAIRS):
+        code_ = bfscript.asm('''    call 0x7A(10)
+    pushn %d, %d
+    call 0x9D
+    push %d
+    call 0x15
+    call 0x15
+    push %d
+    call 0x15
+    sub
+    pushn %d
+    call 0xA8
+    call 0x95(%d)
+    call 0x7B(10)
+    end
+''' % (fused, POTARA_LOOK, fused, a + b, POTARA_SECONDS, fused))
+        step = (potara_at + 3) & ~3; lst = (step + 3 + len(code_) + 3) & ~3; potara_at = lst + 8
+        if set(rom[step:potara_at]) != {0xFF}: sys.exit('no room for the Potara scene')
+        rom[step:step + 3 + len(code_)] = struct.pack('<HB', 1, 0) + bytes(code_)          # step 1, a code block
+        struct.pack_into('<II', rom, lst, ROM_BASE + step, 0)                                # the list: that step, then the end
+        struct.pack_into('<I', rom, sym['potara_list'] - ROM_BASE + 4 * k, ROM_BASE + lst)
     SKILL_TAB = 0x4B024                  # the pause menu's Skills tab: setup (slot 1) learns what play has earned, keys (slot 10) swap with SELECT
     for slot, want, name in ((1, 0x080171A9, 'skilltab_setup'), (10, 0x080175FD, 'skilltab_keys')):
         if ROM_BASE + SKILL_TAB + struct.unpack_from('<i', rom, SKILL_TAB + 4 * slot)[0] != want: sys.exit('Skills tab vtable changed')
@@ -1877,7 +1961,7 @@ def add_outfits(rom, clean, at, art):
         sys.exit('Combat_Damage changed: %s' % rom[DAMAGE:DAMAGE + 8].hex())
     rom[DAMAGE:DAMAGE + 8] = bytes.fromhex('004b1847') + struct.pack('<I', sym['combat_hook'] | 1)
     ssj4_ki_hooks(rom, sym)
-    end, art = add_eraser(rom, clean, sym, tab + 1024, art)    # after the row edits above: it moves the skill table
+    end, art = add_eraser(rom, clean, sym, (potara_at + 3) & ~3, art)    # after the row edits above: it moves the skill table (and after the Potara's scene)
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:
         sys.exit('Select Game party loop changed')
@@ -2326,21 +2410,22 @@ def add_eraser(rom, clean, sym, at, art):
         return one(np.array((min(255, g + 70), min(255, g + 80), min(255, g + 100))))
     white = bytes(whitened(v) for v in range(256))
     ssb_aura = bytes(0 if v == 0 else one(np.array(SSB_AURA[tuple(int(c) for c in pal[v])])) if tuple(int(c) for c in pal[v]) in SSB_AURA else v for v in range(256)) if LOOK170 else ssb_blue
-    if LOOK170:                                 # Blue's glow (outfit.c glow_tick): the field aura's three frames, its outer shades only
-        gold = [k for k in SSB_AURA]            # Super Saiyan's gold, darkest first
-        style = os.environ.get('BFU_GLOW', 'B')
-        keep = {'A': 2, 'B': 3, 'C': 3, 'D': 5}[style]
-        deep = {(248, 168, 0): (24, 128, 240), (248, 208, 0): (69, 199, 246), (248, 248, 0): (86, 246, 246)}     # C: the hair's blues
-        ptrs = []
-        for k in range(3):
-            o = 0x752D28 + 12 * k; t = struct.unpack_from('<I', clean, o + 8)[0] - ROM_BASE
-            src = np.frombuffer(clean[t:t + 1024], np.uint8)
-            out = bytearray(1024)
-            for i, v in enumerate(src):
-                c = tuple(int(x) for x in pal[v]) if v else None
-                if c in gold[:keep]: out[i] = one(np.array(deep[c] if style == 'C' else SSB_AURA[c]))
-            ptrs.append(put_art(bytes(out)))
-        struct.pack_into('<3I', rom, sym['glow_frames'] - ROM_BASE, *ptrs)
+    if LOOK170:                                 # Blue's glow (outfit.c glow_tick): drawn by lib/ssb_glow.py, the style the owner picks (BFU_GLOW)
+        import ssb_glow
+        style = GLOW_STYLE
+        rims = ssb_glow.STYLES[style](); bands = ssb_glow.band_only(ssb_glow.BANDS[style]()) if style in ssb_glow.BANDS else None
+        ptrs, band, band_at = [], [], []
+        for colours in [ssb_glow.COLOURS] + list(GLOW_KINDS[1:] if GLOW_MORE else ()):       # outfit.c GLOW_KINDS: each kind's frames, then the next's
+            lut = np.zeros(16, np.uint8)
+            for k, c in colours.items(): lut[k] = one(np.array(c))
+            ptrs += [put_art(ssb_glow.tiles(lut[f])) for f in rims]
+            if bands:                              # the see-through band: 4 bpp, one colour (glow_band_colour), its own sprite
+                at_ = glow_band_colour(clean, colours[14]); band_at.append(at_)
+                band += [put_art(ssb_glow.tiles4(f, at_ & 15)) for f in bands]
+        struct.pack_into('<%dI' % len(ptrs), rom, sym['glow_frames'] - ROM_BASE, *ptrs)
+        if bands:
+            struct.pack_into('<%dI' % len(band), rom, sym['glow_band'] - ROM_BASE, *band)
+            rom[sym['glow_band_at'] - ROM_BASE:sym['glow_band_at'] - ROM_BASE + len(band_at)] = bytes(band_at)
         vt = sym['glow_vt'] - ROM_BASE; BEAM_ACTOR_VT_ = 0x4AEF8
         mine = {0: 'glow_destroy', 2: 'bomb_nop', 3: 'bomb_one', 4: 'glow_draw_oam', 6: 'bomb_zero', 9: 'bomb_zero', 10: 'bomb_nop'}
         for k in range(14):
@@ -2552,6 +2637,11 @@ def add_eraser(rom, clean, sym, at, art):
     struct.pack_into('<III', row, 12, new_text('Full Power', 'Press the B Button to unleash Mystic Gohan\'s full power: attacks hit 1.75x as hard and its ki drains slowly. In his orange gi only. Press it again to calm down.'),
                      sym['fp_can'] | 1, sym['fp_use'] | 1)
     rows[FP_SKILL] = row
+    row = bytearray(clean[SKILL_ROWS + 24 * 12:SKILL_ROWS + 24 * 13])          # the Potara: the Fusion Dance's row (its icon, in the earrings' gold), its own name, check and use
+    struct.pack_into('<II', row, 4, *[put_art(iconlib.recolour(clean[p - ROM_BASE:p - ROM_BASE + 0x200], shifted(50 / 360))) for p in struct.unpack_from('<II', clean, SKILL_ROWS + 24 * 12 + 4)])
+    struct.pack_into('<III', row, 12, new_text('Potara', 'Put on a Potara earring and fuse with your partner, who must be in the party. Goku and Vegeta: Vegito, for an hour of his fighting.'),
+                     sym['potara_can'] | 1, sym['potara_use'] | 1)
+    rows[POTARA_SKILL] = row
     strings += [put(t.encode('utf-16-le') + b'\0\0') for t in ('Majuub', 'Press the B Button to draw on Majin Buu\'s power and become Majuub: attacks hit 1.5x as hard.  Press it again to change back.')]
     if ERASER_UI + len(strings) != TEEN_NAME_UI: sys.exit('Teen Gohan name moved')
     strings.append(put('Teen Gohan'.encode('utf-16-le') + b'\0\0'))
@@ -2676,7 +2766,7 @@ def add_eraser(rom, clean, sym, at, art):
     # The Fusion Dance (row 12) can't be used in Super 13's fight (outfit.c fusion_can); changed where it lies too.
     if struct.unpack_from('<II', rom, SKILL_ROWS + 24 * 12 + 16) != (0x0801A169, 0x0801A19F):
         sys.exit('skill row 12 is not the original Fusion Dance')
-    struct.pack_into('<I', rom, SKILL_ROWS + 24 * 12 + 16, sym['fusion_can'] | 1)
+    struct.pack_into('<II', rom, SKILL_ROWS + 24 * 12 + 16, sym['fusion_can'] | 1, sym['dance_use'] | 1)     # (Goku's and Vegeta's Super Saiyan 4 dance: dance_use)
     if struct.unpack_from('<I', rom, 0x13618)[0] != ROM_BASE + SKILL_ROWS:
         sys.exit('skill table reference moved')
     struct.pack_into('<I', rom, 0x13618, put(bytes(rom[SKILL_ROWS:SKILL_ROWS + 24 * ERASER_SKILL]) + b''.join(rows[k] for k in sorted(rows))))
@@ -2921,6 +3011,11 @@ def main():
         open(UI, 'w').write(re.sub(r'(?m)^1053\t.*$', '1053\tPress the B Button to gather energy above you, then throw it. It uses half your energy.', re.sub(r'(?m)^1050\t.*$', '1050\tSpirit Bomb', saved[UI])))
         saved.setdefault(BROLY_DEFEAT, open(BROLY_DEFEAT).read())
         open(BROLY_DEFEAT, 'w').write(broly_defeat(saved[BROLY_DEFEAT]))
+        # A fusion's end (global script 503) took Gogeta out by name whoever had fused: it takes out whoever plays now (the fused fighter:
+        # Gogeta, or the Potara's Vegito, Nov 12). Gotenks's branch already did.
+        saved.setdefault(FUSION_END, open(FUSION_END).read())
+        if saved[FUSION_END].count('    call 0x98(7)\n') != 1: sys.exit('global script 503 changed')
+        open(FUSION_END, 'w').write(saved[FUSION_END].replace('    call 0x98(7)\n', '    call 0x15\n    call 0x98\n'))
         ui = open(UI).read()
         for k, v in UI_EDITS.items():
             ui, n = re.subn(r'(?m)^%d\t.*$' % k, '%d\t%s' % (k, v), ui)

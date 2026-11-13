@@ -23,6 +23,29 @@ lit = sum(1 for x, y in marks if fm.getpixel((x + 3, y + 3))[0] > 200 and fm.get
 print('   map markers drawn: %d of %d' % (lit, len(marks)))
 check('the flight map marks every place you can land', lit == len(marks) and 'bad pc' not in out)
 fm.resize((480, 320)).save(d + '/flightmap_x2.png')
+# Nov 12 (the owner: the world map flickers in flight): the markers' tile lay inside a 64x64 flying figure's sprite memory (Broly, Full
+# Power Broly, Super 13: 244-371), drawn over his pixels every frame. Flying as Broly, no other sprite's tiles take in the markers'.
+SZ = {(0, 0): (8, 8), (0, 1): (16, 16), (0, 2): (32, 32), (0, 3): (64, 64), (1, 0): (16, 8), (1, 1): (32, 8), (1, 2): (32, 16), (1, 3): (64, 32), (2, 0): (8, 16), (2, 1): (8, 32), (2, 2): (16, 32), (2, 3): (32, 64)}
+eb = e[:len(start)] + ['poke8 %08X %02X' % (REC + 0x14, forms['broly'])] + e[len(start):]
+out = run(eb + ['keys UP'] + [v for i in range(20) for v in ('run 1', 'mem 07000000 256')] + ['keys', 'shot flightmap_broly'])
+spans, marks_t, clash = [], set(), set()
+for l in out.splitlines():
+    if not l.startswith('mem 07000000'): continue
+    w = [int(x, 16) for x in l.split(':')[1].split()]; one = []
+    for i in range(128):
+        a0, a1, a2 = w[2 * i] & 0xFFFF, w[2 * i] >> 16, w[2 * i + 1] & 0xFFFF
+        if (a0 >> 8) & 3 == 2: continue
+        wd, ht = SZ.get((a0 >> 14, a1 >> 14), (0, 0)); n = wd * ht // 64 * (2 if a0 >> 13 & 1 else 1)
+        one.append((a2 & 0x3FF, n, wd, ht))
+    tiles = [t for t, n, wd, ht in one if (wd, ht) == (8, 8)]
+    mt = max(set(tiles), key=tiles.count) if tiles else None; marks_t.add(mt)
+    if mt is not None: clash |= {(t, t + n - 1) for t, n, wd, ht in one if t != mt and t <= mt + 1 and t + n - 1 >= mt}
+    spans += [(t, t + n - 1, wd, ht) for t, n, wd, ht in one]
+big = [s_ for s_ in spans if s_[2:] == (64, 64)]
+fb = Image.open('%s/flightmap_broly.png' % d).convert('RGB')
+lit_b = sum(1 for x, y in marks if fb.getpixel((x + 3, y + 3))[0] > 200 and fb.getpixel((x + 3, y + 3))[1] > 200)
+print('   flying as Broly: his figure %s, the markers\' tile %s, sprites over it %s, markers drawn %d of %d' % (sorted(set(big))[:2], sorted(marks_t), sorted(clash), lit_b, len(marks)))
+check('flying as Broly (a 64x64 figure), no sprite shares the markers\' tile, and every marker is drawn', at(out) == (50 << 8 | 0) and big and len(marks_t) == 1 and not clash and lit_b == len(marks) and 'bad pc' not in out)
 def paste(name):
     W.paste(Image.open('%s/%s.png' % (d, name)).convert('RGB'), (cell[0] % 5 * 240, cell[0] // 5 * 160)); cell[0] += 1
 for k, (world, area, x, y) in enumerate(zone26.BALLS):
