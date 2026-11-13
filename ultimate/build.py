@@ -172,6 +172,24 @@ def crackle_frames(seed, glow, core):
     return [draw(main[:len(main) // 2]), draw(main, branch), draw(jit), draw(jit, colour=glow, broken=True)]
 
 
+def mystic_change(clean):
+    """Full Power Mystic's change, as canvases for sprites.py (_change_canvases): see add_actors."""
+    import ssb
+    goku, school, gi = ssb.actor_frames(clean, 106), ssb.actor_frames(clean, 98), ssb.actor_frames(clean, 101)
+    head = school[10][0][1][:15].copy()
+    hair = head[:8] != 0; head[:8][hair] = 1                       # his hair's brown flash (the change into gold) black: Mystic's stays black
+    dark = np.arange(256, dtype=np.uint8)                           # Goku's blue undershirt and boots -> the orange gi's black ones (actor
+    for k, v in {157: 111, 159: 112, 161: 1, 165: 111, 80: 111, 81: 112}.items(): dark[k] = v    # 101: its belt and wristbands stay blue)
+    out = []
+    for k in _SSB_SEQ[:-1]:
+        c = goku[10][0][k].copy(); c[:15] = 0
+        c[:15][head != 0] = head[head != 0]
+        c[15:18] = dark[c[15:18]]; c[26:] = dark[c[26:]]
+        out.append(c)
+    out.append(gi[0][0][0])
+    return [out, out, out]
+
+
 def kaioken_rows(clean):
     """Kaioken's forms: the base row's copy with the red actor, in the Super Saiyan class (drain, +5) with no form above, back down to the base.
     Then Super Saiyan Blue's: Super Saiyan 3's row (its class: the orange pool, +15) with the blue actor, the owner's portraits, down to base."""
@@ -1513,10 +1531,13 @@ def add_actors(rom, clean):
     # Full Power Mystic: the orange gi's own figure (actor 101) under its own id; its lightning is the crackle (outfit.c), its power-up the orange gi's (_powerup)
     for n, (_, _, src) in FP_LOOKS.items():
         cfg[n] = {'same_as': src}
-    # Full Power Mystic's change (Nov 12, 20:51, the owner: "Fix his transformation stance too", after Blue's "not raise their hands but do
-    # the normal pose"): his power-up's crouch, fists at his sides, ten times, then his stance (_powerup_still); the orange gi's own Super
-    # Saiyan change keeps the arms-up shout (the owner: "ONLY for him")
-    cfg['_powerup_still'] = [*FP_LOOKS]
+    # Full Power Mystic's change (Nov 12, 20:51, the owner: "Fix his transformation stance too"; 20:55: "Don't use the crouch for Mystic
+    # Gohans power up use the same one Goku and Vegeta had"): BF's Super Saiyan change pose, which the orange gi (actor 101) never had:
+    # BF Goku's change (actor 106, slot 10: the shout, fists at his sides, the dust; his orange gi, blue wristbands, belt and boots, as
+    # Gohan's Mystic gi) with Gohan's head from his own change (actor 98, the school uniform: frame 1, the same shout in the same place,
+    # rows 0-14; its hair black, as it stays), frames 2-9 as Blue's, then his stance. The orange gi's own Super Saiyan change keeps its shout.
+    cfg['_change_canvases'] = {n: mystic_change(clean) for n in FP_LOOKS}
+    cfg['_powerup_still'] = []
     cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', 273, 274, 261, 276, 'vegeta_armor_ss', 'trunks_armor_ss', 'future_trunks_ss', 'gohan_armor_ss2_art',
                       'gohan_gt_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
                                           # was the base's change, so into 2 he went back to black hair and glasses first (test_frames 14)

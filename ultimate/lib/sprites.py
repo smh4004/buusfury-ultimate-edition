@@ -414,10 +414,17 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         seq = [front(up, 0)] * (10 if still else 2) + ([] if still else [front(up, 1)] * 8) + [front(stand, 0)]
         struct.pack_into('<I', rec, 0x54 + 40, ins.put(struct.pack('<I', 11) + struct.pack('<44I', *[f for f in seq for d in range(4)])))
         table[at_] = ins.put(bytes(rec))
+    # A change given as canvases (cfg '_change_canvases': {key: [frames for views 0, 1, 2]}, goku_black.actor_frames' 32 x 64 canvases):
+    # Full Power Mystic's (build.py mystic_change)
+    for key, dirs in cfg.get('_change_canvases', {}).items():
+        at_ = key if isinstance(key, int) else ids[key]
+        o = table[at_] - BASE; n = struct.unpack_from('<I', rom, o)[0] & 0xFF; rec = bytearray(rom[o:o + 0x54 + 4 * n])
+        struct.pack_into('<I', rec, 0x54 + 40, ins.anim(dirs))
+        table[at_] = ins.put(bytes(rec))
     # A same_as actor took its source's record as it was when it was made: point it at the record the source ends up with (_powerup above
     # makes a new one), or armour Gohan's Super Saiyan 2 kept the template's power-down (retail green-gi Gohan) after his own had changed.
     for name, a in cfg.items():
-        if isinstance(a, dict) and 'same_as' in a and name not in cfg.get('_powerup', ()) and name not in cfg.get('_powerup_still', ()):      # (one with a power-up of its own keeps it: Full Power)
+        if isinstance(a, dict) and 'same_as' in a and name not in cfg.get('_powerup', ()) and name not in cfg.get('_powerup_still', ()) and name not in cfg.get('_change_canvases', {}):      # (one with a power-up of its own keeps it: Full Power)
             src = a['same_as']
             table[ids[name]] = table[src] if isinstance(src, int) else table[ids[src]]
     # Actors drawn with no ground shadow (cfg '_no_shadow': ids or names). Record bytes +0xA/+0xB are the shadow's size, looked up when the

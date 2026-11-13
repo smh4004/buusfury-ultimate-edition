@@ -1030,9 +1030,12 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   GLOW_KINDS`), with the transition from his power-up's white aura (`maxp_start`; Roshi's Max Power shares that state and gets none). His
   glow alone holds 3 seconds after the transition (or after it comes with a new area's fight), then dissolves away over six frames
   (`ssb_glow.fadeout`, `glow_fadeout`) and stays gone while he is in the form; the crackle (his lightning) goes on. The glow's phases:
-  `outfit.c GLOW_INTO`, `GLOW_FLAME`, `GLOW_HOLD`, `GLOW_OUT`, `GLOW_GONE`. His change (slot 10): his power-up's crouch, fists at his
-  sides, ten times, then his stance (`sprites.py _powerup_still`; it was the crouch twice and the arms-up shout eight times); the orange
-  gi's own change into Super Saiyan keeps its shout.
+  `outfit.c GLOW_INTO`, `GLOW_FLAME`, `GLOW_HOLD`, `GLOW_OUT`, `GLOW_GONE`. His change (slot 10), 20:55 ("Don't use the crouch for
+  Mystic Gohans power up use the same one Goku and Vegeta had"): BF's Super Saiyan change pose, which the orange gi (actor 101) never
+  had: BF Goku's change (actor 106, frames 2-9: the shout, fists at his sides, the dust) with Goku's blue undershirt and boots made the
+  orange gi's black, and Gohan's own head from his change (actor 98, frame 1, rows 0-14: the same shout in the same place, its hair
+  black), then his stance (`build.py mystic_change`, `sprites.py _change_canvases`). It was the crouch twice and the arms-up shout eight
+  times. The orange gi's own change into Super Saiyan keeps its shout.
 - Nov 12, the Fusion Dance as Super Saiyan 4 never gave Super Saiyan 4 Gogeta: `dance_use` only starts global script 13, which plays the
   dance and its button game over seconds and calls the fusion native at its end, and the "Super Saiyan 4 dance" mark was cleared as soon
   as the script started. Now it is noted for the native (`DANCE_SSJ4`, `DANCE_AT`, good for a minute, only after the ending) and taken
