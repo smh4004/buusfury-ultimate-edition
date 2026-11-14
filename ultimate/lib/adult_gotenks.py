@@ -784,6 +784,10 @@ LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes s
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
 P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
+VEST_AS_WORN = {88: 1, 169: 1, 89: 112, 170: 112, 90: 113}    # Portraits.inlay: that cloth in the colours his vest has on his figure (Kid
+                                          # Gotenks's frames, G_VEST: 112 most of it, 113 its light, black its edge), shade for shade: the
+                                          # owner, Nov 13, 21:39, "Fix the color of the vest in the portraits and on the body and make sure
+                                          # the colors of the outfit match Kid Gotenks outfit colors"
 BARE_BODY = 46                            # Portraits.inlay, without: Gohan's calm picture, where his neck and shoulders are drawn bare: every picture's body
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
@@ -1508,12 +1512,15 @@ class Portraits:
         fr = KH & ndimage.binary_erosion(ksp, np.ones((1, 5), bool)) & (Y < ke) & low & (kraw != 2)
         out[fr] = k[fr]
         done = put | putr | fr
+        vest = np.zeros((64, 64), bool)
         if not SHIRT:                         # (no shirt: the vest is Gotenks's own, as his picture has it and where: its cloth under the
             cloth = np.isin(kraw, P_VEST) & low & ~KH & ~rolls & ~kbg & ~ksp      #  rolls and the line round it, on Gohan's bare shoulders)
             lab, nc = _lab(cloth)             # (it hangs to the picture's foot: a pixel of those colours higher up is not it)
             cloth = np.isin(lab, [i for i in np.unique(lab[56:60]) if i]) if nc else cloth
             vest = (cloth | (ndimage.binary_dilation(cloth) & (kraw == 208) & low & ~KH & ~rolls & ~ksp)) & ~Gface & ~Gears
             out[vest] = k[vest]; done = done | vest
+            for a_, b_ in VEST_AS_WORN.items(): out[vest & cloth & (kraw == a_)] = b_     # (its cloth the colours it has on his figure:
+                                                                                          #  his pictures draw it purple, his frames dark)
         # Gohan's own hair still showing
         m0, m1 = d['cols'][0] + dx, d['cols'][1] + dx
         left = Ghair & low & ~done
@@ -1576,7 +1583,7 @@ class Portraits:
             out[lid] = 208
         # specks: a few pixels of what is behind him, or of the shirt, shut in among Gotenks's hair, rolls and ears where his picture had
         # his wider face: the nearest of his hair and rolls
-        own = put | putr | fr
+        own = put | putr | fr | vest                                  # (the vest is dark and his own: not a speck of the shirt)
         hr, _ = _nearest(put | putr, out)
         for cls, most in ((np.isin(out, (96, 97, 98)) & ~kbg, 6), (np.isin(out, P_DARK) & ~own & ~Gface & low & (Y < 52), 10)):
             lab, nc = _lab(cls & self.inner & ~own)

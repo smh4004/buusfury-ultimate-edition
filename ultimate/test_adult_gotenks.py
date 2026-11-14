@@ -178,11 +178,13 @@ def _crop(c):
     ys = np.nonzero(c.any(1))[0]; xs = np.nonzero(c.any(0))[0]
     return c[ys.min():ys.max() + 1, xs.min():xs.max() + 1] if len(ys) else c[:0, :0]
 SHIRT_C, SKIN_C = list(set(AG.G_UNDER.values())), list(AG.G_UNDER)
+OUTFIT = AG.G_VEST + AG.G_PANTS                   # (his vest, its yellow padding, his trousers)
 for f, n in AG.ACTORS.items():
     act = struct.unpack_from('<H', rom, TABLE + FORM_SIZE * MAP[n] + 0xE)[0] - 9
     got = AG.cells(rom, ACTORS_AT, act); want = AG.grown_frames(clean, 0x6B6BD8, f)
+    kid = AG.cells(clean, 0x6B6BD8, AG.GROWN[f])  # (Kid Gotenks's own frames, the game's)
     was = AG.SHIRT; AG.SHIRT = True; worn = AG.grown_frames(clean, 0x6B6BD8, f); AG.SHIRT = was
-    tot = same = had = px = other = 0
+    tot = same = had = px = other = cols = fewer = 0
     for s in want:
         for v in range(3):
             for j, c in enumerate(want[s][v]):
@@ -192,9 +194,14 @@ for f, n in AG.ACTORS.items():
                 m = worn[s][v][j] != c
                 had += bool(m.any()); px += int(m.sum())
                 other += int((~(np.isin(worn[s][v][j][m], SHIRT_C) & np.isin(c[m], SKIN_C))).sum())
+                kc = kid[s][v][j]                 # (growing him doubles rows and a column of Kid Gotenks's frame: it adds no colour and
+                cols += set(np.unique(c).tolist()) == set(np.unique(kc).tolist())      #  drops none, and no pixel of his outfit is lost)
+                fewer += any((c == o).sum() < (kc == o).sum() for o in OUTFIT)
     check("grown look, %s (figure %d): all %d frames in the ROM are the library's (%d), his chest bare under the vest: %d of them would "
           "wear the undershirt (%d pixels of it, each his own skin here; %d other pixels differ)" % (f, act, tot, same, had, px, other),
           not AG.SHIRT and same == tot and had >= 40 and other == 0)
+    check("grown look, %s: his outfit's colours are Kid Gotenks's (figure %d): %d of %d frames have exactly their Kid Gotenks frame's "
+          "colours, %d with less of a vest, padding or trouser colour than it" % (f, AG.GROWN[f], cols, tot, fewer), cols == tot and fewer == 0)
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
@@ -209,6 +216,10 @@ AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).resh
 pics = AG.Portraits(clean)
 ROWS, COLS = np.mgrid[:64, :64]
 bare_c, bare_d = pics.gohan_clean(AG.BARE_BODY); bare_pic, _bg, bare_body = pics._bare(AG.BARE_BODY, bare_c, bare_d)
+as_worn = np.arange(256, dtype=np.uint8)          # (Gotenks's picture's vest cloth -> the colours his vest has on his figure)
+for _a, _b in AG.VEST_AS_WORN.items(): as_worn[_a] = _b
+check("the portraits' vest colours are his figure's: %s, all of them in Kid Gotenks's frames' vest (%s) or its black line"
+      % (sorted(set(AG.VEST_AS_WORN.values())), AG.G_VEST[:3]), set(AG.VEST_AS_WORN.values()) <= set(AG.G_VEST[:3]) | {1})
 for f in AG.ACTORS:
     kp = {'base': 68, 'ssj': 71, 'ssj3': 73}[f]; kraw = pics.art[kp]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
@@ -241,18 +252,22 @@ for f in AG.ACTORS:
                   min(l, r) >= 12 and abs(l - r) <= 8)
         # no shirt (Nov 13, 21:17): below his ears nothing dark is on him but his own head's (his mouth); his neck and shoulders are
         # Gohan's calm picture's as it is drawn, bare (Portraits._bare), wherever his head, Gotenks's hair, rolls and vest aren't in
-        # front; the vest's cloth is Gotenks's own picture's, every pixel
+        # front; the vest's cloth is where Gotenks's own picture has it, every pixel, in the colours his vest has on his figure (21:39,
+        # the owner: "Fix the color of the vest in the portraits and on the body and make sure the colors of the outfit match Kid
+        # Gotenks outfit colors"): shade for shade (AG.VEST_AS_WORN), none of his picture's purple left, and its rolls his picture's
         head = (AG._shift(d['face'] & ~d['neck'], dy, dx, False) | ears) & pics.inner
         below = ROWS >= d['eb'] + dy - 1
-        shirt = int((np.isin(a, AG.P_DARK) & pics.inner & (a != kraw) & ~head & below).sum())
+        shirt = int((np.isin(a, AG.P_DARK) & pics.inner & (a != kraw) & ~head & ~cloth & below).sum())
         near = lambda m: ndimage.binary_dilation(m, np.ones((3, 3), bool))
         region = bare_at & below & ~near(head) & ~rolls & ~khair & ~near(cloth)
         own = int((a == bare)[region].sum()); skin = int(np.isin(a, AG.P_SKIN + (208,))[region].sum()); vest = cloth & ~head
-        check("portrait %s %d: no shirt (%d dark pixels on him below his ears); his neck and shoulders are bare, Gohan's calm picture's as "
-              "drawn (%d of %d pixels its own, %d skin or its line); the vest's cloth is Gotenks's own (%d of %d pixels)"
-              % (f, i, shirt, own, region.sum(), skin, (a == kraw)[vest].sum(), vest.sum()),
+        worn = int((a == as_worn[kraw])[vest].sum()); purple = int((np.isin(a, AG.P_VEST) & ~khair & (ROWS >= ke + 8) & pics.inner).sum())
+        check("portrait %s %d: no shirt (%d dark pixels on him below his ears that aren't the vest); his neck and shoulders are bare, "
+              "Gohan's calm picture's as drawn (%d of %d pixels its own, %d skin or its line); the vest's cloth is where Gotenks's "
+              "picture has it, in his figure's vest's colours (%d of %d pixels, %d purple left)"
+              % (f, i, shirt, own, region.sum(), skin, worn, vest.sum(), purple),
               not AG.SHIRT and shirt == 0 and region.sum() >= 90 and own >= 0.95 * region.sum() and skin == region.sum()
-              and vest.sum() >= 8 and bool((a == kraw)[vest].all()))
+              and vest.sum() >= 8 and worn == vest.sum() and purple == 0)
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

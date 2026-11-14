@@ -1268,6 +1268,15 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     `test_adult_gotenks.py`: the figures in the ROM are read back (the moved actor table, the figure each form row names) and are
     the library's frame for frame, none with the shirt; each portrait has no dark pixel on him below his ears, its bare body is the
     calm picture's (95% or more its own pixels, all of it skin or its line) and the vest's cloth is Gotenks's pixel for pixel.
+  - 21:39, the owner: "Fix the color of the vest in the portraits and on the body and make sure the colors of the outfit match Kid
+    Gotenks outfit colors". The game draws Kid Gotenks's vest two ways: dark on his figure (his frames: 112 most of it, 113 its
+    light, black its line, yellow padding) and purple in his pictures (lavender as a Super Saiyan), and the portraits of 21:17 had
+    the pictures' purple while the figure was dark. The portraits' vest cloth is now the figure's colours, shade for shade
+    (`VEST_AS_WORN`: the cloth's dark edge black, its main shade 112, its light 113), where Gotenks's picture has it; nothing else
+    in a portrait changed (44, 82 and 10 pixels, all of them that cloth; no purple of it left). The rolls stay his picture's own.
+    On his figure nothing needed changing, and that is now checked rather than assumed: every one of the 570 frames has exactly
+    the colours of the Kid Gotenks frame it is grown from (growing doubles rows and a column: it adds no colour and drops none),
+    and none has less of any vest, padding or trouser colour than that frame. `test_adult_gotenks.py` checks both.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
