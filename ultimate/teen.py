@@ -13,6 +13,9 @@ stops the build.
   ss2(): the Super Saiyan frame with r55's head: r55's frame of the same pose, or, where r55 stands another way (its idle has the
     hands on the hips), a donor pair of the same view whose r56 head is this frame's golden head; then r55's own head for the frame,
     placed on the donor's by its gold (the idle's own hair and blink).
+  (Nov 14, every animation a slot of his plays, for both forms: where LoG2 lacks a record for a pose, bare_place and ss_place place the
+  frames through others that draw the same heads, best2_checked and swap2 make the Super Saiyan 2 frames r55 never draws, and still2
+  keeps the Super Saiyan 2 stance's hair still.)
 check() is run on every finished frame, and every() makes and checks every frame the build uses before the build writes one: a frame
 that can't be placed, or fails a check, stops the build (the owner: "don't allow that to happen anymore").
 The build: use(l2) once, every(), then made(form) is sprites.log2_anim's frame source for the two figures."""
@@ -235,17 +238,78 @@ def socks(p, head):
     return g & ~F.flood(F.grown(FACE[p], 1) & g, g, True) & ~head
 RIMLINE = F.cls({0x14, 0x17, 0xd3})        # the outlines of the purple figure: brown round skin, navy round the gi
 _short = {}
+NOFACE = F.cls(SKIN_S, BROWN_S, {0x0f})     # the face, its outlines and the hair's light: what the purple and short-haired frames share
+def top_of(c, rows=16):
+    """The frame's top rows (its head), nothing else."""
+    ys = np.where((c != 0).any(1))[0]; m = np.zeros(c.shape, bool)
+    if len(ys): m[ys.min():ys.min() + rows] = True
+    return np.where(m, c, 0)
+def through(k, d, f, nx, ny, cx, cy, direct, what, own=None, only=None):
+    """Where record ny's frame (k, d, f) sits on record nx's, for a frame where the two can't be placed on each other directly (their
+    bodies are drawn too differently there). Through other frames of the same view: one whose nx frame draws this very head, every pixel
+    (in class cx) and whose ny frame draws much the same head (cy, 8 in 10 pixels), where the two records place their frames on each
+    other directly; that placing, moved as the two heads lie against these. Each such frame votes, and so does `own`, the direct
+    witness's offset where it is fair (8 in 10 pixels) though not clear. (Only frames record `only` draws too, where given.) The offset with the most votes, at least two and more than any
+    other, places the frame; else Off."""
+    x, y = get(nx, k, d, f), get(ny, k, d, f); votes = []
+    if own is not None: votes.append(own)
+    for k2 in range(20):
+        if k2 == k or one_view('P', k2) != one_view('P', k): continue
+        for f2 in range(L.nframes(REC['P'], k2)):
+            x2, y2 = get(nx, k2, d, f2), get(ny, k2, d, f2)
+            if x2 is None or y2 is None or (only and get(only, k2, d, f2) is None): continue
+            ox, eq, meet, nxt = F.witness(top_of(x), top_of(x2), cx)
+            if eq < 60 or eq < meet: continue
+            oy, eqy, meety, nxty = F.witness(top_of(y), top_of(y2), cy)
+            if eqy < 0.8 * meety: continue
+            try: o2 = direct(k2, d, f2)
+            except Off: continue
+            votes.append((o2[0] + ox[0] - oy[0], o2[1] + ox[1] - oy[1]))
+    tally = sorted(((votes.count(o), o) for o in set(votes)), reverse=True)
+    if not tally or tally[0][0] < 2 or (len(tally) > 1 and tally[1][0] == tally[0][0]):
+        raise Off('%s: nothing places it (votes %s)' % (what, tally))
+    return tally[0][1]
+def fair(a, b, c):
+    """The direct witness's offset of b on a for class c, where at least 8 in 10 of its pixels agree; else None."""
+    o, eq, meet, nxt = F.witness(a, b, c)
+    return o if eq >= 8 and eq >= 0.8 * meet else None
+def bare_place(k, d, f, p, a):
+    """Where the short-haired armor frame sits on the purple one for a pose LoG2 draws no long-haired armor frame of (the charged hit, 16):
+    by what the two share of the head (face, outlines, the hair's light) where that is clear, else through frames that draw these heads
+    (through())."""
+    try: return F.place(p, a, 'short-haired armor on the purple frame', (NOFACE, 8, 0.8, 1.6), (F.cls(SKIN_S), 8, 0.8, 1.6))
+    except Off: pass
+    return through(k, d, f, 'P', 'AS', NOFACE | HAIRB, NOFACE | HAIRB, lambda k2, d2, f2: short(k2, d2, f2)['o_a'],
+                   'short-haired armor on the purple frame', fair(p, a, NOFACE), only='AL')
+def ss_place(k, d, f, a_raw, s_raw):
+    """Where the Super Saiyan armor frame sits on the short-haired armor frame: by their armor where that is clear (the same pose drawn
+    alike), else through frames that draw these two heads (the charged hit's leaps: r56 draws them higher than r53)."""
+    try: return F.place(a_raw, s_raw, 'Super Saiyan armor on the short-haired armor', (SUIT, 30, 0.7, 1.6), (SKIN, 8, 0.8, 1.6))
+    except Off as e: first = e
+    # (in the charged hit's leaps r56 draws him six or seven rows higher than r53 does: past the five rows the witnesses look across,
+    # so they look again from five rows up)
+    try:
+        o = F.place(a_raw, F.shift(s_raw, 0, -5), 'Super Saiyan armor on the short-haired armor', (SUIT, 30, 0.7, 1.6), (SKIN, 8, 0.8, 1.6))
+        return (o[0], o[1] - 5)
+    except Off: pass
+    def direct(k2, d2, f2):
+        return F.place(get('AS', k2, d2, f2), get('S1', k2, d2, f2), 'Super Saiyan armor on the short-haired armor', (SUIT, 30, 0.7, 1.6), (SKIN, 8, 0.8, 1.6))
+    try: return through(k, d, f, 'AS', 'S1', NOFACE | HAIRB, NOFACE | GOLDC, direct, 'Super Saiyan armor on the short-haired armor')
+    except Off as e: raise Off('%s; %s' % (first, e))
 def short(k, d, f):
     if (k, d, f) in _short: return _short[k, d, f]
     p, al, a = get('P', k, d, f), get('AL', k, d, f), get('AS', k, d, f)
-    if p is None or al is None or a is None: raise Off('no frame')
-    o1 = F.place(p, al, 'long-haired armor head on the purple head', (HEADMARK, 8, 0.85, 1.6), (HAIRB, 60, 0.9, 1.3))
-    al = F.shift(al, *o1)
-    o2 = F.place(al, a, 'short-haired armor on long-haired armor', (SUIT, 30, 0.5, 1.6), (HEADMARK, 6, 0.85, 1.6))     # (r52 wears shoulder pads, r53 none: the rest is equal)
+    if p is None or a is None: raise Off('no frame')
+    if al is not None:
+        o1 = F.place(p, al, 'long-haired armor head on the purple head', (HEADMARK, 8, 0.85, 1.6), (HAIRB, 60, 0.9, 1.3))
+        al = F.shift(al, *o1)
+        o2 = F.place(al, a, 'short-haired armor on long-haired armor', (SUIT, 30, 0.5, 1.6), (HEADMARK, 6, 0.85, 1.6))     # (r52 wears shoulder pads, r53 none: the rest is equal)
+    else:
+        o1 = (0, 0); o2 = bare_place(k, d, f, p, a)
     a = F.shift(a, *o2)
     a_raw, s_raw = get('AS', k, d, f), get('S1', k, d, f); o_s = s = None
     if s_raw is not None:
-        o_s = F.place(a_raw, s_raw, 'Super Saiyan armor on the short-haired armor', (SUIT, 30, 0.7, 1.6), (SKIN, 8, 0.8, 1.6))
+        o_s = ss_place(k, d, f, a_raw, s_raw)
         s = F.shift(s_raw, o1[0] + o2[0] + o_s[0], o1[1] + o2[1] + o_s[1])
     rect = head_rect(a, s); box = box_of(p.shape, rect); wide = box_of(p.shape, rect, 14, 8)
     # His long hair: what the long-haired armor frame has of it too (both), the black the two share on the head, and the locks only
@@ -253,10 +317,17 @@ def short(k, d, f):
     # reach of that hair. Never his shoes: black beside a sock's or a shoe's grey, or two pixels from one where the armor frame has
     # its boot, or standing on his shadow. (Seen from behind in a punch, a shoe is dark grey and black right under the hair that
     # hangs down his back: it went with the hair, and the armor's grey boot came in its place.)
-    feet = ground(p)
+    feet = ground(p); bare = al is None
+    if bare:
+        # (no long-haired armor frame: the purple frame's black in and round the head, never his shoes, is his long hair; the short-haired
+        # armor frame with that hair over it stands for the long-haired one. In these leaps his feet pass over his head: a shoe's greys
+        # in the head's box are his shoe's all the same.)
+        sock = socks(p, np.zeros(p.shape, bool))
+        shoe = HAIRB[p] & (F.grown(sock, 1) | (NEUTRAL[a] & F.grown(sock, 2))) | inner(p)
+        al = a.copy(); m = HAIRB[p] & wide & ~feet & ~shoe; al[m] = p[m]
     both = (al != a) & (p == al) & HAIRB[al] & ~feet
     hair = both | (HAIRB[p] & HAIRB[al] & (p == al) & box & ~feet)
-    sock = socks(p, box)
+    sock = socks(p, np.zeros(p.shape, bool) if bare else box)
     shoe = HAIRB[p] & (F.grown(sock, 1) | (NEUTRAL[a] & F.grown(sock, 2)))      # beside a sock's grey, or where the armor has its boot
     shoe |= inner(p)                                                           # and a shoe's black inside its grey rim, wherever it is
     lock = HAIRB[p] & ~feet & ~shoe & wide
@@ -288,6 +359,13 @@ def short(k, d, f):
     skin = gone & FACE[a]; out[skin] = a[skin]                     # his neck
     body_fill(out, fill | edge, a, a, p, ~hair)
     fill = fill | edge
+    if bare:
+        # (the leaps: under his long hair lay the blow's white streak, which the short-haired armor frame draws a pixel off the purple
+        # frame's; filled from it, a speck of gi stood in the streak. A speck of gi with no gi beside it and nothing round it but hair,
+        # white and the air is the streak's white where white is beside it, else the air.)
+        gi = GIC[out] & fill; body = (out != 0) & ~(F.cls({0x01, 0x0f, 0x02}))[out] & ~GIC[out]
+        speck = gi & ~(F.shift(GIC[out], 1, 0) | F.shift(GIC[out], -1, 0) | F.shift(GIC[out], 0, 1) | F.shift(GIC[out], 0, -1)) & ~F.grown(body, 1)
+        out[speck] = np.where(F.grown(out == 0x02, 1)[speck], 0x02, 0)
     more = (al != a) & (p == al) & (HAIRB | FACE)[a] & box & ~hair  # short hair where the long-haired head has none
     out[more] = a[more]
     _short[k, d, f] = dict(out=out, a=a, fill=fill, hair=hair, o_long=o1, o_short=o2, o_a=(o1[0] + o2[0], o1[1] + o2[1]), fills=int(fill.sum()),
@@ -322,6 +400,13 @@ def ss(k, d, f):
     # figure, the difference hollowed his shadow out in the lunge.)
     ch = (a != s) & box_of(a.shape, A['rect'], 1, 1) & ~ground(get('P', k, d, f))
     head = ch & head_of(s)
+    if get('AL', k, d, f) is None:
+        # (the charged hit's leaps, which LoG2 draws no long-haired armor frame of: his feet pass over his head, in front of it. The purple
+        # frame's shoes there stay (their greys, and the black beside them), and so does what r56 draws of its boot round them.)
+        pf = get('P', k, d, f); sock = socks(pf, np.zeros(pf.shape, bool))
+        shoe = sock | (HAIRB[pf] & F.grown(sock, 1) & ~A['hair']) | (HAIRB[pf] & F.grown(sock, 1) & (pf == sh))
+        head &= ~F.flood(F.grown(shoe, 1) & NEUTRAL[s] & ~GOLDC[s], NEUTRAL[s] & ~GOLDC[s])
+        head &= ~shoe
     may = (sh == 0) | HAIRB[sh] | A['fill'] | (sh == a) | (FACE[sh] & (FACE | HAIRB)[a])
     out = sh.copy(); out[head & may] = s[head & may]
     gone = ch & (s == 0) & (sh == a) & (HAIRB | FACE)[a]            # short hair with nothing behind it now
@@ -329,10 +414,13 @@ def ss(k, d, f):
     body = ch & ~head & (s != 0) & HAIRB[a] & (sh == a)             # armor from under the short hair: gi
     fills = body_fill(out, body, s, a, sh, ~(ch | A['fill']))
     mend(out, get('P', k, d, f), s, sh, ~(ch | A['fill']), a)
+    if get('AL', k, d, f) is None:            # (the leaps: his shoe over his head is the purple frame's, to two pixels from its greys)
+        pf = get('P', k, d, f); zone = NEUTRAL[pf] & F.grown(socks(pf, np.zeros(pf.shape, bool)), 2) & ~GOLDC[out] & (out != pf)
+        out[zone] = pf[zone]
     left = ch & ~(head & may) & ~gone & ~body & ((HAIRB | FACE)[a] | head)
     return out, dict(o_long=A['o_long'], o_short=A['o_short'], o_ss=o_s, o_s1=o, fills=A['fills'], fills2=fills, left=int(left.sum()), s=s, a=a, short=sh, p=get('P', k, d, f),
                      filled=A['fill'] | body, hair=A['hair'], placed=head & may, rect=A['rect'], both=A['both'])
-def ss2(k, d, f, donor=None):
+def ss2(k, d, f, donor=None, loose=False):
     base, n1 = ss(k, d, f)
     k2, f2 = donor or (k, f)
     s1_raw, s2_raw = get('S1', k2, d, f2), get('S2', k2, d, f2)
@@ -345,6 +433,12 @@ def ss2(k, d, f, donor=None):
         return base, dict(n1, o_2=o_2, o_donor=None, donor=None, fills3=0, left2=0, miss=0, like=0, s2=s2, s1=s1, placed2=n1['placed'])
     h1, h2 = head_of(s1), head_of(s2)
     miss = int((h1 & (base != s1)).sum() + (GOLDC[base] & ~GOLDC[s1]).sum()) if donor is not None else 0      # the donor's Super Saiyan head against this frame's
+    if loose:
+        # (where no donor passes that: its head only (its gold and the face that hangs together with it), and only where this frame shows
+        # its own head, not his body in front of it. Flying, his hands are beside his head and his collar under it: counted, they turned
+        # every donor away.)
+        front = (base != 0) & ~n1['placed'] & ~GOLDISH[base]
+        miss = int((head_only(s1) & (base != s1) & ~front).sum() + (GOLDC[base] & ~GOLDC[s1]).sum())
     if miss > MAX_MISS: raise Off("the donor's golden head is another drawing (%d pixels)" % miss)
     rect = n1['rect']
     if GOLDC[s2].any(): r2 = head_rect(n1['a'], s2); rect = (min(rect[0], r2[0]), max(rect[1], r2[1]), min(rect[2], r2[2]), max(rect[3], r2[3]))
@@ -393,6 +487,91 @@ def best2(k, d, f):
     except Off: return out, n                 # r55's own head here is another drawing altogether: the donor's stays
     if f == 0: _own[k, d] = o
     return own_on(out, n, own_raw, o, ((head_of(n['s2']) | head_of(n['s'])) & CORE[out]) | GOLDC[out])
+def best2_checked(k, d, f):
+    """best2's frame where it passes check(); else the donors again, each head judged by itself only (ss2 loose), the nearest first, the
+    first that passes check(). (The frames best2 made before keep their donors: only frames it couldn't make, or made wrong, look again.)"""
+    try:
+        out, n = best2(k, d, f)
+        if not check(k, d, f, out, n, True): return out, n
+        first = Off('; '.join(check(k, d, f, out, n, True)))
+    except Off as e: first = e
+    found = []
+    for k2 in range(20):
+        if one_view('P', k2) != one_view('P', k) and d: continue
+        for f2 in range(L.nframes(REC['S2'], k2)):
+            if (k2, f2) == (k, f): continue
+            try: found.append(ss2(k, d, f, (k2, f2), loose=True))
+            except Off: continue
+    own_raw = get('S2', k, d, f); why = []
+    for out, n in sorted(found, key=lambda v: (v[1]['miss'], -v[1]['like'])):
+        if n['miss'] > MAX_MISS: break
+        if own_raw is not None:            # r55's own head for the frame, where it lies on the donor's (as best2 does)
+            try:
+                o = F.place(out, own_raw, "r55's own head on the donor's", (GOLDC, 60, 0.85, 1.15))
+                o2, n2 = own_on(out, n, own_raw, o, ((head_of(n['s2']) | head_of(n['s'])) & CORE[out]) | GOLDC[out])
+                bad = check(k, d, f, o2, n2, True)
+                if not bad: return o2, n2
+                why.append('donor %s with its own head: %s' % (n['donor'], '; '.join(bad)))
+            except Off as e: why.append(str(e))
+        bad = check(k, d, f, out, n, True)
+        if not bad: return out, n
+        why.append('donor %s: %s' % (n['donor'], '; '.join(bad)))
+    try:
+        out, n = swap2(k, d, f); bad = check(k, d, f, out, n, True)
+        if not bad: return out, n
+        why.append('the Super Saiyan 2 head of a made frame: %s' % '; '.join(bad))
+    except Off as e: why.append(str(e))
+    raise Off('no frame of r55 fits (first: %s; %s)' % (first, ' | '.join(why[:4])))
+def swap2(k, d, f):
+    """The last way to a Super Saiyan 2 frame, for a pose r55 never draws and no donor of its fits (the power-up's arms up, where the
+    Super Saiyan head stands squeezed between his fists; the flinch from behind, his hands on his head): this frame's Super Saiyan head
+    swapped for the Super Saiyan 2 head of an approved frame of the same view whose Super Saiyan head is this one, by its face (or, from
+    behind, by its gold), the most alike first. Only over what this frame shows of its head and the air round it: his arms and hands stay
+    in front of it."""
+    base, n1 = ss(k, d, f)
+    if n1.get('plain') or not GOLDC[base].any(): raise Off('no golden head to swap')
+    whole = head_only(base)
+    mine = whole & (n1['placed'] | GOLDISH[base])                      # this frame's own head, as made
+    face = F.cls(SKIN_S, EYES_S); cls = face if F.cls(EYES_S)[np.where(whole, base, 0)].any() else GOLDC
+    if cls is face:                                                     # (with a face: the head is the columns its hair and eyes take,
+        xs = np.where((GOLDC | F.cls(EYES_S))[np.where(whole, base, 0)].any(0))[0]     # his fists and arms beside it are not)
+        span = np.zeros(base.shape, bool); span[:, xs.min():xs.max() + 1] = True
+        mine = whole & span
+    best = None
+    for k2 in APPROVED2:
+        if one_view('P', k2) != one_view('P', k) and d: continue
+        for f2 in range(L.nframes(REC['P'], k2)):
+            if (k2, f2) == (k, f): continue
+            try: r1, r2 = frame('ss', k2, d, f2), frame('ss2', k2, d, f2)
+            except Off: continue
+            h1 = np.where(head_only(r1) & (F.grown(F.cls(EYES_S)[r1], 3) if cls is face else True), r1, 0)    # (by the face: round the eyes only, never
+            o, eq, meet, nxt = F.witness(np.where(whole, base, 0), h1, cls)                                     # the hands beside it)
+            if eq < 8 or eq < 0.7 * meet or eq < 1.3 * nxt: continue
+            if best is None or eq / meet > best[0]: best = (eq / meet, (k2, f2), o, r1, r2)
+    if best is None: raise Off('no approved Super Saiyan 2 frame has this Super Saiyan head')
+    _, don, o, r1, r2 = best
+    r1, r2 = F.shift(r1, *o), F.shift(r2, *o)
+    h2 = head_only(r2)
+    out = base.copy()
+    out[mine & GOLDISH[base]] = 0                                       # the first head's hair (gold and its outline) goes
+    put = h2 & ((base == 0) | mine)                                     # the second head over his head and the air round it, never over
+    out[put] = r2[put]                                                  # his body in front of it
+    for a, b in ((0x40, 0x31), (0x41, 0x32)): out[mine & ~put & (out == a)] = b     # (an eye of the first head left: the second's green)
+    # A frame is one piece of at most 32 rows (fit_rows). Where the first head already took them all (the power-up's arms up: his fists
+    # stand at the top of his hair), the second's taller hair stops where the first's did, its gold left bare there outline, as fit_rows
+    # leaves it: rows of hair taken from over his face would have squeezed his fists with them.
+    ys = np.where((out != 0).any(1))[0]
+    if ys.max() - ys.min() + 1 > ROWS:
+        top = max(np.where((base != 0).any(1))[0].min(), ys.max() - ROWS + 1)
+        cut = np.zeros(out.shape, bool); cut[:top] = True
+        fists = np.where(((base != 0) & ~whole).any(1))[0].min()       # (over his fists the second hair stands only where the first did)
+        cut[:fists] |= (base == 0)[:fists]
+        if (cut & (out != 0) & ~put).any(): raise Off('too tall, and not by the second head alone')
+        out[cut] = 0
+        e = out == 0; bare = GOLDC[out] & (F.shift(e, 1, 0) | F.shift(e, -1, 0) | F.shift(e, 0, 1) | F.shift(e, 0, -1))
+        out[bare & F.grown(cut, 1)] = 0x14
+    return out, dict(n1, s2=r2, s1=r1, donor='made frame %s' % (don,), o_donor=o, miss=0, like=0, fills3=0, left2=0, o_2=(0, 0),
+                     placed2=put, filled=n1['filled'])
 def own_on(out, n, own_raw, o, was):
     """r55's own head for the frame at offset o, in place of the head pixels `was` on the canvas."""
     own = F.shift(own_raw, *o); ho = head_of(own)
@@ -422,12 +601,19 @@ def check(k, d, f, out, n, two):
     hb = box(1)
     o, eq, meet, nxt = F.face_at(p, np.where(hb, out, 0), SKIN)
     faces = int((SKIN[out] & hb).sum())
-    if faces >= 10 and (o != (0, 0) or eq * 2 < meet or eq <= nxt): bad.append('the face is at %+d%+d (%d of %d skin pixels equal, next %d)' % (*o, eq, meet, nxt))
+    # (the face where the purple frame has it: half its skin on the purple frame's, or, where r56 draws that face another way (the charged
+    # hit's leap), twice as much as anywhere else)
+    if faces >= 10 and (o != (0, 0) or (eq * 2 < meet and eq < 2 * nxt) or eq <= nxt): bad.append('the face is at %+d%+d (%d of %d skin pixels equal, next %d)' % (*o, eq, meet, nxt))
     # Black hair left over, looked for in ways that don't lean on the mask the hair was taken with: black where the Super Saiyan armor
     # frame draws nothing within two pixels; black in or beside the new head that that frame hasn't there; black that the two armor
     # records say is long hair. His shadow and the shoes on it are his own.
     feet = ground(p); near = F.grown(F.flood(gold, hs, True), 4) if gold.any() else box(4, 4)
-    old = HAIRB[out] & ~feet & ((HAIRB[p] & ~F.grown(src != 0, 2)) | (~HAIRB[src] & near & hb & ~inner(p)) | n['both'])     # (a shoe held up beside his face is no hair)
+    # (where the head came from another frame of r55's, a donor standing another way, his body is where this frame's own Super Saiyan armor
+    # frame draws it: flying, his shoes trail behind him where the donor has nothing, and they are no hair)
+    body = (src != 0) | (n['s'] != 0) if n.get('donor') else src != 0
+    old = HAIRB[out] & ~feet & ((HAIRB[p] & ~F.grown(body, 2)) | (~HAIRB[src] & near & hb & ~inner(p)) | n['both'])     # (a shoe held up beside his face is no hair)
+    if get('AL', k, d, f) is None:            # (the charged hit's leaps: his shoe over his head, the black beside its greys, is no hair)
+        old &= ~(HAIRB[p] & (out == p) & F.grown(socks(p, np.zeros(p.shape, bool)), 2))
     if old.sum(): bad.append('%d pixels of the black hair are left' % old.sum())
     lost = (feet | ((inner(p) | (HAIRB[p] & F.grown(socks(p, box(2)), 1))) & ~n['both'])) & (out != p)  # (flying, his hair streams back over his heels: the armor records say so)
     lost &= ~(hs & (out == src))                                    # (a spike of the new hair in front of a raised shoe, as its own frame draws it)
@@ -453,16 +639,35 @@ def check(k, d, f, out, n, two):
     if wisp.sum() >= 2: bad.append('%d pixels of gi stand one pixel wide in the air (a streak or a strap taken for his body)' % wisp.sum())
     new_holes = F.holes(out) & ~F.holes(src) & ~F.holes(p) & (src != 0)
     if new_holes.sum(): bad.append('%d holes' % new_holes.sum())
+    # A speck of gi in his hair (a strap of r55's armor beside its own head turned to gi over his hair, the charged hit's leap from behind,
+    # Nov 14): gi with no gi beside it and nothing round it but hair, white and the air, and none of the purple frame's gi within a pixel.
+    gi = GIC[out]; body = (out != 0) & ~(GOLDC | F.cls({0x14, 0x02}))[out] & ~gi
+    alone = gi & ~(F.shift(gi, 1, 0) | F.shift(gi, -1, 0) | F.shift(gi, 0, 1) | F.shift(gi, 0, -1)) & ~F.grown(body, 1) & ~F.grown(GIC[p], 1)
+    if alone.sum(): bad.append('%d specks of gi by themselves' % alone.sum())
+    if two:
+        # His eyes where the Super Saiyan frame of the pose has them (within two pixels): a head that came by another frame's offset and
+        # lay a few rows low covered his face with hair (the flinch, his hands on his head, Nov 14), and too little skin showed for the
+        # face test.
+        one = frame('ss', k, d, f) if k in ANIMS['ss'] else ss(k, d, f)[0]
+        e1, e2 = np.argwhere(EYES[one]), np.argwhere(EYES[out])
+        if len(e1) >= 2 and (not len(e2) or np.abs(e1.mean(0) - e2.mean(0)).max() > 2):
+            bad.append('his eyes are not where the Super Saiyan frame has them (%d of %d)' % (len(e2), len(e1)))
     ys = np.where(SKIN[out] & box(2))[0]
     if len(ys):
         y = ys.max(); cols = np.where(SKIN[out][y] & box(2)[y])[0]
         gap = [x for x in cols if out[y + 1, x] == 0 and p[y + 1, x] != 0 and not n['hair'][y + 1, x]]
         if gap: bad.append('nothing under the chin at %d columns' % len(gap))
     return bad
-# What the build uses of LoG2's animations (sprites.py: actors.json _slots and the two figures' own in build.py). r55 has no power-up (11)
-# and no flight (12): there the Super Saiyan 2 figure does as the armor's does (build.py).
-ANIMS = {'ss': (0, 1, 2, 3, 5, 6, 7, 8, 11, 12, 13), 'ss2': (0, 1, 2, 3, 5, 6, 7, 8, 13)}
-MAKERS = {'ss': lambda k, d, f: ss(k, d, f), 'ss2': lambda k, d, f: best2(k, d, f)}
+# What the build uses of LoG2's animations (sprites.py: actors.json _slots and the two figures' own in build.py): every animation a slot of
+# the purple figure plays, for both forms (Nov 14, the owner: "fix all those not used frames cause its probably his kamehameha and masenko
+# and ki blast and shit never do that again"). Until then the Super Saiyan 2 figure had no power-up (11: the Masenko's arms up and the
+# change into it showed his stance), no flight (12) and neither form the charged hit (16) or the flinch (4), which r55 or r52 never draw:
+# best2_checked and bare_place make them now. (LoG2's 9, 14, 17 and 18, the change, the hands-together charge, the halo and the record's
+# own firing pose, are played by no slot of his.)
+ANIMS = {'ss': (0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 16), 'ss2': (0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 16)}
+APPROVED = (0, 1, 2, 3, 5, 6, 7, 8, 11, 12, 13)     # the Super Saiyan animations the owner approved on Nov 11
+APPROVED2 = (0, 1, 2, 3, 5, 6, 7, 8, 13)     # the Super Saiyan 2 animations the owner approved on Nov 11: swap2 takes its heads from these only
+MAKERS = {'ss': lambda k, d, f: ss(k, d, f), 'ss2': lambda k, d, f: best2_checked(k, d, f)}
 ROWS = 32                                    # a fighter's frame is one piece of at most 32 rows (1 KB of sprite memory)
 def fit_rows(out, p):
     """A finished frame over 32 rows, made to fit. (In one frame, the side view of the second combo's lunge, the purple record holds
@@ -485,16 +690,49 @@ def fit_rows(out, p):
     if (new[face:] != out[face:]).any(): raise Off('fitting the rows changed him under his hair')
     return new
 _made = {}
+EYES = F.cls(EYES_S)
+def still2(d, f):
+    """Frame f of the Super Saiyan 2 stance, view d: frame 0 with only the Super Saiyan stance's blink (Nov 14, the owner: "Why is his ssj2
+    hair moving in idle frames"). r55 waves the hair from frame to frame; the Super Saiyan and base stances only blink. Where frame f of
+    the Super Saiyan stance differs from its frame 0 (his eyes shut, nothing else), the pixels of the second head's eyes (the green and the
+    whites and greys beside it) take frame f's. Off if the Super Saiyan stance changes anything but the eyes."""
+    out = frame('ss2', 0, d, 0).copy(); a, b = frame('ss', 0, d, 0), frame('ss', 0, d, f)
+    blink = a != b
+    if (blink & ~F.grown(EYES[a] | EYES[b], 1)).any(): raise Off('Teen Gohan ss stance, view %d frame %d: changes more than the eyes' % (d, f))
+    eye = blink & (EYES[out] | (NEUTRAL[out] & F.grown(EYES[out], 1)))
+    out[eye] = b[eye]
+    return out
 def frame(form, k, d, f):
     """Frame (k, view d, f) of `form` ('ss' or 'ss2'), made and checked: -> its canvas. Off if it can't be made right."""
+    if form == 'ss2' and k == 0 and f > 0:
+        if ('still', d, f) not in _made: _made['still', d, f] = still2(d, f)
+        return _made['still', d, f]
     if (form, k, d, f) not in _made:
         try: out, n = MAKERS[form](k, d, f)
         except Off as e: raise Off('Teen Gohan %s, animation %d view %d frame %d: %s' % (form, k, d, f, e))
         bad = check(k, d, f, out, n, form == 'ss2')
         if bad: raise Off('Teen Gohan %s, animation %d view %d frame %d: %s' % (form, k, d, f, '; '.join(bad)))
+        if k not in (APPROVED if form == 'ss' else APPROVED2): out = marks(out, get('P', k, d, f))
         try: _made[form, k, d, f] = fit_rows(out, get('P', k, d, f))
         except Off as e: raise Off('Teen Gohan %s, animation %d view %d frame %d: %s' % (form, k, d, f, e))
     return _made[form, k, d, f]
+def marks(out, p):
+    """The purple frame's dizzy stars and sweat marks (pieces of white of at most six pixels, with nothing round most of them) in front
+    of the new head where its hair lay over them (Nov 14: the second head's bigger hair had covered the flinch's stars in some frames
+    and not in others). Only the animations made since Nov 14: the approved ones stay as they were."""
+    out = out.copy(); lab = pieces(p != 0); size = np.bincount(lab.ravel())
+    for i in range(1, lab.max() + 1):
+        m = lab == i
+        if size[i] > 6 or not (p[m] == 0x02).all(): continue
+        ring = F.grown(m, 1) & ~m
+        if (p[ring] == 0).sum() * 2 < ring.sum(): continue
+        put = m & ((out == 0) | GOLDISH[out]); out[put] = 0x02
+    w = pieces(p == 0x02)                                     # (and white the purple frame draws beside his long hair, nothing else)
+    for i in range(1, w.max() + 1):
+        m = w == i; ring = F.grown(m, 1) & ~m
+        if m.sum() > 6 or (ring & (p != 0) & ~HAIRB[p]).any() or not (p[ring] == 0).any(): continue
+        put = m & ((out == 0) | GOLDISH[out]); out[put] = 0x02
+    return out
 def views(k): return 1 if one_view('P', k) else 3
 def every():
     """Every frame the build uses, made and checked. -> how many; Off on the first that isn't right."""

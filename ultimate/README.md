@@ -1059,6 +1059,26 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   (`teen.armor2`, `armor_ss2_idle`: placed by the face, within a pixel of where the records put it; the first head's gold and its
   outline gone where the second has none; checked for gold left over, body changed and holes). The purple gi's Super Saiyan 2 already
   stood with his arms down (`teen.ss2`: r55's head on the Super Saiyan frame), checked in the game.
+- Nov 14, 14:45, the owner (on the Bojack-gi preview of Teen Gohan, which is made from these frames): "Why is his ssj2 hair moving in idle
+  frames ... fix all those not used frames cause its probably his kamehameha and masenko and ki blast and shit never do that again".
+  - Super Saiyan 2's stance keeps frame 0's head; frame 1 only blinks, as the Super Saiyan and base stances do (`teen.still2`: the
+    Super Saiyan stance's blink, on the second head's eyes; r55 waves the hair from frame to frame).
+  - `teen.ANIMS` has every animation a slot of his plays, for both forms (292 frames, every one checked): Super Saiyan 2's power-up
+    (LoG2 11: the Masenko's arms up and the change into Super Saiyan 2 had shown his stance), flight (12, had been the hit), and both
+    forms' flinch (4) and charged hit (16, slot 23, had been the first combo hit). `actors.json` drops the Super Saiyan 2 figure's
+    overrides for 13 and 15 and gives both figures r50:16 for slot 23. LoG2's 9, 14, 17 and 18 are played by no slot of his.
+  - How they are made where LoG2 lacks a record: the charged hit has no long-haired armor frame (r52), so the short-haired armor (r53)
+    goes on the purple frame by the face where that is clear, else by votes through frames of the same view that draw these very heads
+    (`bare_place`, `through`); r56 draws its leaps six or seven rows higher than r53, past the witnesses' five rows (`ss_place` looks
+    again from five rows up); in the leaps his feet pass over his head and the purple frame's shoe stays in front. Super Saiyan 2 frames
+    r55 never draws: `best2_checked` (best2's frame where it passes check, else donors judged by their head alone, `ss2 loose`, with
+    r55's own head where it lies on the donor's), and last `swap2`: the Super Saiyan head swapped for the Super Saiyan 2 head of an
+    approved frame of the same view whose first head is this one (by the face round the eyes, or by the gold from behind), only over the
+    head and the air, never his fists; where the frame would pass 32 rows (the power-up's arms up) the second hair stands no higher than
+    the first. The flinch's dizzy stars go back in front of the bigger hair (`marks`).
+  - `check` is stricter: Super Saiyan 2's eyes where the Super Saiyan frame of the pose has them (a head placed by another frame's
+    offset had covered his face, his hands on his head), and no speck of gi in his hair. The approved frames are unchanged but for the
+    two Super Saiyan 2 stance frames (compared pixel for pixel with the Nov 11 module). Relocked: teen_gohan_ss, teen_gohan_ss2.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
