@@ -58,7 +58,7 @@ static void guest_sync(void) {
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
         teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
-        trunkten[] = {4, 7, 1, 11, 20},     /* Trunkten: ki blasts, Banshee Blast, Flame Kamehameha, Super Saiyan (and 2 through it) */
+        trunkten[] = {5, 7, 1, 11, VICTORY_SKILL, 20},     /* Trunkten: ki blasts, Banshee Blast, Flame Kamehameha, Super Victory Cannon, Super Saiyan (and 2 through it) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -1807,7 +1807,7 @@ void black_kame_use(u8 *record, void *sprite) {
 
 /* More beams on the Kamehameha's code, each with its own frames and strength (build.py KAME_VARIANTS): Vegeta's Galick Gun (violet) and
    Super Saiyan 4's 10x Kamehameha (red). The behaviour is 0x10 bytes as the retail one; +12 is the skill level. */
-#define KV_COUNT 3
+#define KV_COUNT 4
 const u32 kv_params[KV_COUNT][12] = {{1}};
 const int kv_vt[KV_COUNT][9] = {{1}};
 static void kv_begin(u32 *self, void *player, const u32 *params) {
@@ -1843,6 +1843,8 @@ void tenx_start(u32 *self, void *player) { kv_begin(self, player, kv_params[1]);
 void tenx_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[1]); }
 void superkame_start(u32 *self, void *player) { kv_begin(self, player, kv_params[2]); }
 void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]); }
+void victory_start(u32 *self, void *player) { kv_begin(self, player, kv_params[3]); }      /* Trunkten's Super Victory Cannon (Nov 14) */
+void victory_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[3]); }
 /* Goku's Kamehameha counts its uses at its top level towards the Super Kamehameha (skills_sync) */
 static int derived_level(int c, int skill);
 #define MASTERY_BYTES (BENCH.mastery)

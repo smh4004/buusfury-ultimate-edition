@@ -1118,6 +1118,10 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   big one (read from sprite memory: one sprite). `build.py one_ball`: every frame 16x16 (the small ball padded, in its place), and the
   effect spawn (sub_080206B8, every effect it makes) loads a whole 16x16 first frame (288 bytes, not 64), so the first frames don't
   show a quarter ball and old tiles. Checked frame by frame in the game.
+- Nov 14, the owner picked two of the drafted Trunkten moves ("Maybe 3 and 4"). Super Victory Cannon (skill 51, `VICTORY_SKILL`): a
+  beam on the Kamehameha's code (`KAME_VARIANTS`, `outfit.c victory_start`, `victory_use`), white, gold and his sash's orange, 1.3x a
+  Kamehameha; his fifth move (`outfit.c trunkten`). Captured in the game at its top level. The straight beam for now: the drafted pose
+  before it and the zig-zag between enemies are still to do. Potara Pinball next.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
