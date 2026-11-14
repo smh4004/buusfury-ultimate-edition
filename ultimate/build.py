@@ -2045,11 +2045,38 @@ def add_outfits(rom, clean, at, art):
     ssj4_ki_hooks(rom, sym)
     buu_merge_hook(rom, sym)
     end, art = add_eraser(rom, clean, sym, (potara_at + 3) & ~3, art)    # after the row edits above: it moves the skill table (and after the Potara's scene)
+    art = one_ball(rom, clean, art)
     i = rom.find(bytes.fromhex('092c'), 0x4C70, 0x4C84)    # Select Game draws 8 characters, not the guest slot: Broly's size covered the text
     if i < 0:
         sys.exit('Select Game party loop changed')
     rom[i:i + 2] = bytes.fromhex('082c')
     return end, art
+
+
+# The cyan ki ball held while charging (the Banshee Blast's charge, and the other moves that play this animation): its frames go 8x8,
+# 16x16, 8x8, and each change of size loads the new tiles a frame before the sprite's size changes (or after), so for one frame a 16x16
+# sprite showed the small ball in its top-left tile beside three quarters of the big one: two balls (Nov 14, the owner on Trunkten's
+# Banshee Blast: "Why is there two balls when charging", "The default should have only one ball"; seen on Vegito and Teen Gohan too, and
+# in sprite memory: one sprite, its size and tiles out of step). Every frame 16x16 now (the small ball in the middle of 16x16, where it
+# was drawn), so the size never changes. The effect's spawn (sub_080206B8, every such effect) loaded only its first frame's first 64
+# bytes (an 8x8 frame's): the first three frames showed a quarter of the ball and old tiles beside it. It loads 288 now (movs r2, #0xFF:
+# the copy goes by 32-byte blocks, then words), all of a 16x16 frame, inside the 0x300 bytes of sprite memory it takes for the effect.
+CHARGE_BALL = 0x7211AC           # its frame list: 12-byte entries (x, y, w, h, OAM bits, tiles), three frames
+SPAWN_COPY = 0x2074E             # sub_080206B8: movs r2, #0x40 before the copy of the first frame's tiles
+def one_ball(rom, clean, art):
+    if rom[SPAWN_COPY:SPAWN_COPY + 2] != b'\x40\x22': sys.exit('the effect spawn changed')
+    rom[SPAWN_COPY:SPAWN_COPY + 2] = b'\xff\x22'
+    e0 = clean[CHARGE_BALL:CHARGE_BALL + 36]
+    big = e0[12:24]
+    if e0[:8] != bytes.fromhex('0404080800200000') or big[:8] != bytes.fromhex('0808101000200040') or e0[24:32] != e0[:8]:
+        sys.exit('the charge ball changed')
+    small = np.frombuffer(clean[struct.unpack_from('<I', e0, 8)[0] - ROM_BASE:][:64], np.uint8).reshape(8, 8)
+    pad = np.zeros((16, 16), np.uint8); pad[4:12, 4:12] = small
+    data = pad.reshape(2, 8, 2, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()      # 8bpp tiles, row by row
+    art = (art + 3) & ~3; rom[art:art + len(data)] = data; ptr = ROM_BASE + art; art += len(data)
+    for i in (0, 2):
+        struct.pack_into('<8sI', rom, CHARGE_BALL + 12 * i, big[:8], ptr)
+    return art
 
 
 BEAM_POSE = 31                   # outfit.c BEAM_POSE: the actor slot a Kamehameha-code move uses when the fighter's slot 18 can't carry it

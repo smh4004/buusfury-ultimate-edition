@@ -1112,6 +1112,12 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   `gif_cap.py`. 18:10: "The energy sword frames are broken can you do the banshee blast instead, and make him a separate character":
   Banshee Blast (1) in the Energy Sword's place; a guest of his own on Switch Character (`outfits.json`, his own bench group, so his
   own level and stats), open once all four Trials are won (flag 895, when Goku and Vegeta learn the Potara).
+- Nov 14, 18:16, the owner: "Why is there two balls when charging the banshee blast", then "The default should have only one ball". The
+  game's own glitch (Vegito and Teen Gohan show it too): the cyan charge ball's frames go 8x8, 16x16, 8x8, and at each change of size
+  its tiles and its sprite's size were a frame apart, so a 16x16 sprite showed the small ball in its corner beside three quarters of the
+  big one (read from sprite memory: one sprite). `build.py one_ball`: every frame 16x16 (the small ball padded, in its place), and the
+  effect spawn (sub_080206B8, every effect it makes) loads a whole 16x16 first frame (288 bytes, not 64), so the first frames don't
+  show a quarter ball and old tiles. Checked frame by frame in the game.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
