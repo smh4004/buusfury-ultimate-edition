@@ -669,6 +669,17 @@ G_VEST = (112, 113, 115) + G_YEL
 G_PANTS = (114, 117, 119)
 G_SKIN = SKIN + (67,)                   # (67: his stomach's shading)
 G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 67: 112, 16: 1}
+SLOTS = {        # what plays each of Gotenks's animation slots (Nov 13, 22:03, the owner: "Make sure you actually determine what the attacks
+                 # are"): watched in the game (ultimate/slot_probe.py: the player's animation pointer while each control and skill is used;
+                 # a Gunman rig for being shot) or, where marked, read from the code (the slot setter sub_0800ECDA's callers)
+    0: 'Standing', 1: 'Walk', 2: 'Dash (a direction pressed twice)', 3: 'Ki blast (B); Ultra Volleyball Attack', 4: 'Punch (A)',
+    5: 'Punch (A)', 6: 'Combo finisher (A, A, A...)', 7: 'Guard (hold R)', 8: 'Idle animation (left standing about 13 s)',
+    9: 'Hit (shot), and the stop at the end of a dash', 10: 'Turning Super Saiyan', 11: 'Powering down (from the frames: none in base)',
+    12: 'Arms raised (Masenko, Spirit Bomb: not his skills)', 13: 'Charged punch (hold A, let go)',
+    14: 'Hop (no control or skill of his plays it: scene code)', 15: 'Flying (code: the flight mode)',
+    16: 'Flying, banking hard (code: the flight mode)', 17: 'Knocked down (code and frames; not filmed)',
+    18: 'Beam pose (Kamehameha and the other beams: not his skills)', 19: 'Super Kamikaze Ghost Attack',
+    20: 'Laughing pose (no control or skill of his plays it: scene code)'}
 G_HAIR = (138, 146, 147, 148)           # base Gotenks's hair's purple in his frames: the rows his head is in (`_g_grow`)
 SHIRT = os.environ.get('BFU_AG_SHIRT', '0') != '0'     # the black undershirt in his vest's open front (sprites: `grown`; portraits:
                                         # `Portraits.inlay`). Off since Nov 13, 21:17, the owner: "You know what just remove the shirt and do
@@ -726,11 +737,12 @@ def _g_params(n):
 
 def _g_grow(n, prm, head=None):
     """head: the rows his hair is in (base Gotenks's frame: its purple). Upright, his head is above every row that grows. Where it
-    isn't (diving, flying at the camera, knocked down: slots 8, 16, 17) a row that passes through his hair is not doubled, and
+    isn't (lying on his front in his idle animation, banking in flight, knocked down: slots 8, 16, 17; SLOTS) a row that passes
+    through his hair is not doubled, and
     no row his hair is in is widened: his head stays as it is drawn, only what of his body is clear of it grows. Where
-    every row passes through it (slot 16: he flies at the camera, his body behind his head) nothing grows: the frame is Gotenks's
-    own. (The owner, Nov 13, 21:48, on those frames, shown as "Ghost attack": "Wtf is that ghost attack frame": his head had been
-    pulled 3 rows taller.)"""
+    every row passes through it (slot 16 from the front and the side: his body behind his head) nothing grows: the frame is
+    Gotenks's own. (The owner, Nov 13, 21:48, on those frames, which the preview had mislabelled "Ghost attack": "Wtf is that ghost
+    attack frame": his head had been pulled 3 rows taller.)"""
     if prm is None: return n
     rows, c2, cx = prm
     out = n.copy(); hr = None if head is None else head.copy(); kept = done = 0

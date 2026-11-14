@@ -1278,12 +1278,12 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     the colours of the Kid Gotenks frame it is grown from (growing doubles rows and a column: it adds no colour and drops none),
     and none has less of any vest, padding or trouser colour than that frame. `test_adult_gotenks.py` checks both.
   - 21:48, the owner, on the video: "Wtf is that ghost attack frame". Two things were wrong, and a third turned up looking.
-    The label: the video called slots 8 and 16 "Ghost attack" and "Ghost spin". They are Kid Gotenks's own dive (he crouches, then
-    flies head first, his legs behind him) and his flight at the camera; which move plays them is not known yet. The Ghost Attack
+    The label: the video called slots 8 and 16 "Ghost attack" and "Ghost spin" (the generic slot list's guesses; what they really
+    are: see 22:03 below). The Ghost Attack
     itself, filmed in the game (`gif_cap.py`, skill 13, Kid and Adult): he crouches and blows, and the ghosts are the game's own
     cyan figures, the same for both.
     The frames: growing doubles three rows of his body and a column, and it took "his body" to be everything below his collar's
-    first row. Diving, flying at the camera or knocked down his head is beside his body, so those rows went through it: his hair 3
+    first row. Lying on his front, banking in flight or knocked down his head is beside his body, so those rows went through it: his hair 3
     rows taller in slot 16, wider in the others. `_g_grow` now never doubles a row his hair is in and never widens one (`G_HAIR`,
     read off base Gotenks's frame, so his Super Saiyan ones grow the same way); where every row is in his hair (slot 16 from the
     front and the side) nothing grows and the frame is Kid Gotenks's own. 27 base frames changed (slots 8, 15 from the side, 16,
@@ -1294,6 +1294,25 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     pixels over his shadow (seen in the test's own screenshots beside Kid Gotenks, never checked before). `build.py` gives his
     frames `origin_dy` 8. `test_adult_gotenks.py` now reads each frame back at its very place (it compared them cropped, which hid
     this) and checks his feet's row in his idle frames against Kid Gotenks's.
+  - 22:03, the owner: "Make sure you actually determine what the attacks are, thats not "costume" or "laugh" its the ghost attack
+    and something else". The preview's names were the generic slot list's, never checked for Gotenks. Now each is what the game
+    plays, watched: `slot_probe.py` reads the field player's animation pointer (0x0202D378, object 0x0202D328 +0x50) every 2 frames
+    while each control is used and each skill (1-44, one per run) is poked in and fired, as Kid Gotenks (form 31); a Gunman rig
+    (`BFU_RIG_ENEMY="44 137" --enemy`) for being shot. Engine-wide the slot is set by `sub_0800ECDA(object, slot)`, and through
+    `sub_0800ECF0` by an action number (table 0x080725E8 +0x88). The names are `adult_gotenks.SLOTS`:
+    0 standing; 1 walk; 2 dash (a direction pressed twice); 3 ki blast (B), and the Ultra Volleyball Attack (skill 23); 4 and 5
+    the punch (A; the same animation); 6 the combo finisher (A pressed again and again); 7 guard (hold R); 8 his idle animation,
+    after about 13 seconds left standing (he crouches, then lies on his front kicking his feet: the frames taken for a dive); 9 hit
+    (shot), and the stop at the end of a dash; 10 turning Super Saiyan; 12 arms raised (Masenko and Spirit Bomb: not his skills);
+    13 the charged punch (hold A, let go); 18 the beam pose (Kamehameha and every other beam: not his); 19 the Super Kamikaze Ghost
+    Attack (skill 13: he laughs, puffs up and blows the ghosts out; the slot the preview called "Costume").
+    From the code and frames, not filmed: 11 powering down (Super Saiyan only: the hair goes from gold to black); 15 flying and 16
+    flying banking hard (the flight mode, `sub_080103A6`: 16 when the turn passes 0x80; the frames the preview called "Ghost
+    spin"); 17 knocked down (`sub_0801088A`; the Gunman's shots only made him flinch).
+    Not played by any control or skill of his (all 44 tried): 14 a hop and 20 a laughing pose (the one the preview called
+    "Laugh"); only scene and enemy code sets them, and which scene, if any, shows Gotenks's is not known yet.
+    His own attacks are the Super Kamikaze Ghost Attack (19) and the Ultra Volleyball Attack (3); "something else" in the
+    owner's words is likely the Volleyball, or the charged punch (13), the only other moves with frames of their own.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

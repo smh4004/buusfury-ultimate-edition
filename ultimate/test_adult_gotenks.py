@@ -174,7 +174,7 @@ for v in ('head', 'hair', 'recolour'):
 # differ are the shirt's, each his own skin's colour here.
 # Nov 13, 21:48, the owner: "Wtf is that ghost attack frame" (Kid Gotenks's dive, slots 8 and 16, grown: his head had been pulled
 # taller). His head is never stretched: in every base frame his hair's purple has as many pixels as in the Kid Gotenks frame it is
-# grown from, and where he flies at the camera (slot 16, front and side) the frame is Kid Gotenks's own. And he stands where Kid
+# grown from, and where he banks in flight (slot 16, front and side) the frame is Kid Gotenks's own. And he stands where Kid
 # Gotenks stands: each frame is in the ROM at the very place the library has it (it was 8 rows higher: he hovered over his shadow),
 # his feet in his idle frames on Kid Gotenks's row.
 import numpy as np
@@ -210,7 +210,7 @@ for f, n in AG.ACTORS.items():
           all(a_ == b_ for a_, b_ in feet))
     if f == 'base':
         fly = [bool((want[16][v][j] == kid[16][v][j][AG.OUT]).all()) for v in (0, 2) for j in range(len(kid[16][v]))]
-        check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; flying at the camera "
+        check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; banking in flight "
               "(slot 16, front and side) %d of %d frames are Kid Gotenks's own" % (hair, sum(fly), len(fly)), hair == 0 and all(fly))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
