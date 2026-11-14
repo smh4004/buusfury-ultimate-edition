@@ -754,16 +754,18 @@ def cut(canvas, box):
     if box[3] != 32: py = box[1] + box[3] - 32            # (a shorter piece: keep its feet where they are)
     px = min(max(px, x1 - 31), x0); py = min(max(py, y1 - 31), y0)
     return canvas[OY + py:OY + py + 32, OX + px:OX + px + 32].copy(), (px, py, 32, 32)
-def made(form):
+def made(form, canvas=None, anims=None):
     """sprites.log2_anim's frame source for the figure: (record, animation, direction, frame) -> (pixels as shown, box as shown); None for
     another record's. An animation of the purple record that isn't in ANIMS stops the build (it would be the purple record's own frames,
     long black hair: actors.json gives the figures none). Direction 3 (facing right) is the side view mirrored, as the purple record shows it: its entry is the side view's pixels
-    with the mirror flag (checked here), and the game stores a mirrored frame's box where it is shown (x = 16 - w - x)."""
+    with the mirror flag (checked here), and the game stores a mirrored frame's box where it is shown (x = 16 - w - x).
+    canvas(k, d, f), anims: another look's frames of the same poses in place of frame(form, ...) (teen_bojack.py, Nov 14)."""
+    canvas = canvas or (lambda k, d, f: frame(form, k, d, f)); anims = anims or ANIMS[form]
     def source(rec, k, d, f):
         if rec != REC['P']: return None
-        if k not in ANIMS[form]: raise Off('Teen Gohan %s: a slot asks for the purple record\'s animation %d, which teen.py doesn\'t make' % (form, k))
+        if k not in anims: raise Off('Teen Gohan %s: a slot asks for the purple record\'s animation %d, which teen.py doesn\'t make' % (form, k))
         v = min(d, views(k) - 1); box = L.raw(REC['P'], k, v, f)[:4]
-        px, (x, y, w, h) = cut(frame(form, k, v, f), box)
+        px, (x, y, w, h) = cut(canvas(k, v, f), box)
         a2, a = (L.raw(REC['P'], k, e, f)[5] & 0x10000000 for e in (v, d))
         if v == d or views(k) == 1:
             if a: raise Off('Teen Gohan %s, animation %d direction %d frame %d: the purple record mirrors it' % (form, k, d, f))

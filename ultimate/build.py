@@ -341,7 +341,7 @@ ACTOR_BASE = 298
 def new_actor_ids():
     """Ids add_actors will give: actors.json's new actors in order, then Super 13 and Android 13. Checked after the build."""
     cfg = json.load(open('ultimate/actors.json'))
-    n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a and not a.get('last'))
+    n = ACTOR_BASE + sum(1 for k, a in cfg.items() if not k.startswith('_') and 'replace' not in a and not a.get('last') and not a.get('after_all'))
     return {'super13': n, 'android13': n + 1, 'broly_fp': n + 2, 'gogeta_dbs': n + 3, 'gogeta_dbs_ss': n + 4, 'gogeta_ssb': n + 5, 'android13_player': n + 6, 'super13_player': n + 7, 'goku_ss2': n + 8, 'goku_ss2_b': n + 9, 'gohan_ss2': n + 10, 'gohan_green_ss2': n + 11, 'vegeta_ss2': n + 12, 'vegeta_ss2_b': n + 13, 'vegeta_armor_ss2': n + 14, 'gohan_armor_ss2': n + 15, 'trunks_ss2': n + 16, 'trunks_armor_ss2': n + 17, 'vegito_ss2': n + 18, 'super17': n + 19, 'android13_absorb': n + 20, 'cell_imperfect': n + 21, 'cell_semi': n + 22, 'cell_perfect': n + 23, 'cell_junior': n + 24, **{'dragon_ball_%d' % (k + 1): n + 25 + k for k in range(7)}, 'goku_black': n + 32, 'goku_rose': n + 33, **{k: n + 34 + i for i, k in enumerate(gt.ACTORS)}, **{k: n + 34 + len(gt.ACTORS) + i for i, k in enumerate(garlic_art.ACTORS)}}
 
 
@@ -1412,8 +1412,14 @@ def add_actors(rom, clean):
             try: return fn(*args)
             except teen.Off as e: sys.exit(str(e))
         return source
+    # Teen Gohan in Goku's gi from Bojack Unbound (Nov 14, teen_bojack.py): those frames with his clothes in Goku's colours, every one checked
+    import teen_bojack
+    try: print("teen gohan in goku's gi: %d frames made and checked" % teen_bojack.every())
+    except teen.Off as e: sys.exit(str(e))
     for k, a in cfg.items():
-        if isinstance(a, dict) and isinstance(a.get('log2_source'), str): a['log2_source'] = checked(teen.made(a['log2_source']))
+        if isinstance(a, dict) and isinstance(a.get('log2_source'), str):
+            src = a['log2_source']
+            a['log2_source'] = checked(teen_bojack.made(src.split(':')[1]) if src.startswith('bojack:') else teen.made(src))
     # The Saiyan armor's Super Saiyan 2 stance: the Super Saiyan stance (arms down) with r55's head (Nov 12, the owner: "SSJ2 Teen Gohan idle
     # pose his hands are raised up instead of down, if you can fix that to standard"; teen.armor2)
     cfg['gohan_armor_ss2_art']['log2_source'] = checked(teen.armor2())
@@ -1581,6 +1587,8 @@ def add_actors(rom, clean):
                                                     #  and the ending stopped there (Nov 13); all three forms the same, as android17's note says)
                          'origin_dy': 8}                    # (adult_gotenks's canvas has 8 rows under a fighter's cell (CH): without this he
                                                             #  stood 8 pixels over his shadow; found Nov 13 in the game's own pictures)
+    for name in [k for k, a in cfg.items() if isinstance(a, dict) and a.get('after_all')]:   # actors.json "after_all": after Adult Gotenks's
+        cfg[name] = cfg.pop(name)                                                             # figures too (Teen Gohan in Goku's gi, Nov 14)
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
 
@@ -1597,11 +1605,15 @@ LOG2_CHANGES = (('gohan_armor', 'gohan_armor_ss', None), ('gohan_armor_ss', 'goh
                 ('trunks_armor', 'trunks_armor_ss', None), ('trunks_armor_ss', None, 'trunks_armor'), ('vegeta_armor', 'vegeta_armor_ss', None),
                 ('vegeta_armor_ss', None, 'vegeta_armor'), ('vegeta_armor_ssb', None, 'vegeta_armor'), ('future_trunks', 'future_trunks_ss', None),
                 ('future_trunks_ss', None, 'future_trunks'), ('android17', 'super17', None),
-                ('teen_gohan', 'teen_gohan_ss', None), ('teen_gohan_ss', 'teen_gohan_ss2', 'teen_gohan'), ('teen_gohan_ss2', None, 'teen_gohan'))
+                ('teen_gohan', 'teen_gohan_ss', None), ('teen_gohan_ss', 'teen_gohan_ss2', 'teen_gohan'), ('teen_gohan_ss2', None, 'teen_gohan'),
+                ('teen_gohan_bojack', 'teen_gohan_bojack_ss', None), ('teen_gohan_bojack_ss', 'teen_gohan_bojack_ss2', 'teen_gohan_bojack'),
+                ('teen_gohan_bojack_ss2', None, 'teen_gohan_bojack'))
 LOG2_OWN_CHANGE = ('gohan_armor_ss', 'trunks_armor', 'vegeta_armor', 'future_trunks')     # their slot 10 is LoG2's animation 9
-TEEN_FORMS = ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2', 'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2')     # outfit.c is_teen: Teen Gohan's (Nov 12)
+TEEN_FORMS = ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2', 'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2',     # outfit.c is_teen: Teen Gohan's (Nov 12)
+              'teen_gohan_bojack', 'teen_gohan_bojack_ss', 'teen_gohan_bojack_ss2')                                      # (Goku's gi, Nov 14)
 FT_ARMOR = ('trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2')     # outfit.c ft_armor: Future Trunks's Saiyan armor (Trunks's until Nov 12)
-MASENKO_FIGURES = ('gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2_art', 'piccolo', 'teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2')     # the Masenko (Gohan's, Piccolo's) plays slot 12: arms up, then the arm out; LoG2 figures had their stance
+MASENKO_FIGURES = ('gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2_art', 'piccolo', 'teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2',
+                   'teen_gohan_bojack', 'teen_gohan_bojack_ss', 'teen_gohan_bojack_ss2')     # the Masenko (Gohan's, Piccolo's) plays slot 12: arms up, then the arm out; LoG2 figures had their stance
 
 
 def fighter_poses(rom, ids, at):
@@ -2217,6 +2229,7 @@ FIST_POSE = 29                   # outfit.c FIST_POSE: Goku's Super Saiyan 3 fig
 SSJ3_GOKU = (5, 6, 7, 8)         # the original game's Super Saiyan 3 Goku forms (figures 111 and 112: alive and with his halo, each twice); Kid Goku's is by name
 BEAM_FORMS = ('android13', 'krillin', 'krillin_kaioken', 'tien', 'tien_kaioken', 'future_trunks', 'future_trunks_ss', 'android17', 'super17', 'android18',
               'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'trunks_armor', 'trunks_armor_ss', 'trunks_armor_ss2', 'teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2',
+              'teen_gohan_bojack', 'teen_gohan_bojack_ss', 'teen_gohan_bojack_ss2',
               'kid_buu', 'majin_buu')    # the Buus' Kamehameha (Nov 10): their slot 18 is a boss move (Kid Buu's rush, Majin Buu's antenna beam)
 # The rule for a figure with no beam frames of its own (Nov 10, 21:20, the owner: "Never use guards as an attack frame, use ki blast frames
 # but dont loop them just make it one smooth sustained transition on beams if none exist"): the ki blast's wind-up while it charges, then
@@ -3135,6 +3148,7 @@ def main():
                         for f, n, row, up, down in (('base', 'adult_gotenks', 31, 'adult_gotenks_ssj', 255),
                                                     ('ssj', 'adult_gotenks_ssj', 34, 'adult_gotenks_ssj3', 'adult_gotenks'),
                                                     ('ssj3', 'adult_gotenks_ssj3', 35, 255, 'adult_gotenks'))]
+    cfg['rows'] += cfg.pop('rows_last', [])           # rows after every other, Adult Gotenks's too (Teen Gohan in Goku's gi, Nov 14)
     saved = {p: open(p).read() for p in (INTRO, FIELD, ACTORS_FILE, ENDING)}
     try:
         for p, s in unlock_edits_paths().items():

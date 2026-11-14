@@ -1079,6 +1079,28 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   - `check` is stricter: Super Saiyan 2's eyes where the Super Saiyan frame of the pose has them (a head placed by another frame's
     offset had covered his face, his hands on his head), and no speck of gi in his hair. The approved frames are unchanged but for the
     two Super Saiyan 2 stance frames (compared pixel for pixel with the Nov 11 module). Relocked: teen_gohan_ss, teen_gohan_ss2.
+- Nov 14, 16:29, the owner, on Teen Gohan in Goku's Bojack Unbound gi: "Finally lock that in as an unlock too for something".
+  `teen_bojack.py` makes it from the purple gi's frames as `teen.py` makes them, every pixel where it is: only his clothes take Goku's
+  LoG2 colours (r57's orange and navy, the navy V under his neck), and base is the Super Saiyan head with the hair black, shaded as LoG2's
+  black hair (16:23: "base SSJ1 hair shape just BLACK like normal not FULLY MATTE BLACK"). 438 frames, each checked (`problems`: outline,
+  nothing but clothes changed, none of the purple gi's colours left); one that fails stops the build. Three figures and form rows
+  (`teen_gohan_bojack`, `_ss`, `_ss2`; `actors.json` "after_all": built after Adult Gotenks's figures, `forms.json` "rows_last": rows
+  169-171, so no id or row anything knew moves; `new_actor_ids` leaves "after_all" figures out of its count as it does "last"). He is
+  the guest list's "Teen Gohan, orange gi" (`outfits.json`, Gohan's list), unlocked by winning the tournament's Hard bracket (flag 2013,
+  `zone26.MORE_HARD`); his Super Saiyan and 2 go up the same chain as the purple gi's. Locked (`locked.json`). `test_teen.py` checks
+  the three figures' frames, names, chain and a fight. `teen_bojack.parts` gives the clothes it finds (top, socks and shoes, upper and
+  lower body), so another look can dress the same frames (`trunkten.py`; `make` is unchanged, every frame compared before and after).
+- Nov 14, 16:29, the owner: "lets start on the Trunkten potara fusion with the green gi and orange belt and orange undershirt you can
+  maybe use this model as a base but keep the black/purple base hair color inverted from gotenks"; 17:19, on the first preview (the
+  model's own hair, purple crown, black sides): "Try Vegitos hair shape instead and use the Potara from him if he has it".
+  `trunkten.py` dresses the orange-gi model's Super Saiyan frames: green gi (BF 252, 215, 251, 216 through LoG2 indices teen.py never
+  uses: `CMAP`, the figure's colour map), orange sash and undershirt, navy wristbands and boots as the model's. His hair is BF's Vegito's
+  (actor 275, Super Vegito, the game's only one), each view's stance head laid on the model's face by the eyes (the two games' faces are
+  the same size), and on every frame where the frame's head matches the stance head best (moved up to 8 pixels), so it never moves on his
+  head; the model's hair goes, holes it leaves inside the figure take their neighbours' colour, specks it alone held go, and the tips go
+  where the frame would pass 32 rows. Base: Gotenks's colours turned round (crown purple, the sides and low hair black); Super Saiyan:
+  Super Vegito's own colours; Super Saiyan 2: the model's Super Saiyan 2 golds. Vegito's Potara earring (BF 29, one pixel) under each ear.
+  438 frames, each checked (`problems`). Previewed; not in the build until the owner approves.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,

@@ -4,6 +4,7 @@
 1. Read from the ROM, no emulator: every frame of his purple-gi Super Saiyan and Super Saiyan 2 figures is one teen.py makes (the owner's
    approved frames, Nov 11), shown the same way for the same direction (its pixels, its place round the origin, mirrored to the right),
    and nothing of the purple record's own (long black hair) is left in them. His base figure is LoG2's purple record (r50), every slot filled.
+   Goku's gi from Bojack Unbound (Nov 14): every frame of its three figures is one teen_bojack.py makes, its own chain.
    The armor's forms are his (owner 8, his name), not adult Gohan's.
 2. In the Bomber fight: each look's ki blast and Kamehameha hit and its Masenko goes, in base, Super Saiyan and Super Saiyan 2, no bad jump,
    and Super Saiyan 2 comes through the Super Saiyan skill with no story flag (ss2_open). The pose the game shows each frame of the
@@ -23,7 +24,7 @@ def check(name, ok):
     print('PASS' if ok else 'FAIL', name, flush=True)
     if not ok: fails.append(name)
 
-import sprites, teen, artclean, goku_black
+import sprites, teen, teen_bojack, artclean, goku_black
 l2 = open(os.environ['BFU_COMBO'], 'rb').read()[0x800000:]
 teen.use(l2)
 clean = open('baserom.gba', 'rb').read()
@@ -54,8 +55,11 @@ P = teen.REC['P']
 def place(px, x, y):
     c = np.zeros((128, 128), np.uint8); h, w = px.shape; c[64 + y:64 + y + h, 64 + x:64 + x + w] = cmap[px]; return c.tobytes()
 def made_views(name):
-    src = teen.made(name); want = {d: set() for d in range(4)}
-    for k in teen.ANIMS[name]:
+    if name.startswith('bojack:'):
+        look = name.split(':')[1]; src = teen_bojack.made(look); ks = teen_bojack.anims(look)
+    else: src = teen.made(name); ks = teen.ANIMS[name]
+    want = {d: set() for d in range(4)}
+    for k in ks:
         for d in range(4):
             for f in range(teen.L.nframes(P, k)):
                 px, (x, y, w, h) = src(P, k, d, f); want[d].add(place(px, x, y))
@@ -68,11 +72,14 @@ def own_views():
                 v = teen.L.raw(P, k, d, f)
                 if v is not None: want[d].add(place(v[4], v[0], v[1]))
     return want
-VIEWS = {'teen_gohan': own_views(), 'teen_gohan_ss': made_views('ss'), 'teen_gohan_ss2': made_views('ss2')}
-NEXT = {'teen_gohan': 'teen_gohan_ss', 'teen_gohan_ss': 'teen_gohan_ss2', 'teen_gohan_ss2': None}
-for form in ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2'):
+VIEWS = {'teen_gohan': own_views(), 'teen_gohan_ss': made_views('ss'), 'teen_gohan_ss2': made_views('ss2'),
+         'teen_gohan_bojack': made_views('bojack:base'), 'teen_gohan_bojack_ss': made_views('bojack:ss'), 'teen_gohan_bojack_ss2': made_views('bojack:ss2')}
+NEXT = {'teen_gohan': 'teen_gohan_ss', 'teen_gohan_ss': 'teen_gohan_ss2', 'teen_gohan_ss2': None,
+        'teen_gohan_bojack': 'teen_gohan_bojack_ss', 'teen_gohan_bojack_ss': 'teen_gohan_bojack_ss2', 'teen_gohan_bojack_ss2': None}
+BASE_OF = {f: ('teen_gohan_bojack' if 'bojack' in f else 'teen_gohan') for f in NEXT}
+for form in NEXT:
     want = VIEWS[form]; every = set().union(*want.values())
-    change = every | (set().union(*VIEWS[NEXT[form]].values()) if NEXT[form] else set()) | (set().union(*VIEWS['teen_gohan'].values()) if form != 'teen_gohan' else set())
+    change = every | (set().union(*VIEWS[NEXT[form]].values()) if NEXT[form] else set()) | (set().union(*VIEWS[BASE_OF[form]].values()) if form != BASE_OF[form] else set())
     sl = slots(record(forms[form])); n = 0; bad = []
     for s, frames in sl.items():
         for i, fr in enumerate(frames):
@@ -80,22 +87,26 @@ for form in ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2'):
                 n += 1; c = canvas(fr[d]).tobytes()
                 if not (c in want[d] if s not in (10, 11) else c in change): bad.append((s, i, d))
     print('   %s: %d slots, %d frame views; not as made: %s' % (form, len(sl), n, bad[:12]))
-    check('%s: every frame is %s, shown as made for its direction' % (form, 'the purple record\'s own' if form == 'teen_gohan' else 'one teen.py makes'), n > 0 and not bad)
-    need = [s for s in list(range(24)) + [31] if not (s == 11 and form == 'teen_gohan')]     # (a base form never powers down: no 11, as armour Gohan's and Future Trunks')
+    check('%s: every frame is %s, shown as made for its direction' % (form, 'the purple record\'s own' if form == 'teen_gohan' else 'one teen.py makes' if 'bojack' not in form else 'one teen_bojack.py makes'), n > 0 and not bad)
+    need = [s for s in list(range(24)) + [31] if not (s == 11 and form == BASE_OF[form])]     # (a base form never powers down: no 11, as armour Gohan's and Future Trunks')
     check('%s: every slot a fighter uses is filled (0-23, and the beam pose 31)' % form, all(s in sl for s in need))
-for f in ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2', 'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2'):
+for f in ('teen_gohan', 'teen_gohan_ss', 'teen_gohan_ss2', 'gohan_armor', 'gohan_armor_ss', 'gohan_armor_ss2', 'teen_gohan_bojack', 'teen_gohan_bojack_ss', 'teen_gohan_bojack_ss2'):
     r = row(forms[f])
     check('%s: owner 8 (the guest), name "Teen Gohan"' % f, r[0x0C] == 8 and struct.unpack_from('<H', r, 2)[0] == 1588)
 check('the chain: purple gi base, Super Saiyan, Super Saiyan 2, and back to base',
       row(forms['teen_gohan'])[0x16] == forms['teen_gohan_ss'] and row(forms['teen_gohan_ss'])[0x16] == forms['teen_gohan_ss2']
       and row(forms['teen_gohan_ss'])[0x17] == forms['teen_gohan'] and row(forms['teen_gohan_ss2'])[0x17] == forms['teen_gohan'] and row(forms['teen_gohan_ss2'])[0x16] == 255)
+check("Goku's gi: the same chain",
+      row(forms['teen_gohan_bojack'])[0x16] == forms['teen_gohan_bojack_ss'] and row(forms['teen_gohan_bojack_ss'])[0x16] == forms['teen_gohan_bojack_ss2']
+      and row(forms['teen_gohan_bojack_ss'])[0x17] == forms['teen_gohan_bojack'] and row(forms['teen_gohan_bojack_ss2'])[0x17] == forms['teen_gohan_bojack']
+      and row(forms['teen_gohan_bojack_ss2'])[0x16] == 255)
 
 # 2. in the Bomber fight, his figure from the start (the form set during the intro, before the field loads the player's actor)
 import test_moves as T
 TEEN = [7, 8, 17, 15, 20]                      # ki blasts, rush, Masenko, Kamehameha, Super Saiyan (outfit.c teen)
 R = T.R
 k_ = [i for i, l in enumerate(T.base) if l == 'tap A 100'][20]
-for look in ('teen_gohan', 'gohan_armor'):
+for look in ('teen_gohan', 'gohan_armor', 'teen_gohan_bojack'):
     T.base[k_:k_] = ['poke8 %08X %02X' % (R + 0x14, forms[look])]
     for tier, presses in (('base', (0,)), ('ss', (0, 4)), ('ss2', (0, 4, 4))):
         want = forms[look] if tier == 'base' else forms[look + '_' + tier]
