@@ -1277,6 +1277,23 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     On his figure nothing needed changing, and that is now checked rather than assumed: every one of the 570 frames has exactly
     the colours of the Kid Gotenks frame it is grown from (growing doubles rows and a column: it adds no colour and drops none),
     and none has less of any vest, padding or trouser colour than that frame. `test_adult_gotenks.py` checks both.
+  - 21:48, the owner, on the video: "Wtf is that ghost attack frame". Two things were wrong, and a third turned up looking.
+    The label: the video called slots 8 and 16 "Ghost attack" and "Ghost spin". They are Kid Gotenks's own dive (he crouches, then
+    flies head first, his legs behind him) and his flight at the camera; which move plays them is not known yet. The Ghost Attack
+    itself, filmed in the game (`gif_cap.py`, skill 13, Kid and Adult): he crouches and blows, and the ghosts are the game's own
+    cyan figures, the same for both.
+    The frames: growing doubles three rows of his body and a column, and it took "his body" to be everything below his collar's
+    first row. Diving, flying at the camera or knocked down his head is beside his body, so those rows went through it: his hair 3
+    rows taller in slot 16, wider in the others. `_g_grow` now never doubles a row his hair is in and never widens one (`G_HAIR`,
+    read off base Gotenks's frame, so his Super Saiyan ones grow the same way); where every row is in his hair (slot 16 from the
+    front and the side) nothing grows and the frame is Kid Gotenks's own. 27 base frames changed (slots 8, 15 from the side, 16,
+    17), 13 Super Saiyan and 10 Super Saiyan 3 (15, 17); upright frames not at all. In every base frame his hair now has as many
+    purple pixels as the Kid Gotenks frame it is grown from.
+    And where he stood: `adult_gotenks`'s canvas keeps 8 rows under a fighter's cell (`CH`), `sprites.Inserter` takes a cell's
+    last row as the fighter's cell's, so every frame of every look went into the ROM 8 rows too high: in the game he hovered 8
+    pixels over his shadow (seen in the test's own screenshots beside Kid Gotenks, never checked before). `build.py` gives his
+    frames `origin_dy` 8. `test_adult_gotenks.py` now reads each frame back at its very place (it compared them cropped, which hid
+    this) and checks his feet's row in his idle frames against Kid Gotenks's.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

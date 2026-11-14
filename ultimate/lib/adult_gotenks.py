@@ -29,8 +29,11 @@ import numpy as np
 from scipy import ndimage
 
 BASE = 0x08000000
-CH, CW = 56, 96                 # the canvas: the sprite's origin at row 48, column 48 (pieces sit at origin + their offset - 8)
-OUT = (slice(0, CH), slice(16, 80))      # what goes to the build: 64 columns, bottom-centred on the origin as sprites.Inserter takes it
+CH, CW = 56, 96                 # the canvas: a fighter's cell ends at row 48 (the sprite's origin 8 rows above it, at column 48: a piece
+                                # sits at row 40 + its y, column 40 + its x); the 8 rows under it are for what hangs lower
+OUT = (slice(0, CH), slice(16, 80))      # what goes to the build: 64 columns, all 56 rows. sprites.Inserter takes a cell's last row as
+                                         # the fighter's cell's, so these go in with 'origin_dy': 8 (build.py): without it he is drawn
+                                         # 8 pixels too high, over his shadow
 GOHAN = 101
 GOTENKS = {'base': 117, 'ssj': 120, 'ssj3': 121}
 VARIANTS = ('head', 'hair', 'recolour', 'grown')
@@ -666,6 +669,7 @@ G_VEST = (112, 113, 115) + G_YEL
 G_PANTS = (114, 117, 119)
 G_SKIN = SKIN + (67,)                   # (67: his stomach's shading)
 G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 67: 112, 16: 1}
+G_HAIR = (138, 146, 147, 148)           # base Gotenks's hair's purple in his frames: the rows his head is in (`_g_grow`)
 SHIRT = os.environ.get('BFU_AG_SHIRT', '0') != '0'     # the black undershirt in his vest's open front (sprites: `grown`; portraits:
                                         # `Portraits.inlay`). Off since Nov 13, 21:17, the owner: "You know what just remove the shirt and do
                                         # the vest only its not looking right no matter how you do it", "Sprites and portraits both": his
@@ -720,13 +724,23 @@ def _g_params(n):
     return rows, c2, cx
 
 
-def _g_grow(n, prm):
+def _g_grow(n, prm, head=None):
+    """head: the rows his hair is in (base Gotenks's frame: its purple). Upright, his head is above every row that grows. Where it
+    isn't (diving, flying at the camera, knocked down: slots 8, 16, 17) a row that passes through his hair is not doubled, and
+    no row his hair is in is widened: his head stays as it is drawn, only what of his body is clear of it grows. Where
+    every row passes through it (slot 16: he flies at the camera, his body behind his head) nothing grows: the frame is Gotenks's
+    own. (The owner, Nov 13, 21:48, on those frames, shown as "Ghost attack": "Wtf is that ghost attack frame": his head had been
+    pulled 3 rows taller.)"""
     if prm is None: return n
     rows, c2, cx = prm
-    out = n.copy()
+    out = n.copy(); hr = None if head is None else head.copy(); kept = done = 0
     for r in rows:
-        top = out[:r + 1].copy(); out[:r] = top[1:]; out[r] = top[r]
+        if hr is not None and hr[r]: kept += 1; continue
+        top = out[:r + 1].copy(); out[:r] = top[1:]; out[r] = top[r]; done += 1
+        if hr is not None: t = hr[:r + 1].copy(); hr[:r] = t[1:]; hr[r] = t[r]
+    if kept and not done: return n
     res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]
+    if hr is not None: res[hr] = out[hr]
     return res
 
 
@@ -741,7 +755,7 @@ def grown(c, ref=None):
     if SHIRT:
         chest = _g_chest(nr) & (n == nr)
         for k, v in G_UNDER.items(): n[chest & (n == k)] = v
-    return np.rot90(_g_grow(n, _g_params(nr)), r)
+    return np.rot90(_g_grow(n, _g_params(nr), np.isin(nr, G_HAIR).any(1)), r)
 
 
 def grown_frames(rom, actor_list, form):

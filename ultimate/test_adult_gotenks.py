@@ -172,11 +172,13 @@ for v in ('head', 'hair', 'recolour'):
 # his chest is bare under the vest, as Kid Gotenks's is. Every frame of his three figures in the ROM (the moved actor table, the
 # figure his form row names) is the library's; none has the undershirt: against the frames with it (AG.SHIRT), the only pixels that
 # differ are the shirt's, each his own skin's colour here.
+# Nov 13, 21:48, the owner: "Wtf is that ghost attack frame" (Kid Gotenks's dive, slots 8 and 16, grown: his head had been pulled
+# taller). His head is never stretched: in every base frame his hair's purple has as many pixels as in the Kid Gotenks frame it is
+# grown from, and where he flies at the camera (slot 16, front and side) the frame is Kid Gotenks's own. And he stands where Kid
+# Gotenks stands: each frame is in the ROM at the very place the library has it (it was 8 rows higher: he hovered over his shadow),
+# his feet in his idle frames on Kid Gotenks's row.
 import numpy as np
 ACTORS_AT = 0x850000                              # (build.py: the moved actor table)
-def _crop(c):
-    ys = np.nonzero(c.any(1))[0]; xs = np.nonzero(c.any(0))[0]
-    return c[ys.min():ys.max() + 1, xs.min():xs.max() + 1] if len(ys) else c[:0, :0]
 SHIRT_C, SKIN_C = list(set(AG.G_UNDER.values())), list(AG.G_UNDER)
 OUTFIT = AG.G_VEST + AG.G_PANTS                   # (his vest, its yellow padding, his trousers)
 for f, n in AG.ACTORS.items():
@@ -184,24 +186,32 @@ for f, n in AG.ACTORS.items():
     got = AG.cells(rom, ACTORS_AT, act); want = AG.grown_frames(clean, 0x6B6BD8, f)
     kid = AG.cells(clean, 0x6B6BD8, AG.GROWN[f])  # (Kid Gotenks's own frames, the game's)
     was = AG.SHIRT; AG.SHIRT = True; worn = AG.grown_frames(clean, 0x6B6BD8, f); AG.SHIRT = was
-    tot = same = had = px = other = cols = fewer = 0
+    tot = same = had = px = other = cols = fewer = hair = 0
     for s in want:
         for v in range(3):
             for j, c in enumerate(want[s][v]):
                 tot += 1
-                g_ = _crop(got[s][v][j]) if s in got and j < len(got[s][v]) else None
-                same += g_ is not None and g_.shape == _crop(c).shape and bool((g_ == _crop(c)).all())
+                same += s in got and j < len(got[s][v]) and bool((got[s][v][j][AG.OUT] == c).all())     # (the same pixels at the same place)
                 m = worn[s][v][j] != c
                 had += bool(m.any()); px += int(m.sum())
                 other += int((~(np.isin(worn[s][v][j][m], SHIRT_C) & np.isin(c[m], SKIN_C))).sum())
                 kc = kid[s][v][j]                 # (growing him doubles rows and a column of Kid Gotenks's frame: it adds no colour and
                 cols += set(np.unique(c).tolist()) == set(np.unique(kc).tolist())      #  drops none, and no pixel of his outfit is lost)
                 fewer += any((c == o).sum() < (kc == o).sum() for o in OUTFIT)
+                hair += f == 'base' and int(np.isin(c, AG.G_HAIR).sum()) != int(np.isin(kc, AG.G_HAIR).sum())
     check("grown look, %s (figure %d): all %d frames in the ROM are the library's (%d), his chest bare under the vest: %d of them would "
           "wear the undershirt (%d pixels of it, each his own skin here; %d other pixels differ)" % (f, act, tot, same, had, px, other),
           not AG.SHIRT and same == tot and had >= 40 and other == 0)
     check("grown look, %s: his outfit's colours are Kid Gotenks's (figure %d): %d of %d frames have exactly their Kid Gotenks frame's "
           "colours, %d with less of a vest, padding or trouser colour than it" % (f, AG.GROWN[f], cols, tot, fewer), cols == tot and fewer == 0)
+    last = lambda c: int(np.nonzero(c.any(1))[0].max())
+    feet = [(last(got[0][v][j][AG.OUT]), last(kid[0][v][j][AG.OUT])) for v in range(3) for j in range(len(kid[0][v]))]
+    check("grown look, %s: he stands where Kid Gotenks stands: his feet's row in his idle frames in the ROM and Kid Gotenks's %s" % (f, feet),
+          all(a_ == b_ for a_, b_ in feet))
+    if f == 'base':
+        fly = [bool((want[16][v][j] == kid[16][v][j][AG.OUT]).all()) for v in (0, 2) for j in range(len(kid[16][v]))]
+        check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; flying at the camera "
+              "(slot 16, front and side) %d of %d frames are Kid Gotenks's own" % (hair, sum(fly), len(fly)), hair == 0 and all(fly))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
