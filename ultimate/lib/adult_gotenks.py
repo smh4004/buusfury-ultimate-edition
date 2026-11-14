@@ -669,17 +669,22 @@ G_VEST = (112, 113, 115) + G_YEL
 G_PANTS = (114, 117, 119)
 G_SKIN = SKIN + (67,)                   # (67: his stomach's shading)
 G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 67: 112, 16: 1}
-SLOTS = {        # what plays each of Gotenks's animation slots (Nov 13, 22:03, the owner: "Make sure you actually determine what the attacks
-                 # are"): watched in the game (ultimate/slot_probe.py: the player's animation pointer while each control and skill is used;
-                 # a Gunman rig for being shot) or, where marked, read from the code (the slot setter sub_0800ECDA's callers)
-    0: 'Standing', 1: 'Walk', 2: 'Dash (a direction pressed twice)', 3: 'Ki blast (B); Ultra Volleyball Attack', 4: 'Punch (A)',
-    5: 'Punch (A)', 6: 'Combo finisher (A, A, A...)', 7: 'Guard (hold R)', 8: 'Idle animation (left standing about 13 s)',
-    9: 'Hit (shot), and the stop at the end of a dash', 10: 'Turning Super Saiyan', 11: 'Powering down (from the frames: none in base)',
-    12: 'Arms raised (Masenko, Spirit Bomb: not his skills)', 13: 'Charged punch (hold A, let go)',
-    14: 'Hop (no control or skill of his plays it: scene code)', 15: 'Flying (code: the flight mode)',
-    16: 'Flying, banking hard (code: the flight mode)', 17: 'Knocked down (code and frames; not filmed)',
-    18: 'Beam pose (Kamehameha and the other beams: not his skills)', 19: 'Super Kamikaze Ghost Attack',
-    20: 'Laughing pose (no control or skill of his plays it: scene code)'}
+SLOTS = {        # what plays each of Gotenks's animation slots, every one watched in the game (Nov 13, 22:03 and 22:35, the owner: "Make sure
+                 # you actually determine what the attacks are", "Get it right"). ultimate/slot_probe.py and the clips: the player's animation
+                 # pointer read every 2 frames while each control, each skill (1-44), the fusion dance, being shot and dying (a Gunman rig) and
+                 # the world-map flight (the story build) were played as Kid Gotenks, with screenshots. His own skills (record 5 at a new
+                 # game): Energy Blast, Super Saiyan, Super Kamikaze Ghost Attack, Ultra Volleyball Attack.
+    0: 'Standing', 1: 'Walking', 2: 'Running (a direction pressed twice and held)',
+    3: 'Energy Blast (B) and the Ultra Volleyball Attack: he throws his hand out', 4: 'Punch (A, every second press)',
+    5: 'Punch (the same animation as 4)', 6: 'Spin kick (A: the first press, then every second one)', 7: 'Guard (hold R)',
+    8: 'Bored: about 15 s left standing, he lies down on his front, feet up', 9: 'Hurt: hit, or running into a wall',
+    10: 'Turning Super Saiyan', 11: 'Powering back down (Super Saiyan pressed again)',
+    12: 'Arms raised: never shown for Gotenks (only Masenko and the Spirit Bomb play it)',
+    13: 'Charging a punch while A is held; let go and he punches for about 3.5 times the damage',
+    14: 'A hop: never shown for Gotenks (nothing he does plays it)', 15: 'Flying over the world map',
+    16: 'Banking into a turn, flying over the world map (his Super Saiyan forms: their flying animation)', 17: 'Falling, defeated (his health gone)',
+    18: 'Beam stance: never shown for Gotenks (only beam skills play it; he has none)',
+    19: 'Super Kamikaze Ghost Attack (hold B, let go)', 20: 'A laugh: never shown for Gotenks (nothing he does plays it)'}
 G_HAIR = (138, 146, 147, 148)           # base Gotenks's hair's purple in his frames: the rows his head is in (`_g_grow`)
 SHIRT = os.environ.get('BFU_AG_SHIRT', '0') != '0'     # the black undershirt in his vest's open front (sprites: `grown`; portraits:
                                         # `Portraits.inlay`). Off since Nov 13, 21:17, the owner: "You know what just remove the shirt and do
@@ -735,7 +740,7 @@ def _g_params(n):
     return rows, c2, cx
 
 
-def _g_grow(n, prm, head=None):
+def _g_grow(n, prm, head=None, widen=True):
     """head: the rows his hair is in (base Gotenks's frame: its purple). Upright, his head is above every row that grows. Where it
     isn't (lying on his front in his idle animation, banking in flight, knocked down: slots 8, 16, 17; SLOTS) a row that passes
     through his hair is not doubled, and
@@ -751,9 +756,15 @@ def _g_grow(n, prm, head=None):
         top = out[:r + 1].copy(); out[:r] = top[1:]; out[r] = top[r]; done += 1
         if hr is not None: t = hr[:r + 1].copy(); hr[:r] = t[1:]; hr[r] = t[r]
     if kept and not done: return n
+    if not widen: return out
     res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]
     if hr is not None: res[hr] = out[hr]
     return res
+
+
+def _span(a):
+    ys = np.nonzero(a.any(1))[0]; xs = np.nonzero(a.any(0))[0]
+    return (ys.max() - ys.min() + 1, xs.max() - xs.min() + 1) if len(ys) else (0, 0)
 
 
 def grown(c, ref=None):
@@ -767,7 +778,10 @@ def grown(c, ref=None):
     if SHIRT:
         chest = _g_chest(nr) & (n == nr)
         for k, v in G_UNDER.items(): n[chest & (n == k)] = v
-    return np.rot90(_g_grow(n, _g_params(nr), np.isin(nr, G_HAIR).any(1)), r)
+    g = _g_grow(n, _g_params(nr), np.isin(nr, G_HAIR).any(1))
+    if min(_span(g)) > 32:              # (more than 32 both ways needs a 64 x 64 piece, past his 2 KB of sprite memory (build.py): such a frame
+        g = _g_grow(n, _g_params(nr), np.isin(nr, G_HAIR).any(1), widen=False)     #  grows taller only: the Super Saiyan 3 change, 24 frames)
+    return np.rot90(g, r)
 
 
 def grown_frames(rom, actor_list, form):
@@ -775,7 +789,9 @@ def grown_frames(rom, actor_list, form):
     g = cells(rom, actor_list, GROWN[form]); base = cells(rom, actor_list, GROWN['base'])
     def ref(s, d, j):
         return base[s][d][j] if s in base and len(base[s][d]) == len(g[s][d]) else None
-    return {s: [[grown(c, ref(s, d, j))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
+    out = {s: [[grown(c, ref(s, d, j))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
+    if 16 not in out and 15 in out: out[16] = out[15]     # (Kid Gotenks's Super Saiyan figures have no banking animation (16): over the
+    return out                                            #  world map the game showed nothing while he turned. The flying one in its place)
 
 
 # ---- his portraits (the owner: "build a portrait too from Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible

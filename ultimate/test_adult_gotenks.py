@@ -195,7 +195,7 @@ for f, n in AG.ACTORS.items():
                 m = worn[s][v][j] != c
                 had += bool(m.any()); px += int(m.sum())
                 other += int((~(np.isin(worn[s][v][j][m], SHIRT_C) & np.isin(c[m], SKIN_C))).sum())
-                kc = kid[s][v][j]                 # (growing him doubles rows and a column of Kid Gotenks's frame: it adds no colour and
+                kc = kid[s if s in kid else 15][v][j]     # (growing him doubles rows and a column of Kid Gotenks's frame: it adds no colour and
                 cols += set(np.unique(c).tolist()) == set(np.unique(kc).tolist())      #  drops none, and no pixel of his outfit is lost)
                 fewer += any((c == o).sum() < (kc == o).sum() for o in OUTFIT)
                 hair += f == 'base' and int(np.isin(c, AG.G_HAIR).sum()) != int(np.isin(kc, AG.G_HAIR).sum())
@@ -278,6 +278,55 @@ for f in AG.ACTORS:
               % (f, i, shirt, own, region.sum(), skin, worn, vest.sum(), purple),
               not AG.SHIRT and shirt == 0 and region.sum() >= 90 and own >= 0.95 * region.sum() and skin == region.sum()
               and vest.sum() >= 8 and worn == vest.sum() and purple == 0)
+# 7: his sprite memory. Each frame is one piece in the record's share of sprite memory (record +2). 4 KB, as Broly's, worked on foot but
+# over the world map he wasn't drawn and the ending's flight never went on to the Lookout (Nov 13, found filming what plays each
+# animation): 2 KB, the same for all three forms (a change of size on transforming scrambles other sprites, build.py android17), and
+# every piece fits it (the Super Saiyan 3 change's frames grow taller only, adult_gotenks.grown).
+for f, n in AG.ACTORS.items():
+    act = struct.unpack_from('<H', rom, TABLE + FORM_SIZE * MAP[n] + 0xE)[0] - 9
+    rec = u(ACTORS_AT + 4 * act) - 0x08000000; most = 0
+    for sl in range(u(rec) & 0xFF):
+        an = u(rec + 0x54 + 4 * sl)
+        if not an: continue
+        an -= 0x08000000
+        for k in range(u(an)):
+            for v in range(3):
+                fp = u(an + 4 + 16 * k + 4 * v) - 0x08000000
+                for j in range(u(fp)):
+                    w_, h_ = rom[fp + 8 + 12 * j + 2], rom[fp + 8 + 12 * j + 3]; most = max(most, w_ * h_)
+    check("%s's sprite memory: %d bytes a frame, his biggest piece %d" % (n, struct.unpack_from('<H', rom, rec + 2)[0], most),
+          struct.unpack_from('<H', rom, rec + 2)[0] == 2048 and most <= 2048)
+# 8 (with a story build, BFU_ZONE_ROM: BFU_ADULT_GOTENKS=1 build.py --debug --zone): he flies over the world map. The real ending as each
+# of his forms (test_story.py's route): its flight shows his figure, and flying on, his flying animation (15) and, turning, his banking
+# one (16); then landing reaches West City, as for anyone.
+ZONE = os.environ.get('BFU_ZONE_ROM')
+if ZONE:
+    zrom = open(ZONE, 'rb').read(); zu = lambda o: struct.unpack_from('<I', zrom, o)[0]
+    zmap = json.load(open(ZONE.replace('_PERSONAL_USE_ONLY.gba', '.map.json')))['forms']
+    def zrun(lines):
+        pth = OUT + '/z.txt'; open(pth, 'w').write('\n'.join(lines) + '\n')
+        return subprocess.run(['tools/harness/harness', ZONE, pth, OUT], capture_output=True, text=True, timeout=900).stdout
+    zstart = open('tools/harness/long.txt').read().split('\n')[1:93] + ['tap A 60'] * 4 + ['run 60', 'guardon 0x09000000']
+    zptr = lambda base: int([l for l in zrun(base + ['mem 03001C34 1']).splitlines() if l.startswith('mem 03001c34')][-1].split()[2], 16)
+    zpl = zptr(zstart); zrun(zstart + ['dump g 03001068 8a8']); zg = open(OUT + '/g.bin', 'rb').read()
+    for f, n in AG.ACTORS.items():
+        e = zstart + ['poke8 %08X 02' % (RECS + 8 * RS), 'poke8 %08X %02X' % (G + 0x55 + 149 // 8, zg[0x55 + 149 // 8] & ~(1 << 149 % 8) & 255),
+                      'poke8 %08X %02X' % (RECS + 0x14, zmap[n]), 'poke %08X %08X' % (zpl + 0x1A0, 8 << 8), 'run 3', 'keys LEFT', 'run 20', 'keys', 'run 5']
+        for k in range(10): e += ['run 200', 'tap A 20']
+        e += ['run 200']
+        p3 = zptr(e)
+        o = zrun(e + ['shot fly_%s' % n, 'mem %08X 1' % (p3 + 0x58), 'mem 07000000 64', 'keys A'] + ['run 2', 'mem %08X 1' % (p3 + 0x50)] * 30 +
+                 ['keys A,LEFT'] + ['run 2', 'mem %08X 1' % (p3 + 0x50)] * 30 + ['keys', 'shot fly_turn_%s' % n,
+                 'poke %08X %08X' % (p3 + 0x1A0, 1250 << 8), 'poke %08X %08X' % (p3 + 0x1A4, 1200 << 8), 'run 4', 'tap A 100', 'run 60', 'keys A', 'run 300', 'keys', 'run 100', 'mem 0300197C 1'])
+        zrec = int([l for l in o.splitlines() if l.startswith('mem %08x' % (p3 + 0x58))][-1].split()[2], 16) - 0x08000000
+        slots = {zu(zrec + 0x54 + 4 * sl): sl for sl in range(zu(zrec) & 0xFF) if zu(zrec + 0x54 + 4 * sl)}
+        seen = [slots.get(int(l.split(':')[1].split()[0], 16)) for l in o.splitlines() if l.startswith('mem %08x' % (p3 + 0x50))]
+        oam = [int(x, 16) for x in [l for l in o.splitlines() if l.startswith('mem 07000000')][-1].split(':')[1].split()]
+        drawn = any((oam[2 * i] >> 8 & 1) and (oam[2 * i] >> 14 & 3, oam[2 * i] >> 30) not in ((0, 0), (1, 0)) and (oam[2 * i] & 255) < 120
+                    for i in range(32))          # (the flying figure: scaled, so an affine sprite; not the 8 x 8 arrow nor the 16 x 8 shadow)
+        land = int([l for l in o.splitlines() if l.startswith('mem 0300197c')][-1].split(':')[1].split()[0], 16) & 0xFFFF
+        check('%s flies over the world map: his figure drawn (%s), flying %s, banking in a turn %s, landing reaches West City (%04X)'
+              % (n, drawn, 15 in seen[:30], 16 in seen[30:], land), drawn and 15 in seen[:30] and 16 in seen[30:] and land == (1 << 8 | 4) and 'bad pc' not in o)
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

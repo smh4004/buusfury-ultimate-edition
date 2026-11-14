@@ -349,7 +349,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
                 sl = ([int(v) for v in sl.split(',')] if ',' in sl else slice(*map(int, sl.split(':')))) if sl else None   # a..b or an exact list of frames
                 ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post, a.get('log2_source'))
                 if ptr: struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ptr)
-        ins.frame_limit = 4096 if a.get('big') else 1024   # boss-class actors may use one 64x64 piece
+        ins.frame_limit = a.get('frame_limit', 4096 if a.get('big') else 1024)   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
             ins.oy = a.get('origin_dy', 0)                 # map door regions already draw with the BF OBJ palette)
             for slot, dirs in a['raw_frames'].items():

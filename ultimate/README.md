@@ -1300,6 +1300,7 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     while each control is used and each skill (1-44, one per run) is poked in and fired, as Kid Gotenks (form 31); a Gunman rig
     (`BFU_RIG_ENEMY="44 137" --enemy`) for being shot. Engine-wide the slot is set by `sub_0800ECDA(object, slot)`, and through
     `sub_0800ECF0` by an action number (table 0x080725E8 +0x88). The names are `adult_gotenks.SLOTS`:
+    (some of these were wrong: see 22:35 below)
     0 standing; 1 walk; 2 dash (a direction pressed twice); 3 ki blast (B), and the Ultra Volleyball Attack (skill 23); 4 and 5
     the punch (A; the same animation); 6 the combo finisher (A pressed again and again); 7 guard (hold R); 8 his idle animation,
     after about 13 seconds left standing (he crouches, then lies on his front kicking his feet: the frames taken for a dive); 9 hit
@@ -1313,6 +1314,35 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     "Laugh"); only scene and enemy code sets them, and which scene, if any, shows Gotenks's is not known yet.
     His own attacks are the Super Kamikaze Ghost Attack (19) and the Ultra Volleyball Attack (3); "something else" in the
     owner's words is likely the Volleyball, or the charged punch (13), the only other moves with frames of their own.
+  - 22:35, the owner: "Get it right jesus half that shit makes no sense like charged punch why would it be that". Some of the
+    22:03 names were read from code and frame shapes, and some were wrong. Every one is now filmed in the game, Kid and Adult side
+    by side (`slot_probe.py`; the Gunman rig; the story build for the world map), and `adult_gotenks.SLOTS` says what is seen:
+    - A: the first press a spin kick (6), the next a punch (4 and 5 are one animation), and so on alternately. 6 is not a combo
+      finisher.
+    - Held A: his charging stance (13) for as long as it is held; let go, the punch. Measured on the Bomber: a tapped punch 52,
+      one held a second and let go 179 (3.5 times). His energy doesn't change.
+    - Bored (8): left standing about 15 seconds (1,014 frames in one run), he lies down on his front, chin on his hands, feet up.
+    - Hurt (9): shot by the Gunman, and when a run (2) ends against a wall (the stars round his head).
+    - 11, powering down: pressing Super Saiyan again (filmed: the hair from gold to black). 15 and 16: the world-map flight, filmed
+      in the story build after the ending: 15 flying on, 16 banking into a turn. 17: falling when his health runs out ("You have
+      died!"), filmed in the Gunman rig.
+    - His own skills (record 5 at a new game): Energy Blast (3), Super Saiyan (10, 11), the Super Kamikaze Ghost Attack (19) and
+      the Ultra Volleyball Attack (3: the beam turns the enemy into a ball; a punch knocks it away). None of them, no control,
+      the fusion dance, being shot, dying or flying shows 12, 14, 18 or 20: 12 and 18 are other characters' skills' poses
+      (Masenko and the Spirit Bomb; the beams), and 14 and 20 (a hop, a laugh) are set only by scene and enemy code. "Laugh" was
+      the preview's name for 20, never something he does.
+    - Found while filming: as Adult Gotenks the world-map flight never drew him, and the ending's flight never went on to the
+      Lookout (OAM had no entry for him; Kid Gotenks's 16 x 32 one at tile 210). His record asked for 4 KB of sprite memory a frame
+      (`'big'`, `'reserve': 4096`, as Broly's); with 1 KB or 2 KB (the record patched in a copy of the build) he flies, turns and
+      the ending goes on. 1 KB is too small for his frames 33-35 pixels tall (one 32 x 64 piece, 2 KB), so all three forms take
+      2 KB (`'reserve': 2048`, `'frame_limit': 2048`, new in `sprites.build_actors`); a change of size between forms scrambles
+      other sprites (android17's note). The Super Saiyan to Super Saiyan 3 change (Super Saiyan slot 10, 24 frames) was 33 wide
+      and 34-35 tall, a 64 x 64 piece: those frames grow taller only, not wider (`adult_gotenks.grown`). Why 4 KB breaks his
+      flight when Broly's 4 KB doesn't is not known yet. `test_adult_gotenks.py` checks each record's share and every piece, and
+      with a story build (`BFU_ZONE_ROM`) flies each form after the ending: drawn, flying, banking, landing at West City.
+    - And then: as a Super Saiyan or Super Saiyan 3 he vanished whenever he banked. Kid Gotenks's Super Saiyan figures (actors 120,
+      121) have no animation 16, so the game shows nothing in a turn: the original does the same (filmed, forms 34 and 35; left as
+      it is). His own Super Saiyan figures now bank in their flying animation (`grown_frames`: 16 from 15), so he stays drawn.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

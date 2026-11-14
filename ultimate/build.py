@@ -1576,7 +1576,9 @@ def add_actors(rom, clean):
                 if bad: sys.exit('%s: %s' % (name, bad[:5]))
                 template = adult_gotenks.GOHAN
             cfg[name] = {'template': template, 'raw_frames': {str(k): v for k, v in sorted(frames.items())}, 'compress': True, 'high': True,
-                         'big': True, 'reserve': 4096,      # (Gotenks's hair makes some frames 33 or 34 pixels: past one 32 x 32 piece, as Broly's)
+                         'frame_limit': 2048, 'reserve': 2048,   # (Gotenks's hair makes some frames 33-35 pixels tall: one 32 x 64 piece, 2 KB of
+                                                    #  sprite memory. Not 4 KB as Broly's: with that he wasn't drawn flying over the world map
+                                                    #  and the ending stopped there (Nov 13); all three forms the same, as android17's note says)
                          'origin_dy': 8}                    # (adult_gotenks's canvas has 8 rows under a fighter's cell (CH): without this he
                                                             #  stood 8 pixels over his shadow; found Nov 13 in the game's own pictures)
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)

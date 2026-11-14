@@ -65,7 +65,12 @@ if sys.argv[4] == 'dash':
     for d in ('RIGHT', 'UP', 'DOWN'):
         T('double-tap %s, hold' % d, ['keys ' + d, 'run 3', 'keys', 'run 3', 'keys ' + d] + watch(60) + ['keys'] + watch(30))
         T('double-tap %s, let go' % d, ['keys ' + d, 'run 3', 'keys', 'run 3', 'keys ' + d, 'run 3', 'keys'] + watch(60))
-for sk in ([] if BASIC or sys.argv[4] in ('fly', 'enemy', 'more', 'run', 'dash') else [int(x) for x in sys.argv[4].split(',')]):
+if sys.argv[4] == 'change':
+    sel = lambda sk: ['poke8 %08X 01' % (R + 0x0C), 'poke8 %08X %02X' % (R + 0x0D, sk), 'poke8 %08X 00' % (R + 0x15)]
+    T('Super Saiyan (skill 20), pressed', sel(20) + FULL + ['keys B', 'run 2', 'keys'] + watch(120))
+    T('pressed again', ['keys B', 'run 2', 'keys'] + watch(120))
+    T('Super Saiyan again, then his energy emptied', sel(20) + FULL + ['keys B', 'run 2', 'keys'] + watch(60) + ['poke8 %08X 00' % (R + 0x1A), 'poke8 %08X 00' % (R + 0x1B)] + watch(300))
+for sk in ([] if BASIC or sys.argv[4] in ('fly', 'enemy', 'more', 'run', 'dash', 'change') else [int(x) for x in sys.argv[4].split(',')]):
     T('skill %d (B held, let go)' % sk, ['poke8 %08X 01' % (R + 0x0C), 'poke8 %08X %02X' % (R + 0x0D, sk), 'poke8 %08X 00' % (R + 0x15)] + FULL +
       ['keys LEFT', 'run 2', 'keys', 'run 10', 'keys B'] + watch(22) + ['keys'] + watch(60))
 import os; os.makedirs(OUTD, exist_ok=True); open(OUTD + '/p.txt', 'w').write('\n'.join(l for l in L if not l.startswith('mark ')) + '\n')
