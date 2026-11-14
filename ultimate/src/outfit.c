@@ -34,13 +34,16 @@ extern const struct outfit outfit_table[];
 extern const u8 form_table[];
 
 /* Teen Gohan's forms (Nov 12): the purple gi and the Saiyan armor (adult Gohan's until then), base, Super Saiyan and 2. */
-static const u8 teen_forms[] = {TEEN_FORMS}, ft_armor_forms[] = {FT_ARMOR};
+static const u8 teen_forms[] = {TEEN_FORMS}, ft_armor_forms[] = {FT_ARMOR}, trunkten_forms[] = {TRUNKTEN_FORMS};
 static int in_list(const u8 *list, int n, int form) {
     int i;
     for (i = 0; i < n; i++) if (list[i] == form) return 1;
     return 0;
 }
 static int is_teen(int form) { return in_list(teen_forms, sizeof teen_forms, form); }
+/* Trunkten (Nov 14): base, Super Saiyan and 2. For now the guest's, with Vegito's moves (the owner: "give him Vegitos beam sword attack for
+   now and flame kamehameha") */
+static int is_trunkten(int form) { return in_list(trunkten_forms, sizeof trunkten_forms, form); }
 /* Future Trunks's Saiyan armor (Nov 12: Trunks's until then; kid Trunks never wore it) */
 static int ft_armor(int form) { return in_list(ft_armor_forms, sizeof ft_armor_forms, form); }
 /* The guest slot has one skill list but different fighters, so the list follows the outfit. A story form (Hercule, say) leaves it alone. */
@@ -54,6 +57,7 @@ static void guest_sync(void) {
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
         teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
+        trunkten[] = {4, 7, 9, 11, 20},     /* Trunkten: ki blasts, Vegito's Energy Sword and Flame Kamehameha, Super Saiyan (and 2 through it) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -77,6 +81,7 @@ static void guest_sync(void) {
     else if (form == FORM_ROSHI || form == FORM_ROSHI_MAX) list = roshi;
     else if (form == FORM_KID_BUU || form == FORM_MAJIN_BUU) list = buu;
     else if (is_teen(form)) list = teen;
+    else if (is_trunkten(form)) list = trunkten;
     else if (form == FORM_JANEMBA) list = fighter;
     else return;
     r[0x0C] = list[0];
@@ -2127,7 +2132,7 @@ static int is_ss2(int form) {
 /* The story sets SS2_FLAG + owner when that character reaches it. Goku learns Super Saiyan 3 in the same scene, so a save made after it counts too. */
 static int ss2_open(const u8 *record, int owner) {
     int i;
-    if (is_teen(record[0x14])) return 1;              /* Teen Gohan comes with it: the Cell Games opened him */
+    if (is_teen(record[0x14]) || is_trunkten(record[0x14])) return 1;     /* Teen Gohan comes with it (the Cell Games opened him); Trunkten too */
     if (GetFlag((void *)0x03001068, SS2_FLAG + owner)) return 1;
     for (i = 0; i < record[0x0C]; i++) if (record[0x0D + i] == 22) return 1;
     return 0;

@@ -1,5 +1,5 @@
 {
- "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS). rows_after: rows placed after the build's own (Kaioken, Blue, God, Full Power and the shelved Great Ape at 159-161), so no saved form id moves: new forms go there, from 162. Teen Gohan (Nov 12): his own guest (owner 8, name 1588 'Teen Gohan'), purple gi (teen_gohan, from 163) and the Saiyan armor (gohan_armor's three rows, adult Gohan's until Nov 12: the rows keep their ids, now owner 8). Future Trunks (Nov 12): the Saiyan armor (trunks_armor's rows, Trunks's until Nov 12; kid Trunks never wore it) is his second look, owner 8, his name and portraits; Super Saiyan is its top, as in his jacket (trunks_armor_ss2 stays, unreachable, so no id moves). rows_last: rows after every other (the build's Adult Gotenks rows at 166-168 included), so no saved id moves: Teen Gohan in Goku's gi from Bojack Unbound (Nov 14), base, Super Saiyan and 2, from 169.",
+ "_note": "New rows appended to the form table (first new row = 54). copy = existing row used as the template; character = actor id + 9; owner = party slot (8 = shared guest slot); name = UI string; portrait = speaker id from the scouter table. edit = changes to original rows. down = form to return to. flags 0x51 = Super Saiyan. flags 0x10 = earns EXP: every playable form needs it (the row Broly and the other guests were copied from has none, so they never levelled). flags 1 also sets the Super Saiyan behaviour object. portrait may be a list of the six expressions, and \"gt:<name>\" is a portrait from the GT sheet (gt.py PORTRAITS). rows_after: rows placed after the build's own (Kaioken, Blue, God, Full Power and the shelved Great Ape at 159-161), so no saved form id moves: new forms go there, from 162. Teen Gohan (Nov 12): his own guest (owner 8, name 1588 'Teen Gohan'), purple gi (teen_gohan, from 163) and the Saiyan armor (gohan_armor's three rows, adult Gohan's until Nov 12: the rows keep their ids, now owner 8). Future Trunks (Nov 12): the Saiyan armor (trunks_armor's rows, Trunks's until Nov 12; kid Trunks never wore it) is his second look, owner 8, his name and portraits; Super Saiyan is its top, as in his jacket (trunks_armor_ss2 stays, unreachable, so no id moves). rows_last: rows after every other (the build's Adult Gotenks rows at 166-168 included), so no saved id moves: Teen Gohan in Goku's gi from Bojack Unbound (Nov 14), base, Super Saiyan and 2, from 169. Trunkten (Nov 14): base, Super Saiyan and 2, from 172, name 1589 'Trunkten' (build.py TRUNKTEN_NAME_UI); for now the guest's, with Vegito's Energy Sword and Flame Kamehameha (outfit.c trunkten).",
  "rows": [
   {
    "id": "broly",
@@ -826,6 +826,32 @@
    "name": 1588,
    "up": 255,
    "down": "teen_gohan_bojack"
+  },
+  {
+   "id": "trunkten",
+   "copy": 10,
+   "actor": "trunkten",
+   "owner": 8,
+   "name": 1589,
+   "up": "trunkten_ss"
+  },
+  {
+   "id": "trunkten_ss",
+   "copy": 16,
+   "actor": "trunkten_ss",
+   "owner": 8,
+   "name": 1589,
+   "down": "trunkten",
+   "up": "trunkten_ss2"
+  },
+  {
+   "id": "trunkten_ss2",
+   "copy": 16,
+   "actor": "trunkten_ss2",
+   "owner": 8,
+   "name": 1589,
+   "up": 255,
+   "down": "trunkten"
   }
  ],
  "edit": {

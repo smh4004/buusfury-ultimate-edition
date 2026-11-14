@@ -322,6 +322,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
         if 'log2_record' in a and l2 is not None:          # animations taken from a LoG2 actor
             usable, pal_rgb = colour_ctx(a.get('act'))
             cmap = log2_colour_map(l2, usable, pal_rgb); cache = {}
+            for i_, v_ in a.get('cmap', {}).items(): cmap[int(i_)] = v_      # (LoG2 indices a made figure uses for BF colours LoG2 hasn't: trunkten.CMAP)
             edit = None; post = None
             if a.get('head_of') is not None:               # another character's head on these frames: lib/headswap.py
                 import headswap
