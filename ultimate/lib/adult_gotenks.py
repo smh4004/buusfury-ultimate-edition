@@ -23,6 +23,7 @@ brown boots; the belt the teal sash; the wristbands and the hands past them brow
   hair's shading), and as a Super Saiyan 3 Gotenks's long hair behind his own.
 Where Gohan's head is: his standing heads (front, back, side, the side mirrored), each matched to the frame's head turned the way the
 frame's view has it (HEAD_KIND for the frames whose head turns another way: read off every frame). Every colour is one the game has."""
+import os
 import struct
 import numpy as np
 from scipy import ndimage
@@ -658,13 +659,17 @@ def frames(rom, actor_list, form='base', variant='head', slots=None, gh=None, gt
 # his own moves and ghost attacks), each with his head up: three rows more of body (one in his chest, one in his thighs, one in his shins,
 # everything above each moved up, so his feet stay on the ground: 30 pixels tall to 33, Gohan 31) and one column wider below his collar
 # (his body's middle doubled); his bare chest inside the vest the black undershirt (Gohan's black suit's black and greys, by the light
-# that was there). His head stays Gotenks's.
+# that was there). His head stays Gotenks's. Nov 13, 21:17, the owner: no shirt, the vest only (SHIRT): his chest stays as Gotenks's is.
 GROWN = {'base': 117, 'ssj': 120, 'ssj3': 121}
 G_YEL = (243, 27, 250, 242)
 G_VEST = (112, 113, 115) + G_YEL
 G_PANTS = (114, 117, 119)
 G_SKIN = SKIN + (67,)                   # (67: his stomach's shading)
 G_UNDER = {200: 113, 201: 112, 202: 111, 203: 112, 205: 111, 67: 112, 16: 1}
+SHIRT = os.environ.get('BFU_AG_SHIRT', '0') != '0'     # the black undershirt in his vest's open front (sprites: `grown`; portraits:
+                                        # `Portraits.inlay`). Off since Nov 13, 21:17, the owner: "You know what just remove the shirt and do
+                                        # the vest only its not looking right no matter how you do it", "Sprites and portraits both": his
+                                        # chest bare under the vest, as Kid Gotenks's is (BFU_AG_SHIRT=1: the look before)
 
 
 def _g_axis(c):
@@ -726,15 +731,16 @@ def _g_grow(n, prm):
 
 
 def grown(c, ref=None):
-    """One of Gotenks's frames (the 56 x 96 canvas) grown, in the undershirt. ref: the same frame of base Gotenks (117), whose body his
-    Super Saiyan ones share: where his chest is and how he grows are read off it (his Super Saiyan hair is drawn in skin's colours, and
-    from behind his Super Saiyan 3 hair hides his collar)."""
+    """One of Gotenks's frames (the 56 x 96 canvas) grown; with SHIRT, in the undershirt (without: his chest bare in the vest, as it is
+    drawn). ref: the same frame of base Gotenks (117), whose body his Super Saiyan ones share: where his chest is and how he grows are
+    read off it (his Super Saiyan hair is drawn in skin's colours, and from behind his Super Saiyan 3 hair hides his collar)."""
     if not c.any(): return c.copy()
     ref = c if ref is None or not ref.any() else ref
     r = _g_axis(ref); n = np.rot90(c, -r); nr = np.rot90(ref, -r)
-    chest = _g_chest(nr) & (n == nr)
     n = n.copy()
-    for k, v in G_UNDER.items(): n[chest & (n == k)] = v
+    if SHIRT:
+        chest = _g_chest(nr) & (n == nr)
+        for k, v in G_UNDER.items(): n[chest & (n == k)] = v
     return np.rot90(_g_grow(n, _g_params(nr)), r)
 
 
@@ -776,10 +782,17 @@ NECK_HALF = 7
 P_LINES = (208, 16, 17, 1)                # the outlines' colours in the pictures
 LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes sit above Gotenks's (near where the game has Gohan: room for his neck)
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
-SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay: where he shouts, the calm picture his neck and shirt are taken from
+SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
+P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
+BARE_BODY = 46                            # Portraits.inlay, without: Gohan's calm picture, where his neck and shoulders are drawn bare: every picture's body
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
 BROW_C = (208, 248, 249, 82, 81, 110, 28, 29)                         # Super Saiyan Gohan's brows: their brown line and their gold
+
+
+def body_from(gp):
+    """The picture Gohan's body below his jaw is taken from in portrait gp's (Portraits._calm_body), or None: his own picture's."""
+    return SHOUT_BODY.get(gp) if SHIRT else BARE_BODY
 
 
 def portrait_art(rom, i):
@@ -1346,7 +1359,24 @@ class Portraits:
                     ncol, _ = _nearest(okc, out); out[m] = ncol[m]
         return out, bg, (dark | neck) & ~bg
 
-    def _calm_body(self, gp, kp_eyes, lift, layer, src, seb):
+    def _bare(self, gp, gc, d):
+        """Gohan's calm picture (BARE_BODY; gc, d: `gohan_clean`'s) below his jaw as he is drawn there: his neck and shoulders bare, with
+        their own lines; Gotenks's blue behind him; the corner of his gi at the picture's foot his nearest skin (the vest is Gotenks's
+        own, laid on by `inlay`). Nothing is painted over him: no shirt (the owner, Nov 13, 21:17: "just remove the shirt and do the vest
+        only"). -> (picture, its background, his neck and shoulders), as `_dressed`."""
+        Y, X = np.mgrid[:64, :64]
+        face = d['face']
+        out = gc.copy()
+        bg = np.isin(gc, BG_OF[gp]) & self.inner & ~face
+        for k_, v in P_BG.items(): out[bg & (gc == k_)] = v
+        jaw = int(np.nonzero(face)[0].max())
+        body = self.inner & ~bg & ~face & ~d['hair'] & ~d['ears'] & (Y >= jaw - 14)
+        gi = body & np.isin(gc, P_CLOTHES)
+        if gi.any():
+            sc, _ = _nearest(body & np.isin(gc, (83, 84, 67)), gc); out[gi] = sc[gi]
+        return out, bg, body
+
+    def _calm_body(self, gp, rp, kp_eyes, lift, layer, src, seb, neck):
         """Where he shouts: his head on the body of his calm picture (SHOUT_BODY), the same neck, neckline and shirt (Nov 13, 19:27,
         the owner: "now fix the shirt on the shouting ones and DONT CHANGE ANYTHING ELSE THE REST IS FINE"). When he shouts Gohan is
         drawn hunched: his head down, his bare shoulders up beside his jaw to his ears. Dressed, those shoulders were the shirt:
@@ -1357,13 +1387,17 @@ class Portraits:
         Where the calm picture has its own head and this one's doesn't cover it: between its neck's edges, under his ears, his neck
         (this picture's own skin there if it is plain skin, else the calm neck's nearest); elsewhere what is behind him. Where his
         neck then lies against what is behind him, his skin's line. Above that row nothing changes.
-        layer: (picture, behind him, body, hair, face, ears) as `inlay` has them, in the portrait's place; src: his picture not
-        dressed; seb: his ears' last row. -> (picture, behind him, body, hair)."""
+        Without SHIRT (Nov 13, 21:17, the owner: "just remove the shirt and do the vest only its not looking right no matter how
+        you do it"): every picture's body is taken this way from his calm picture as it is drawn, bare (`_bare`): his own neck and
+        shoulders, nothing painted on them. Where his face and neck are one piece of skin (38, 54: `neck`) his neck is not his head:
+        it is the calm picture's too, so no neckline of what he wore in that picture is left on him.
+        rp: the picture the body is from (`body_from`). layer: (picture, behind him, body, hair, face, ears) as `inlay` has them, in
+        the portrait's place; src: his picture not dressed; seb: his ears' last row; neck: his neck where it is in his face's mask.
+        -> (picture, behind him, body, hair)."""
         G, Gbg, Gbody, Ghair, Gface, Gears = layer
         G = G.copy(); ke, kmid = kp_eyes
         Y, X = np.mgrid[:64, :64]; K3 = np.ones((3, 3), bool)
-        rp = SHOUT_BODY[gp]
-        gcr, dr = self.gohan_clean(rp); Dr, rbg, rbody = self._dressed(rp, gcr, dr)
+        gcr, dr = self.gohan_clean(rp); Dr, rbg, rbody = self._dressed(rp, gcr, dr) if SHIRT else self._bare(rp, gcr, dr)
         dyr, dxr = ke - dr['eye'] - lift, int(round(kmid - dr['mid']))
         Sr = lambda a, fill=0: _shift(a, dyr, dxr, fill)
         Vr = Sr(self.inner, False) & self.inner
@@ -1376,7 +1410,7 @@ class Portraits:
         Rface = (Sr(dr['face'], False) | Sr(dr['ears'], False)) & Vr & ~Rneck
         Rline = np.isin(Gr, (208, 16, 17, 62)) & ndimage.binary_dilation(Rskin | Rbody, K3) & ~ndimage.binary_dilation(Rface, K3) & ~Rskin & ~Rbody & ~Rbg
         reb = dr['eb'] + dyr
-        head = Gface | Gears
+        head = (Gface & ~neck) | Gears
         jl = np.isin(src, (208, 16, 17)) & ndimage.binary_dilation(head, K3) & ~head            # (his jaw's line)
         keep = head | jl
         L = (Y >= seb - 1) & self.inner & ~keep
@@ -1411,6 +1445,11 @@ class Portraits:
         - Gotenks's hair and his collar's rolls: his picture's own pixels, not moved (13:15);
         - Gohan's face, brows, ears, neck, shoulders and what he wears: his own picture as he is drawn, dressed (`_dressed`); his neck
           and shoulders are his own outline, so the neckline and the room between his jaw and the rolls are not a fill (15:13);
+        - 19:27, "now fix the shirt on the shouting ones", then 21:17, "just remove the shirt and do the vest only its not looking
+          right no matter how you do it" (SHIRT off): below his jaw every picture has Gohan's calm picture's neck and shoulders as
+          they are drawn there, bare (`_calm_body`, `_bare`); over them Gotenks's vest as his own picture has it and where: its cloth
+          under the rolls with the line round it, and at the picture's foot outside it his arm (in Gohan's skin's colours). Nothing
+          dark is painted on him;
         - his brows whole, no lock of his own hair in his face (`gohan_clean`; Super Saiyan, `_ssj_brows`, 17:36).
         Gohan's picture is moved so his eyes sit `lift` rows above Gotenks's (LIFT), close to where the game has him: a child's eyes
         sit low, and with Gohan's on Gotenks's his chin was at the picture's edge with no room for his neck.
@@ -1451,8 +1490,9 @@ class Portraits:
         Gface, Gears, Ghair, Gbrow, Gclear, Gsp = (S(m, False) & V for m in (d['face'], d['ears'], d['hair'], d['brow'], d['clear'], d['span']))
         Gbg = (S(dbg, False) & V)[iy, ix] & self.inner
         Gbody = (S(dbody, False) & V)[iy, ix] & self.inner
-        if gp in SHOUT_BODY: G, Gbg, Gbody, Ghair = self._calm_body(gp, kp_eyes=(ke, kmid), lift=lift, layer=(G, Gbg, Gbody, Ghair, Gface, Gears),
-                                                                    src=S(gc)[iy, ix], seb=d['eb'] + dy)
+        rp = body_from(gp)
+        if rp is not None: G, Gbg, Gbody, Ghair = self._calm_body(gp, rp, kp_eyes=(ke, kmid), lift=lift, layer=(G, Gbg, Gbody, Ghair, Gface, Gears),
+                                                                  src=S(gc)[iy, ix], seb=d['eb'] + dy, neck=S(d['neck'], False) & V)
         sk = d['eye'] + dy - 4
         low = (Y >= sk) & self.inner; above = (Y < sk) & self.inner
         out = k.copy()
@@ -1468,6 +1508,12 @@ class Portraits:
         fr = KH & ndimage.binary_erosion(ksp, np.ones((1, 5), bool)) & (Y < ke) & low & (kraw != 2)
         out[fr] = k[fr]
         done = put | putr | fr
+        if not SHIRT:                         # (no shirt: the vest is Gotenks's own, as his picture has it and where: its cloth under the
+            cloth = np.isin(kraw, P_VEST) & low & ~KH & ~rolls & ~kbg & ~ksp      #  rolls and the line round it, on Gohan's bare shoulders)
+            lab, nc = _lab(cloth)             # (it hangs to the picture's foot: a pixel of those colours higher up is not it)
+            cloth = np.isin(lab, [i for i in np.unique(lab[56:60]) if i]) if nc else cloth
+            vest = (cloth | (ndimage.binary_dilation(cloth) & (kraw == 208) & low & ~KH & ~rolls & ~ksp)) & ~Gface & ~Gears
+            out[vest] = k[vest]; done = done | vest
         # Gohan's own hair still showing
         m0, m1 = d['cols'][0] + dx, d['cols'][1] + dx
         left = Ghair & low & ~done
@@ -1499,7 +1545,9 @@ class Portraits:
         lab, nb = _lab(kbody)                                          # (his body reaches the picture's foot: a stray pixel higher up is not it)
         kbody = np.isin(lab, [i for i in np.unique(lab[56:60]) if i]) if nb else kbody
         sh = (kbody | (Y >= d['eye'] + dy + 21)) & Gbg & low & ~done & ~strip          # (and from his chin's height down)
-        if sh.any():
+        if not SHIRT:                         # (no shirt: where Gotenks's own body was and Gohan's isn't it is Gotenks's, his arm outside
+            sh = kbody & Gbg & low & ~done & ~strip; out[sh] = k[sh]                #  the vest, in Gohan's skin's colours)
+        elif sh.any():
             dk = low & np.isin(out, P_DARK) & ~done & ~Gbg & ~Gface
             if dk.any(): c, _ = _nearest(dk, out); out[sh] = c[sh]
             else: out[sh] = 111

@@ -1252,6 +1252,22 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     own head and the shouting one's doesn't cover it, his neck (his own skin there if plain, else the calm neck's nearest); where
     his neck then lies against what is behind him, his skin's line. Changed: 313 and 271 pixels, all in rows 40-59, none in his
     face or ears, none of Gotenks's own hair or rolls; the last three rows of each are its calm picture's pixel for pixel.
+  - 21:17, the owner, on the sprites and portraits shown together: "You know what just remove the shirt and do the vest only its not
+    looking right no matter how you do it", "Sprites and portraits both". The black undershirt is gone (`adult_gotenks.SHIRT`, off;
+    `BFU_AG_SHIRT=1` builds the look before): his chest is bare under the vest, as Kid Gotenks's is.
+    Sprites (`grown`): the frames are Gotenks's own, grown, and nothing else: the chest is no longer recoloured. 277 of the 570
+    frames wore the shirt (2,386 pixels); in each every one of those pixels is his own skin again and no other pixel differs.
+    Portraits (`Portraits.inlay`): nothing dark is painted on him. Below his jaw every picture has the neck and shoulders of
+    Gohan's calm picture (46), where he is drawn bare, as they are drawn (`_bare`; `_calm_body` now lays it under every head, not
+    only the shouting ones: `body_from`, `BARE_BODY`). Where a picture's face and neck are one piece of skin (38, 54) the neck is
+    no longer part of his head, so no neckline of the suit or gi he wore in it is left on him. The vest is Gotenks's own picture's:
+    the rolls as before, and now its cloth too, under the rolls with the line round it (`P_VEST`: purple, lavender as a Super
+    Saiyan, as the game draws his vest in his pictures; 44, 82 and 10 pixels), and at the picture's foot outside the vest his arm,
+    in Gohan's skin's colours. The corner of gi in Gohan's calm picture is his skin. Above his ears' foot nothing changed (rows
+    45-59 in the base calm picture, from row 40 in the others); hair, face, brows and ears are the pictures of 19:27.
+    `test_adult_gotenks.py`: the figures in the ROM are read back (the moved actor table, the figure each form row names) and are
+    the library's frame for frame, none with the shirt; each portrait has no dark pixel on him below his ears, its bare body is the
+    calm picture's (95% or more its own pixels, all of it skin or its line) and the vest's cloth is Gotenks's pixel for pixel.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

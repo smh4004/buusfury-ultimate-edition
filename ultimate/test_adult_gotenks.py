@@ -168,23 +168,57 @@ for v in ('head', 'hair', 'recolour'):
         fr, notes = AG.frames(clean, 0x6B6BD8, f, v, gh=gh, gt=gk)
         bad = AG.problems(gh, fr, notes)
         check('%s head, %s: %d frames, none with a hole, a stray piece or gi colours %s' % (v, f, len(notes), bad[:3]), not bad)
+# 5b: the grown look, the one the build has (Kid Gotenks's own frames grown, AG.grown_frames). No shirt (Nov 13, 21:17, the owner):
+# his chest is bare under the vest, as Kid Gotenks's is. Every frame of his three figures in the ROM (the moved actor table, the
+# figure his form row names) is the library's; none has the undershirt: against the frames with it (AG.SHIRT), the only pixels that
+# differ are the shirt's, each his own skin's colour here.
+import numpy as np
+ACTORS_AT = 0x850000                              # (build.py: the moved actor table)
+def _crop(c):
+    ys = np.nonzero(c.any(1))[0]; xs = np.nonzero(c.any(0))[0]
+    return c[ys.min():ys.max() + 1, xs.min():xs.max() + 1] if len(ys) else c[:0, :0]
+SHIRT_C, SKIN_C = list(set(AG.G_UNDER.values())), list(AG.G_UNDER)
+for f, n in AG.ACTORS.items():
+    act = struct.unpack_from('<H', rom, TABLE + FORM_SIZE * MAP[n] + 0xE)[0] - 9
+    got = AG.cells(rom, ACTORS_AT, act); want = AG.grown_frames(clean, 0x6B6BD8, f)
+    was = AG.SHIRT; AG.SHIRT = True; worn = AG.grown_frames(clean, 0x6B6BD8, f); AG.SHIRT = was
+    tot = same = had = px = other = 0
+    for s in want:
+        for v in range(3):
+            for j, c in enumerate(want[s][v]):
+                tot += 1
+                g_ = _crop(got[s][v][j]) if s in got and j < len(got[s][v]) else None
+                same += g_ is not None and g_.shape == _crop(c).shape and bool((g_ == _crop(c)).all())
+                m = worn[s][v][j] != c
+                had += bool(m.any()); px += int(m.sum())
+                other += int((~(np.isin(worn[s][v][j][m], SHIRT_C) & np.isin(c[m], SKIN_C))).sum())
+    check("grown look, %s (figure %d): all %d frames in the ROM are the library's (%d), his chest bare under the vest: %d of them would "
+          "wear the undershirt (%d pixels of it, each his own skin here; %d other pixels differ)" % (f, act, tot, same, had, px, other),
+          not AG.SHIRT and same == tot and had >= 40 and other == 0)
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
 # of it but what his ears' tops are in front of, and nearly all of it over the whole picture: the rest is behind Gohan's face, ears and
 # shoulders); his collar's rolls whole. Gohan's ears are whole: every pixel of them and of the line round them is in the picture.
-# Super Saiyan: his two brows are the same size (the left one was a broken mirror of the right). Where he shouts, his shirt is his calm
-# picture's: none of it beside his jaw.
+# Super Saiyan: his two brows are the same size (the left one was a broken mirror of the right). No shirt (Nov 13, 21:17, the owner:
+# "just remove the shirt and do the vest only its not looking right no matter how you do it", "Sprites and portraits both"): his neck
+# and shoulders bare, the vest Gotenks's own.
 import numpy as np
+from scipy import ndimage
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)
 ROWS, COLS = np.mgrid[:64, :64]
+bare_c, bare_d = pics.gohan_clean(AG.BARE_BODY); bare_pic, _bg, bare_body = pics._bare(AG.BARE_BODY, bare_c, bare_d)
 for f in AG.ACTORS:
     kp = {'base': 68, 'ssj': 71, 'ssj3': 73}[f]; kraw = pics.art[kp]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
     ke, kmid = pics._eyes(kraw, AG._rows_filled(kface))
     top = khair & (ROWS < ke - 4 - AG.LIFT[f])      # (above Gohan's brow line)
     rolls = pics.rolls_whole(kp)
+    cloth = np.isin(kraw, AG.P_VEST) & ~khair & ~rolls & (ROWS >= ke + 8) & pics.inner     # (Gotenks's vest's cloth: it hangs to the picture's foot)
+    lab, _n = ndimage.label(cloth, np.ones((3, 3))); cloth = np.isin(lab, [j for j in np.unique(lab[56:60]) if j])
+    by, bx = ke - bare_d['eye'] - AG.LIFT[f], int(round(kmid - bare_d['mid']))             # (Gohan's calm picture, bare, where the portrait has it)
+    bare = AG._shift(bare_pic, by, bx); bare_at = AG._shift(bare_body, by, bx, False) & pics.inner
     for i, a in enumerate(pics.make('grown', f)):
         gp = AG.PICS[f][i][0]; gc, d = pics.gohan_clean(gp)
         inner = a[pics.inner]
@@ -205,15 +239,20 @@ for f in AG.ACTORS:
             b = d['brow'] & (ROWS < d['eye']); l, r = int((b & (COLS < d['mid'])).sum()), int((b & (COLS > d['mid'])).sum())
             check("portrait %s %d: his two brows are whole: %d pixels of the left one and %d of the right above his eyes" % (f, i, l, r),
                   min(l, r) >= 12 and abs(l - r) <= 8)
-        if gp in AG.SHOUT_BODY:               # (where he shouts: his head on his calm picture's neck and shirt, Portraits._calm_body)
-            calm = pics.inlay(AG.SHOUT_BODY[gp], kp, f)
-            head = (AG._shift(d['face'], dy, dx, False) | ears) & pics.inner
-            shirt = np.isin(a, AG.P_DARK) & pics.inner & (a != kraw) & ~head
-            beside = int((shirt & (ROWS >= d['eb'] + dy - 1) & (ROWS <= 50)).sum())
-            foot = pics.inner & (ROWS >= 56) & (ROWS <= 58)
-            check("portrait %s %d (shouting): no shirt beside his jaw (%d dark pixels from his ears' foot to row 50, not his head's), and its "
-                  "last rows are his calm picture's (%d of %d pixels)" % (f, i, beside, (a == calm)[foot].sum(), foot.sum()),
-                  beside == 0 and bool((a == calm)[foot].all()))
+        # no shirt (Nov 13, 21:17): below his ears nothing dark is on him but his own head's (his mouth); his neck and shoulders are
+        # Gohan's calm picture's as it is drawn, bare (Portraits._bare), wherever his head, Gotenks's hair, rolls and vest aren't in
+        # front; the vest's cloth is Gotenks's own picture's, every pixel
+        head = (AG._shift(d['face'] & ~d['neck'], dy, dx, False) | ears) & pics.inner
+        below = ROWS >= d['eb'] + dy - 1
+        shirt = int((np.isin(a, AG.P_DARK) & pics.inner & (a != kraw) & ~head & below).sum())
+        near = lambda m: ndimage.binary_dilation(m, np.ones((3, 3), bool))
+        region = bare_at & below & ~near(head) & ~rolls & ~khair & ~near(cloth)
+        own = int((a == bare)[region].sum()); skin = int(np.isin(a, AG.P_SKIN + (208,))[region].sum()); vest = cloth & ~head
+        check("portrait %s %d: no shirt (%d dark pixels on him below his ears); his neck and shoulders are bare, Gohan's calm picture's as "
+              "drawn (%d of %d pixels its own, %d skin or its line); the vest's cloth is Gotenks's own (%d of %d pixels)"
+              % (f, i, shirt, own, region.sum(), skin, (a == kraw)[vest].sum(), vest.sum()),
+              not AG.SHIRT and shirt == 0 and region.sum() >= 90 and own >= 0.95 * region.sum() and skin == region.sum()
+              and vest.sum() >= 8 and bool((a == kraw)[vest].all()))
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')
