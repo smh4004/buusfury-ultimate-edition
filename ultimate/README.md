@@ -1090,8 +1090,8 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   the ki blast's, the arm held, the side points against the built frames; `test_wrath.py`'s Kid Buu checks follow. Broly (the Dojo's)
   was looked at in the game the same way: from his hand every side (he knocks the player down before firing, so his rig can't show a
   hit).
-- Nov 12, Adult Gotenks (`lib/adult_gotenks.py`, behind `BFU_ADULT_GOTENKS=1` until the owner picks his look; `BFU_AG_HEAD` picks the
-  head). The owner, 22:09: GT Goten and GT Trunks's fusion, "base it on the Gohan black suit outfit from BF, then overlay Gotenks head and
+- Nov 12, Adult Gotenks (`lib/adult_gotenks.py`; behind `BFU_ADULT_GOTENKS=1` until Nov 14, in every build since: `BFU_ADULT_GOTENKS=0`
+  leaves him out; `BFU_AG_HEAD` picks the head). The owner, 22:09: GT Goten and GT Trunks's fusion, "base it on the Gohan black suit outfit from BF, then overlay Gotenks head and
   each SSJ form, vest, and then recolor to fit ... Make this separate from the other Gotenks too where it's only possible to use them for
   those two chars, and build a portrait too from Mystic Gohan or whatever Gohan combined with Gotenks in the cleanest possible way"; 22:46,
   after the first try: "Both glitched bad. Possibly use Mystic Gohans head as a base as an option too and try both Gotenks hair and Gohans
@@ -1379,6 +1379,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     `adult_gotenks.kid_outfit_table`: his retail frames read part by part as Adult Gotenks's are, his Super Saiyan ones off base's;
     `BFU_KID_GOTENKS_TEAL=0` leaves him as he was). His portraits are left as they were: they show only a corner of the vest, and its
     purple there is his hair's and the background's. `test_adult_gotenks.py` checks every one of his frames in the ROM.
+  - 01:03, the owner: "Lock it", then "Make that fusion an unlock for GT Trunks and GT Goten only". Adult Gotenks is in every build
+    now (`ADULT_GOTENKS` on). He comes only from Goten and Trunks dancing in their GT looks (`outfit.c fusion_native`: Goten in one of
+    `GT_GOTEN`, Trunks in one of `GT_TRUNKS`; their GT looks open with flag 2028, when Ledgic falls), base, Super Saiyan or Super Saiyan
+    3 as the dance gives; in their own looks they make Kid Gotenks, and no outfit list offers him. Locked (`locked.json`): his three
+    figures and Kid Gotenks's three in the new colours (the game's forms 31, 34, 35, named `kid_gotenks*` for the lock: `build.py
+    KID_GOTENKS_FORMS`); a build with either switch off leaves those out of the check (`lock.check` off). `front_changes` still gives
+    Adult Gotenks his change's front in every view, as when he was approved (`FRONT_LOCKED`). The full suite with him in every build: 1,683
+    checks passed, none failed.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

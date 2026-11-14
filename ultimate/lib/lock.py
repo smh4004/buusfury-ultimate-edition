@@ -38,12 +38,14 @@ def fingerprint(rom, rec):
     return h.hexdigest()
 
 
-def check(rom, forms, record_of):
-    """forms: {name: form id}; record_of(form id) -> the form's actor record (ROM offset). Exits if a locked figure changed."""
+def check(rom, forms, record_of, off=()):
+    """forms: {name: form id}; record_of(form id) -> the form's actor record (ROM offset). Exits if a locked figure changed. off: locked
+    figures this build was told to leave out or as they were (an environment switch): not checked."""
     data = json.load(open(PATH))
     locked = data['forms']; relock = set(filter(None, os.environ.get('BFU_RELOCK', '').split(',')))
     changed, new = [], []
     for name, old in locked.items():
+        if name in off: continue
         if name not in forms: sys.exit('locked.json: no form %r in this build' % name)
         now = fingerprint(rom, record_of(forms[name]))
         if old is None or name in relock:
@@ -55,4 +57,4 @@ def check(rom, forms, record_of):
     if new:
         json.dump(data, open(PATH, 'w'), indent=1); open(PATH, 'a').write('\n')
         print('locked figures recorded:', ', '.join(new))
-    print('locked figures: %d unchanged' % (len(locked) - len(new)))
+    print('locked figures: %d unchanged' % (len(locked) - len(new) - len([n for n in locked if n in off])))

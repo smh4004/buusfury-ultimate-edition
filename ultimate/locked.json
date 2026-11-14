@@ -1,5 +1,5 @@
 {
- "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose). Nov 11 21:01: Super Saiyan 4 Goku after his touch-up (\"Lock that Goku for now\"). Nov 12: Teen Gohan in the purple gi, base, Super Saiyan and 2 (approved Nov 11, 18:12: \"Teen Gohan looks good to lock\").",
+ "_note": "Figures the owner approved (Nov 10): every frame fingerprinted (lib/lock.py). A build stops if one changes; BFU_RELOCK=<form> records a change the owner asked for. Nov 10 15:16 pass (approved 16:08, \"Reshoot it all and lock changes\"): GT Vegeta's looks (their changes), Broly Full Power, the armour Vegetas (Galick Gun pose), Super 13, SSJ4 Gogeta; and the Blue looks approved earlier that day (Goku, Vegeta, Gogeta). Added 17:05 (\"Approve all fixed\"): Master Roshi (his Kamehameha pose). Nov 11 21:01: Super Saiyan 4 Goku after his touch-up (\"Lock that Goku for now\"). Nov 12: Teen Gohan in the purple gi, base, Super Saiyan and 2 (approved Nov 11, 18:12: \"Teen Gohan looks good to lock\"). Nov 14 01:03 (\"Lock it\"): Adult Gotenks, base, Super Saiyan and 3 (Kid Gotenks grown, the owner's pictures' outfit colours: dark navy vest, teal sash and ankle wraps, black wristbands and boots), and Kid Gotenks's own three figures in the same colours (the game's forms 31, 34, 35: build.py KID_GOTENKS_FORMS).",
  "forms": {
   "vegeta_gt": "f5e8460b5199f3127d36c931f379b38d7946c04f",
   "vegeta_gt_tank": "ddf2ed9ce3795f6ceb6ddd8a92f472b50f43679d",
@@ -25,6 +25,12 @@
   "kid_goku_ssj4": "a31a3e0ace0a6076dec8850a4e729f03af2d025e",
   "teen_gohan": "171a17fd84ecb08ae20c73bae699fd5beb26c8a4",
   "teen_gohan_ss": "0064bc9dcdcd797dea42d4b0926f1bce015f693d",
-  "teen_gohan_ss2": "bc1067de47b4c1422af4403a3e7fc3139744f573"
+  "teen_gohan_ss2": "bc1067de47b4c1422af4403a3e7fc3139744f573",
+  "adult_gotenks": "0ec8c2638914deab9f0272974c32cade2479d0d6",
+  "adult_gotenks_ssj": "348048a91416add8e0e3fa8e5b7e4106bdf0717e",
+  "adult_gotenks_ssj3": "29daedaa26c37e38ac74735ac9dddffd4b53661e",
+  "kid_gotenks": "93f53c8004b59c2485578bf9abaf63a84856032b",
+  "kid_gotenks_ssj": "bfe473c696397e5039f0fea88b6fde2d1ee0ae68",
+  "kid_gotenks_ssj3": "0ae6df41955049c6e0ed5fcbce9c7a8978d52139"
  }
 }

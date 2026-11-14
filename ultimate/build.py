@@ -109,7 +109,7 @@ LOOK170 = os.environ.get('BFU_LOOK170', '1') != '0'      # on since the owner's 
 GLOW_STYLE = os.environ.get('BFU_GLOW', '1c')       # Blue's glow (lib/ssb_glow.py STYLES): the owner's pick (Nov 12, 19:04: "1c looks good use that")
 GLOW_ALPHA = (6, 10)
 GLOW_MORE = os.environ.get('BFU_GLOW_MORE', '1') != '0'      # the glow in Super Saiyan God's reds and Rose's pinks too (owner, Nov 12 19:35 drafts, 19:42: "Auras all look good to lock in")
-ADULT_GOTENKS = os.environ.get('BFU_ADULT_GOTENKS', '0') != '0'      # Adult Gotenks (lib/adult_gotenks.py): GT Goten and GT Trunks's dance; off until the owner OKs his look
+ADULT_GOTENKS = os.environ.get('BFU_ADULT_GOTENKS', '1') != '0'      # Adult Gotenks (lib/adult_gotenks.py): GT Goten and GT Trunks's dance; in every build since Nov 14, 01:03 (BFU_ADULT_GOTENKS=0 leaves him out)
 AG_HEAD = os.environ.get('BFU_AG_HEAD', 'grown')         # his look: 'head' (Gotenks's), 'hair' (Mystic Gohan's face, Gotenks's hair), 'recolour', 'grown' (Gotenks grown) (lib/adult_gotenks.py)
 CELL_BEAM = os.environ.get('BFU_CELL_BEAM', '1') != '0'      # Perfect Cell fires in LoG2's firing frames, not his idle (Nov 12, 21:40, the owner on the preview: "Make the beam actually come from Cell's hand too")
 # Each kind's colours for lib/ssb_glow.py's shades (its COLOURS keys, dark to light: 11 1 6 2 13 5 3 12 4; 14 the band): 0 Blue (ssb_glow's
@@ -2293,13 +2293,17 @@ def fist_poses(rom, put_art):
         struct.pack_into('<I', rom, ACTORS_AT + 4 * (char - 9), put_art(bytes(new)))
 
 
+FRONT_LOCKED = ('adult_gotenks', 'adult_gotenks_ssj', 'adult_gotenks_ssj3')     # locked (Nov 14) as approved: with their change's front in every
+                                                                                # view, which front_changes still gives them
+
+
 def front_changes(rom, put_art):
     """Every mod figure's change of form (slot 10, a form with one above it) and power-down (slot 11, a Super Saiyan-class form with one below)
     shows its front in every view, as GT Vegeta's (Nov 10, the owner: "they should all be the same anyways"): the game plays them in whatever
     view the fighter faces, and a side or back view of a change looked like an attack (armour Gohan "lifts his arms", "punches"). test_frames 13."""
     u = lambda o: struct.unpack_from('<I', rom, o)[0]
     fm = json.load(open(OUT + '/_forms.json')); done = set()
-    locked = {fm[n] for n in json.load(open('ultimate/locked.json'))['forms']}      # approved figures stay as approved (lib/lock.py)
+    locked = {fm[n] for n in json.load(open('ultimate/locked.json'))['forms'] if n in fm and n not in FRONT_LOCKED}      # approved figures stay as approved (lib/lock.py)
     import bso_import
     locked |= {fm[n] for n in bso_import.SHEETS if n in fm}                       # and the owner's own every-frame sheets are drawn as he sent them
     for f in range(max(fm.values()) + 1):
@@ -3041,6 +3045,7 @@ def ssj4_fix(rom, actors, at):
 
 
 KID_GOTENKS_COLOURS = os.environ.get('BFU_KID_GOTENKS_TEAL', '1') != '0'
+KID_GOTENKS_FORMS = {'kid_gotenks': 31, 'kid_gotenks_ssj': 34, 'kid_gotenks_ssj3': 35}     # (the game's own forms, named for locked.json)
 
 
 def kid_gotenks_colours(rom, clean, at):
@@ -3225,7 +3230,8 @@ def main():
     still = idle_still(rom, index)
     if still: print('idles made still (their second frame moved the head or changed pose): %s' % ', '.join('%s %s' % (n, '/'.join(v)) for n, v in still))
     import lock                                       # approved figures (locked.json): the build stops if one changed
-    lock.check(rom, index, lambda f: struct.unpack_from('<I', rom, ACTORS_AT + 4 * (struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] - 9))[0] - ROM_BASE)
+    off = (() if ADULT_GOTENKS else ('adult_gotenks', 'adult_gotenks_ssj', 'adult_gotenks_ssj3')) + (() if KID_GOTENKS_COLOURS else tuple(KID_GOTENKS_FORMS))
+    lock.check(rom, {**index, **KID_GOTENKS_FORMS}, lambda f: struct.unpack_from('<I', rom, ACTORS_AT + 4 * (struct.unpack_from('<H', rom, SPACE + FORM_SIZE * f + 0x0E)[0] - 9))[0] - ROM_BASE, off)
     out = bytes(rom[:size])
     if bps.apply(clean, bps.make(clean, out)) != out:
         sys.exit('BPS round trip failed')
