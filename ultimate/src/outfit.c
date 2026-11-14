@@ -41,8 +41,9 @@ static int in_list(const u8 *list, int n, int form) {
     return 0;
 }
 static int is_teen(int form) { return in_list(teen_forms, sizeof teen_forms, form); }
-/* Trunkten (Nov 14): base, Super Saiyan and 2. For now the guest's, with Vegito's moves (the owner: "give him Vegitos beam sword attack for
-   now and flame kamehameha") */
+/* Trunkten (Nov 14): base, Super Saiyan and 2, a guest of his own (the owner, 18:10: "make him a separate character"; outfits.json, his own
+   bench group). Moves: "give him Vegitos beam sword attack for now and flame kamehameha", then (18:10) "The energy sword frames are
+   broken can you do the banshee blast instead" */
 static int is_trunkten(int form) { return in_list(trunkten_forms, sizeof trunkten_forms, form); }
 /* Future Trunks's Saiyan armor (Nov 12: Trunks's until then; kid Trunks never wore it) */
 static int ft_armor(int form) { return in_list(ft_armor_forms, sizeof ft_armor_forms, form); }
@@ -57,7 +58,7 @@ static void guest_sync(void) {
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
         teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
-        trunkten[] = {4, 7, 9, 11, 20},     /* Trunkten: ki blasts, Vegito's Energy Sword and Flame Kamehameha, Super Saiyan (and 2 through it) */
+        trunkten[] = {4, 7, 1, 11, 20},     /* Trunkten: ki blasts, Banshee Blast, Flame Kamehameha, Super Saiyan (and 2 through it) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;

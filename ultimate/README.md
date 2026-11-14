@@ -1107,9 +1107,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   the model's reds the sash's orange). 438 frames, each checked
   (`problems`). 17:53: "Show a render of him in game with SSJ2 ... Doing different attacks also give him Vegitos beam sword attack for
   now and flame kamehameha": he is built (figures `trunkten`, `_ss`, `_ss2` after everything else, rows 172-174, name 'Trunkten'
-  `TRUNKTEN_NAME_UI`; `lib/sprites.py` takes a figure's "cmap" entries into its colour map), for now the guest's with Vegito's Energy
-  Sword (9) and Flame Kamehameha (11) and ki blasts, Super Saiyan and 2 (`outfit.c trunkten`, `is_trunkten`, ss2_open). In no outfit
-  list yet (no way to pick him but a debug poke): the owner still to say where he goes. Captured in the game with `gif_cap.py`.
+  `TRUNKTEN_NAME_UI`; `lib/sprites.py` takes a figure's "cmap" entries into its colour map), with Vegito's Energy Sword (9) and Flame
+  Kamehameha (11) and ki blasts, Super Saiyan and 2 (`outfit.c trunkten`, `is_trunkten`, ss2_open). Captured in the game with
+  `gif_cap.py`. 18:10: "The energy sword frames are broken can you do the banshee blast instead, and make him a separate character":
+  Banshee Blast (1) in the Energy Sword's place; a guest of his own on Switch Character (`outfits.json`, his own bench group, so his
+  own level and stats), open once all four Trials are won (flag 895, when Goku and Vegeta learn the Potara).
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
