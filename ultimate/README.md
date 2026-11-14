@@ -1094,7 +1094,7 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   maybe use this model as a base but keep the black/purple base hair color inverted from gotenks"; 17:19, on the first preview (the
   model's own hair, purple crown, black sides): "Try Vegitos hair shape instead and use the Potara from him if he has it".
   `trunkten.py` dresses the orange-gi model's Super Saiyan frames: green gi (BF 252, 215, 251, 216 through LoG2 indices teen.py never
-  uses: `CMAP`, the figure's colour map), orange sash and undershirt, navy wristbands and boots as the model's. His hair is BF's Vegito's
+  uses: `CMAP`, the figure's colour map), orange sash and undershirt. His hair is BF's Vegito's
   (actor 275, Super Vegito, the game's only one), each view's stance head laid on the model's face by the eyes (the two games' faces are
   the same size), and on every frame where the frame's head matches the stance head best (moved up to 8 pixels), so it never moves on his
   head; the model's hair goes, holes it leaves inside the figure take their neighbours' colour, specks it alone held go, and the tips go
@@ -1103,7 +1103,8 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   earring (BF 29, one pixel) under each ear. 17:42-17:43: "make his boots orange to match his belt like that first ref pic next to
   gotenks", "make his gi cleaner like vegitos so you can actually see the shirt and undershirt against each other": orange boots; the
   gi one green and its shade (BF 215, 216) with a dark outline (BF 70) where the model's navy edges were, the undershirt's orange
-  sleeves at the shoulders (`sleeves`: the top two rows of the gi outside his neck) and Goku's V. 438 frames, each checked
+  sleeves at the shoulders (`sleeves`: the top two rows of the gi outside his neck) and Goku's V. 17:49: "orange wristbands too" (all
+  the model's reds the sash's orange). 438 frames, each checked
   (`problems`). Previewed; not in the build until the owner approves.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone

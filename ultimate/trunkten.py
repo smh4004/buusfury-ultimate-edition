@@ -9,7 +9,7 @@ with the clothes teen_bojack.parts finds dressed again and Vegito's hair in plac
     these colours, so the figure's colour map sends LoG2 indices teen.py never uses to them (CMAP);
   his undershirt, Goku's orange: its sleeves (sleeves(): the top two rows of his gi at each shoulder, outside his neck, as Vegito's
     orange shoulders) and Goku's V under his neck;
-  his sash (the reds that don't touch his skin): Goku's orange; his wristbands (the reds on his hands): Goku's navy, as the model's;
+  his sash and wristbands (the model's reds): Goku's orange (17:49, the owner: "orange wristbands too");
   his trousers' navy edge: the darkest green; his socks and shoes: orange, the sash's (17:42, the owner: "make his boots orange to
     match his belt like that first ref pic next to gotenks"), their black as it is.
 Hair (head()): BF's Vegito (actor 275, the game's only Vegito: Super Vegito), his stance's head in each view, every pixel of its hair
@@ -247,18 +247,6 @@ def sleeves(top, hm, at):
     return near & ((X - nx >= 3) if i == 2 else (nx - X >= 3))
 
 
-def wristbands(done):
-    """The pieces of red (4-connected) that touch his skin and not his trousers: his wristbands. The rest is his sash."""
-    reds = np.isin(done, B.REDS)
-    lab, n = ndimage.label(reds)
-    out = np.zeros(reds.shape, bool)
-    skin = SKIN[done] | np.isin(done, (0x15, 0x16, 0x17))
-    for i in range(1, n + 1):
-        m = lab == i; ring = F.grown(m, 1) & ~m
-        if (ring & skin).any() and not (ring & np.isin(done, (0x50, 0x51))).any(): out |= m
-    return out
-
-
 def make(form, k, d, f):
     """Frame (k, d, f) of the look ('base', 'ss', 'ss2') on teen.py's canvas, in LoG2 colour indices (CMAP's included)."""
     p = B.parts('ss', k, d, f)
@@ -267,9 +255,7 @@ def make(form, k, d, f):
     out = c.copy()
     for a, b in GI_GREY.items(): out[shirt & (done == a)] = b
     for a, b in BOOT.items(): out[boots & (done == a)] = b
-    reds = np.isin(done, B.REDS); wb = wristbands(done)
-    for a, b in B.RED_TO.items(): out[wb & (done == a)] = b
-    for a, b in SASH.items(): out[reds & ~wb & (done == a)] = b
+    for a, b in SASH.items(): out[done == a] = b
     out[body & (done == 0x50)] = GI_MAIN
     out[body & (done == 0x51)] = GI_SHADE
     out[body & (done == B.EDGE)] = GI_LINE                  # (the gi's edges: its outline)
@@ -290,7 +276,7 @@ def problems(form, k, d, f, out):
     pixel that isn't his clothes changed; any of the model's gold or its brown outline left on his head, or a hole where it was (air
     the figure closes round); Vegito's hair in other than the look's colours, or over his face; an earring not under an ear (touching
     his skin or its outline); the purple gi's colours left on him (its reds and navy edge, a grey of its against his new colours:
-    clothing missed); a red that became anything but the sash's orange or a wristband's navy, a wristband not on his hand; a shoe's
+    clothing missed); a red that became anything but the sash's orange; a shoe's
     darkest grey made anything but navy beside his boots; his eyes not the look's."""
     p = B.parts('ss', k, d, f); done, hm = p['done'], p['head']
     ref, old, hair, ear = head(form, k, d, f)
@@ -336,13 +322,8 @@ def problems(form, k, d, f, out):
     left |= p['body'] & np.isin(done, (0x50, 0x51)) & ~np.isin(out, GREENS + ORANGES + NAVY)
     if left.any(): bad.append('purple gi colours left %d' % left.sum())
     reds = np.isin(done, B.REDS)
-    x = reds & ~np.isin(out, tuple(SASH.values()) + tuple(B.RED_TO.values()))
+    x = reds & ~np.isin(out, tuple(SASH.values()))
     if x.any(): bad.append('a red made something else %d' % x.sum())
-    wb = reds & np.isin(out, tuple(B.RED_TO.values()))
-    skin = SKIN[done] | np.isin(done, (0x15, 0x16, 0x17))
-    lab, nn = ndimage.label(wb)
-    for i in range(1, nn + 1):
-        if not (F.grown(lab == i, 1) & skin).any(): bad.append('a wristband off his hand'); break
     return bad
 
 
