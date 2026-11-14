@@ -262,6 +262,23 @@ for f, (teal, plain) in TEALS.items():
     check("picture's colours, %s: only his outfit's greys change, each to its part's colour (%d pixels otherwise), no sash or wrap by his "
           "hair (%d); standing, sash, wraps, vest and wristbands in their colours (pixels of each: %s)" % (f, bad, near, stand),
           bad == 0 and near == 0 and all(x[0] >= 4 and x[1] >= 4 and x[2] >= 4 and x[3] >= 2 for x in stand))
+# 5d: Kid Gotenks's own figures in the same colours (Nov 14, 00:52, the owner, with a picture of Kid Gotenks: "Make kid gotenks this color
+# too"; build.py kid_gotenks_colours): every frame of each in the ROM is his retail frame through AG.metamoran (his Super Saiyan ones read
+# off base's), and standing (every view) his vest is dark navy, his sash teal and his wristbands black.
+for aid in AG.KID_GOTENKS:
+    got = AG.cells(rom, ACTORS_AT, aid); src = AG.cells(clean, 0x6B6BD8, aid); kb = AG.cells(clean, 0x6B6BD8, AG.KID_GOTENKS[0])
+    tot = same = 0; stand = []
+    for s in src:
+        for v in range(3):
+            for j, c in enumerate(src[s][v]):
+                ref = kb[s][v][j] if s in kb and len(kb[s][v]) == len(src[s][v]) else None
+                want = AG.metamoran(c, ref); tot += 1; same += bool((got[s][v][j] == want).all())
+                if s == 0:
+                    part = AG.metamoran_parts(c if ref is None else ref); m = want != c
+                    stand.append(tuple(int((m & (part == k)).sum()) for k in (1, 2, 5)))
+    if aid == AG.KID_GOTENKS[2]: stand = [(max(a_, 4), max(b_, 4), max(w_, 2)) if i in (2, 3) else (a_, b_, w_) for i, (a_, b_, w_) in enumerate(stand)]   # (from behind his Super Saiyan 3 hair)
+    check("Kid Gotenks (figure %d) in the outfit colours: %d of %d frames in the ROM are his own through them; standing, vest, sash and "
+          "wristbands changed (pixels of each: %s)" % (aid, same, tot, stand), same == tot and all(a_ >= 4 and b_ >= 4 and w_ >= 2 for a_, b_, w_ in stand))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all

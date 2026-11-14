@@ -3040,6 +3040,30 @@ def ssj4_fix(rom, actors, at):
     return ins.cur, (changed, hits[0])
 
 
+KID_GOTENKS_COLOURS = os.environ.get('BFU_KID_GOTENKS_TEAL', '1') != '0'
+
+
+def kid_gotenks_colours(rom, clean, at):
+    """Kid Gotenks's own figures (actors 117, 120, 121) in Adult Gotenks's outfit colours (the owner, Nov 14, 00:52, with a picture of
+    Kid Gotenks: "Make kid gotenks this color too"): dark navy vest, teal sash and ankle wraps, black wristbands and boots
+    (lib/adult_gotenks.py kid_outfit_table, read off the retail frames). Every frame of each figure goes through the table, so the
+    layout and sprite memory stay his own. -> (the end of what was written, (pictures changed, frame records through it))"""
+    import adult_gotenks
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    table, changed = adult_gotenks.kid_outfit_table(clean, sprites.ACTOR_LIST)
+    ins = sprites.Inserter(rom, (at + 3) & ~3); hits = [0]
+    def fn(img, view):
+        got = table.get(img.tobytes() + bytes(img.shape))
+        if got is None: return img
+        hits[0] += got is not img and bool((got != img).any())
+        return got
+    for aid in adult_gotenks.KID_GOTENKS:
+        rec = sprites.composed_actor(ins, rom, u(ACTORS_AT + 4 * aid) - ROM_BASE, fn)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * aid, ins.put(bytes(rec)))
+    if changed < 300 or hits[0] < changed: sys.exit('Kid Gotenks: the outfit colours found only %d pictures to change (%d records)' % (changed, hits[0]))
+    return ins.cur, (changed, hits[0])
+
+
 IDLE_MAX = 20                        # pixels: the game's own idles differ by 3 to 15 between their two frames (a breath in the chest)
 IDLE_WAITS = ()                      # (Super Saiyan 4 Goku waited here for the owner's word on his touch-up; it has his own still idle now)
 
@@ -3194,6 +3218,9 @@ def main():
     print('Super Saiyan 4 Gogeta: %d pictures fixed, %d frame records through them' % touched)
     actors_end, touched = ssj4_fix(rom, actors, actors_end)
     print('Super Saiyan 4 Goku: %d pictures fixed as previewed, %d frame records through them' % touched)
+    if KID_GOTENKS_COLOURS:
+        actors_end, touched = kid_gotenks_colours(rom, clean, actors_end)
+        print('Kid Gotenks: %d pictures in the outfit colours, %d frame records through them' % touched)
     if actors_end > 0x1000000: sys.exit('ROM layout overflow after the Super Saiyan 4 passes: sprites end %X' % actors_end)
     still = idle_still(rom, index)
     if still: print('idles made still (their second frame moved the head or changed pose): %s' % ', '.join('%s %s' % (n, '/'.join(v)) for n, v in still))

@@ -1372,6 +1372,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     light), on his figures and in his portraits (`VEST_AS_WORN`); the wristbands are told apart from it (beside a hand, and the
     band's rows that repeat it) and stay black with the boots, as in the picture. `test_adult_gotenks.py`: every changed pixel is its
     part's colour, and standing (every view, every form) the sash, wraps, vest and wristbands each have theirs.
+  - 00:52, the owner, with a picture of Kid Gotenks (vest (24, 40, 88), the sash and wraps green-teal, black wristbands and shoes):
+    "That's not dark navy thats the same as the waistband. I said dark navy. Make kid gotenks this color too". The vest is now 69
+    (32, 32, 64), the palette's nearest to the picture's, with 158 (0, 32, 136) its light, on his figures and portraits. Kid Gotenks's
+    own figures (actors 117, 120, 121: forms 31, 34, 35) get the same outfit colours in every build (`build.py kid_gotenks_colours`,
+    `adult_gotenks.kid_outfit_table`: his retail frames read part by part as Adult Gotenks's are, his Super Saiyan ones off base's;
+    `BFU_KID_GOTENKS_TEAL=0` leaves him as he was). His portraits are left as they were: they show only a corner of the vest, and its
+    purple there is his hair's and the background's. `test_adult_gotenks.py` checks every one of his frames in the ROM.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

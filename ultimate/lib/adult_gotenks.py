@@ -844,10 +844,13 @@ def _bored(c, ref=None):
 #   pieces of 4 or more with 115 in them.
 # The wristbands a shade darker and the boots black (the picture's: the greys one step down), the sash and wraps teal: the nearest the
 # game's palette has (71 its shade, 186, 199 its light). The vest black too at first; Nov 14, 00:29, the owner: "Can you make his vest
-# his dark navy too": the sash's colours (71 most of it). Nothing else changes. His head and the trousers' shading never: the trouser
+# his dark navy too": the sash's colours (71 most of it); 00:52, with a picture of Kid Gotenks (his vest (24, 40, 88)): "That's not dark
+# navy thats the same as the waistband. I said dark navy. Make kid gotenks this color too": 69 (32, 32, 64), the palette's nearest to it,
+# for its dark and its middle, 158 (0, 32, 136) its light; and Kid Gotenks's own frames the same (`kid_outfit_table`). Nothing else
+# changes. His head and the trousers' shading never: the trouser
 # greys he has in shadow are left as drawn. Super Saiyan frames are read off the same base frame (their bodies are its), pixel for pixel.
 TEAL = os.environ.get('BFU_AG_TEAL', '1') != '0'      # (BFU_AG_TEAL=0: Kid Gotenks's colours, the look before)
-OUTFIT_MAPS = {1: {112: 71, 113: 186, 115: 199, 114: 186},        # the vest: the sash's dark navy (Nov 14, 00:29)
+OUTFIT_MAPS = {1: {112: 69, 113: 69, 115: 158, 114: 69},          # the vest: dark navy (Nov 14, 00:52: the owner's picture's, (24, 40, 88))
                2: {112: 71, 113: 186, 115: 199, 114: 186},        # the sash: teal
                3: {112: 71, 114: 186, 113: 186, 115: 199},        # the ankle wraps: teal
                4: {112: 111, 114: 112, 113: 112, 115: 113},       # the boots: black
@@ -985,6 +988,51 @@ def metamoran(c, ref=None):
     return out
 
 
+KID_GOTENKS = (117, 120, 121)           # Kid Gotenks's own figures: base, Super Saiyan, Super Saiyan 3 (forms 31, 34, 35)
+
+
+def _boxes(rom, actor_list, actor):
+    """{(slot, frame, view): (the frame's image as sprites.composed_actor puts it together: its box, each piece in place, (by, bx))}."""
+    from wfz import decompress_stream
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    rec = u(actor_list + 4 * actor) - BASE; out = {}
+    for slot in range(u(rec) & 0xFF):
+        a = u(rec + 0x54 + 4 * slot)
+        if not a: continue
+        a -= BASE
+        for k in range(u(a)):
+            for d in range(3):
+                fp = u(a + 4 + 16 * k + 4 * d) - BASE; bx, by, bw, bh = struct.unpack_from('<bbBB', rom, fp + 4)
+                img = np.zeros((bh, bw), np.uint8)
+                for j in range(u(fp)):
+                    x, y, w, h = struct.unpack_from('<bbBB', rom, fp + 8 + 12 * j); tp = u(fp + 16 + 12 * j) - BASE
+                    t, size = u(tp), u(tp + 4)
+                    raw = rom[tp + 8:tp + 8 + size] if t == 0 else bytes(decompress_stream(rom, tp + 8, size)[0])
+                    img[y - by:y - by + h, x - bx:x - bx + w] = np.frombuffer(bytes(raw[:w * h]).ljust(w * h, b'\0'), np.uint8).reshape(
+                        h // 8, w // 8, 8, 8).transpose(0, 2, 1, 3).reshape(h, w)
+                out[slot, k, d] = (img, (by, bx))
+    return out
+
+
+def kid_outfit_table(rom, actor_list):
+    """Kid Gotenks's own frames in the outfit's colours (Nov 14, 00:52, the owner: "Make kid gotenks this color too"): `metamoran` on
+    each, his Super Saiyan ones read off base's frame (same slot, frame and view). -> ({frame image (sprites.composed_actor's): the
+    image recoloured}, how many frames differ)."""
+    base = _boxes(rom, actor_list, KID_GOTENKS[0]); table = {}; changed = 0
+    def canvas(img, at):
+        c = np.zeros((128, 128), np.uint8); by, bx = at; c[64 + by:64 + by + img.shape[0], 64 + bx:64 + bx + img.shape[1]] = img
+        return c
+    for actor in KID_GOTENKS:
+        for key, (img, at) in _boxes(rom, actor_list, actor).items():
+            ref = canvas(*base[key]) if key in base else None
+            c = canvas(img, at); new = metamoran(c, ref)
+            by, bx = at; out = new[64 + by:64 + by + img.shape[0], 64 + bx:64 + bx + img.shape[1]]
+            k = img.tobytes() + bytes(img.shape)
+            if k not in table:
+                table[k] = out; changed += bool((out != img).any())
+    return table, changed
+
+
 def grown_frames(rom, actor_list, form, teal=None):
     """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form]); with teal (TEAL by
     default) in the owner's picture's colours (`metamoran`)."""
@@ -1033,11 +1081,11 @@ LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes s
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
 P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
-VEST_AS_WORN = ({88: 1, 169: 1, 89: 71, 170: 71, 90: 186} if TEAL else      # Portraits.inlay: that cloth in the colours his vest has on
+VEST_AS_WORN = ({88: 1, 169: 1, 89: 69, 170: 69, 90: 158} if TEAL else      # Portraits.inlay: that cloth in the colours his vest has on
                 {88: 1, 169: 1, 89: 112, 170: 112, 90: 113})               # his figure, shade for shade: the owner, Nov 13, 21:39, "Fix
                                           # the color of the vest in the portraits and on the body and make sure the colors of the outfit
                                           # match Kid Gotenks outfit colors" (Kid Gotenks's frames, G_VEST: 112 most of it, 113 its light,
-                                          # black its edge); since Nov 14, 00:29 (TEAL) his figure's dark navy (OUTFIT_MAPS[1]: 71, 186)
+                                          # black its edge); since Nov 14 (TEAL) his figure's dark navy (OUTFIT_MAPS[1]: 69, 158)
 BARE_BODY = 46                            # Portraits.inlay, without: Gohan's calm picture, where his neck and shoulders are drawn bare: every picture's body
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
