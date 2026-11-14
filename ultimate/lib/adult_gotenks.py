@@ -784,12 +784,53 @@ def grown(c, ref=None):
     return np.rot90(g, r)
 
 
+BORED = 8                               # his bored animation (SLOTS): a crouch, then lying on his front, legs up behind him
+G_LEGS = (112, 113, 114, 115, 117, 119, 2, 1)   # his trousers, socks and shoes in his frames
+
+
+def _bored(c, ref=None):
+    """One frame of his bored animation (BORED) grown. The owner, Nov 13, 23:16: "That "lying" down is broken thats not right": grown
+    as he is standing, the crouch's legs were doubled through (he stood hunched, long and thin) and lying, the rows doubled went across
+    his raised legs (thick, the shoes doubled). Here: the crouch (his head above his body) grows two rows in his legs, no wider; lying,
+    his raised legs are lengthened along themselves, 2 rows (the shins: from the first row where each leg is a run of trouser colour,
+    everything above it moved up and that row repeated), and the forearm hanging under his chin 1 row (the skin row 2 above its
+    wristband repeated). Nothing else of Kid Gotenks's frame changes: his head, hands and vest stay as drawn."""
+    ref = c if ref is None or not ref.any() else ref
+    if _g_axis(ref) == 0:
+        prm = _g_params(ref)
+        if prm is None: return c.copy()
+        rows, c2, cx = prm
+        return _g_grow(c, (rows[:2], c2, cx), np.isin(ref, G_HAIR).any(1), widen=False)
+    out = c.copy()
+    hair = np.isin(ref, G_HAIR)
+    if not hair.any(): return out
+    hb = int(np.nonzero(hair.any(1))[0].max())
+    lab, _ = ndimage.label(np.isin(c, G_LEGS))
+    legs = np.zeros(c.shape, bool)
+    for i in set(np.unique(lab[:hb][c[:hb] == 112]).tolist()) - {0}:
+        if np.isin(c[lab == i], G_PANTS).any(): legs |= lab == i
+    cut = None
+    for r in (np.nonzero(legs.any(1))[0] if legs.any() else []):
+        xs = np.nonzero(legs[r])[0]; segs = np.split(xs, np.nonzero(np.diff(xs) > 1)[0] + 1)
+        if len(segs) >= 2 and all(np.isin(c[r, g], G_PANTS).any() and not (c[r, g] == 1).any() for g in segs): cut = int(r); break
+    if cut is not None:
+        up = legs.copy(); up[cut:] = False
+        out[up] = 0; ys, xs = np.nonzero(up); out[ys - 2, xs] = c[ys, xs]
+        for k in (1, 2): out[cut - k, legs[cut]] = c[cut, legs[cut]]
+    rows_ = np.nonzero((c > 0).any(1))[0]
+    band = [y for y in range(hb + 5, int(rows_.max())) if np.isin(c[y], (113, 115)).sum() >= 2]
+    if band:
+        r = band[0] - 2; arm = out.copy()
+        arm[r + 1:] = out[r:-1]; arm[r] = out[r]; out = arm
+    return out
+
+
 def grown_frames(rom, actor_list, form):
     """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form])."""
     g = cells(rom, actor_list, GROWN[form]); base = cells(rom, actor_list, GROWN['base'])
     def ref(s, d, j):
         return base[s][d][j] if s in base and len(base[s][d]) == len(g[s][d]) else None
-    out = {s: [[grown(c, ref(s, d, j))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
+    out = {s: [[(_bored(c, ref(s, d, j)) if s == BORED else grown(c, ref(s, d, j)))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
     if 16 not in out and 15 in out: out[16] = out[15]     # (Kid Gotenks's Super Saiyan figures have no banking animation (16): over the
     return out                                            #  world map the game showed nothing while he turned. The flying one in its place)
 

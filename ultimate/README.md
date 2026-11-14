@@ -1343,6 +1343,14 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     - And then: as a Super Saiyan or Super Saiyan 3 he vanished whenever he banked. Kid Gotenks's Super Saiyan figures (actors 120,
       121) have no animation 16, so the game shows nothing in a turn: the original does the same (filmed, forms 34 and 35; left as
       it is). His own Super Saiyan figures now bank in their flying animation (`grown_frames`: 16 from 15), so he stays drawn.
+  - 23:16, the owner: "That "lying" down is broken thats not right". His bored animation (8: Kid Gotenks crouches, then lies on his
+    front, chin on his hands, legs up behind him) had been grown as if he were standing. In the crouch the rows doubled went
+    through his folded legs, so he stood hunched, long and thin; lying, they went across his raised legs, so the legs came out thick
+    and the shoes doubled. `adult_gotenks._bored` grows it as the pose is: the crouch two rows in its legs and no wider; lying, the
+    raised legs lengthened along themselves by 2 rows (from the first row where each leg is a run of trouser colour, everything
+    above it moved up and that row repeated) and the forearm hanging under his chin by 1; his head, hands and vest as Kid Gotenks's
+    are. Only those 9 frames changed. `test_adult_gotenks.py`: no wider than Kid Gotenks's, the head where his is, the shoes 2 rows
+    higher.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

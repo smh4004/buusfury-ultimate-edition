@@ -210,6 +210,15 @@ for f, n in AG.ACTORS.items():
           all(a_ == b_ for a_, b_ in feet))
     if f == 'base':
         fly = [bool((want[16][v][j] == kid[16][v][j][AG.OUT]).all()) for v in (0, 2) for j in range(len(kid[16][v]))]
+        # his bored animation (Nov 13, 23:16, the owner: "That "lying" down is broken"): no wider than Kid Gotenks's, his head as drawn,
+        # and lying (frames 1 and 2) his raised legs 2 rows longer: the top of his shoes 2 rows higher, nothing else of the frame moved
+        span = lambda a: (np.nonzero(a.any(0))[0].min(), np.nonzero(a.any(0))[0].max())
+        bw = [span(want[AG.BORED][v][j]) == span(kid[AG.BORED][v][j][AG.OUT]) for v in range(3) for j in range(3)]
+        top = lambda a: np.nonzero(np.isin(a, (112,)).any(1))[0].min()
+        hairs = [bool((np.isin(want[AG.BORED][v][j], AG.G_HAIR) == np.isin(kid[AG.BORED][v][j][AG.OUT], AG.G_HAIR)).all()) for v in range(3) for j in (1, 2)]
+        lift = [int(top(kid[AG.BORED][v][j][AG.OUT]) - top(want[AG.BORED][v][j])) for v in range(3) for j in (1, 2)]
+        check("grown look, base: bored, as wide as Kid Gotenks (%d of 9 frames), lying his head where Kid Gotenks's is (%d of 6) and his legs "
+              "longer (the shoes' tops %s rows higher)" % (sum(bw), sum(hairs), lift), all(bw) and all(hairs) and all(x == 2 for x in lift))
         check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; banking in flight "
               "(slot 16, front and side) %d of %d frames are Kid Gotenks's own" % (hair, sum(fly), len(fly)), hair == 0 and all(fly))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
