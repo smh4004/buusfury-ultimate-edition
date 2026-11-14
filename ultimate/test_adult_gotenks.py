@@ -173,7 +173,8 @@ for v in ('head', 'hair', 'recolour'):
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
 # of it but what his ears' tops are in front of, and nearly all of it over the whole picture: the rest is behind Gohan's face, ears and
 # shoulders); his collar's rolls whole. Gohan's ears are whole: every pixel of them and of the line round them is in the picture.
-# Super Saiyan: his two brows are the same size (the left one was a broken mirror of the right).
+# Super Saiyan: his two brows are the same size (the left one was a broken mirror of the right). Where he shouts, his shirt is his calm
+# picture's: none of it beside his jaw.
 import numpy as np
 AG.set_palette(np.frombuffer(clean[0x701B0 + 768:0x701B0 + 1536], np.uint8).reshape(256, 3))
 pics = AG.Portraits(clean)
@@ -204,6 +205,15 @@ for f in AG.ACTORS:
             b = d['brow'] & (ROWS < d['eye']); l, r = int((b & (COLS < d['mid'])).sum()), int((b & (COLS > d['mid'])).sum())
             check("portrait %s %d: his two brows are whole: %d pixels of the left one and %d of the right above his eyes" % (f, i, l, r),
                   min(l, r) >= 12 and abs(l - r) <= 8)
+        if gp in AG.SHOUT_BODY:               # (where he shouts: his head on his calm picture's neck and shirt, Portraits._calm_body)
+            calm = pics.inlay(AG.SHOUT_BODY[gp], kp, f)
+            head = (AG._shift(d['face'], dy, dx, False) | ears) & pics.inner
+            shirt = np.isin(a, AG.P_DARK) & pics.inner & (a != kraw) & ~head
+            beside = int((shirt & (ROWS >= d['eb'] + dy - 1) & (ROWS <= 50)).sum())
+            foot = pics.inner & (ROWS >= 56) & (ROWS <= 58)
+            check("portrait %s %d (shouting): no shirt beside his jaw (%d dark pixels from his ears' foot to row 50, not his head's), and its "
+                  "last rows are his calm picture's (%d of %d pixels)" % (f, i, beside, (a == calm)[foot].sum(), foot.sum()),
+                  beside == 0 and bool((a == calm)[foot].all()))
 print('screens in', OUT)
 if fails: sys.exit('FAILED: %s' % fails)
 print('ALL PASS')

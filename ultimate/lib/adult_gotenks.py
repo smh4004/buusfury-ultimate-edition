@@ -776,6 +776,7 @@ NECK_HALF = 7
 P_LINES = (208, 16, 17, 1)                # the outlines' colours in the pictures
 LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes sit above Gotenks's (near where the game has Gohan: room for his neck)
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
+SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay: where he shouts, the calm picture his neck and shirt are taken from
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
 BROW_C = (208, 248, 249, 82, 81, 110, 28, 29)                         # Super Saiyan Gohan's brows: their brown line and their gold
@@ -1345,6 +1346,62 @@ class Portraits:
                     ncol, _ = _nearest(okc, out); out[m] = ncol[m]
         return out, bg, (dark | neck) & ~bg
 
+    def _calm_body(self, gp, kp_eyes, lift, layer, src, seb):
+        """Where he shouts: his head on the body of his calm picture (SHOUT_BODY), the same neck, neckline and shirt (Nov 13, 19:27,
+        the owner: "now fix the shirt on the shouting ones and DONT CHANGE ANYTHING ELSE THE REST IS FINE"). When he shouts Gohan is
+        drawn hunched: his head down, his bare shoulders up beside his jaw to his ears. Dressed, those shoulders were the shirt:
+        black from his ears down either side of his jaw, his neck a strip under his chin, the line of his jaw black with it. The
+        calm pictures, which are fine, have his neck either side of his jaw, a neckline under his chin and the shirt below.
+        Here, from a row above his ears' foot down, all of his own picture but his head (his face, his ears, his jaw's line, brown
+        again) is his calm picture's, laid where the calm portrait has it: its neck, its neck's line, its shirt, what is behind him.
+        Where the calm picture has its own head and this one's doesn't cover it: between its neck's edges, under his ears, his neck
+        (this picture's own skin there if it is plain skin, else the calm neck's nearest); elsewhere what is behind him. Where his
+        neck then lies against what is behind him, his skin's line. Above that row nothing changes.
+        layer: (picture, behind him, body, hair, face, ears) as `inlay` has them, in the portrait's place; src: his picture not
+        dressed; seb: his ears' last row. -> (picture, behind him, body, hair)."""
+        G, Gbg, Gbody, Ghair, Gface, Gears = layer
+        G = G.copy(); ke, kmid = kp_eyes
+        Y, X = np.mgrid[:64, :64]; K3 = np.ones((3, 3), bool)
+        rp = SHOUT_BODY[gp]
+        gcr, dr = self.gohan_clean(rp); Dr, rbg, rbody = self._dressed(rp, gcr, dr)
+        dyr, dxr = ke - dr['eye'] - lift, int(round(kmid - dr['mid']))
+        Sr = lambda a, fill=0: _shift(a, dyr, dxr, fill)
+        Vr = Sr(self.inner, False) & self.inner
+        _, (jy, jx) = ndimage.distance_transform_edt(~Vr, return_indices=True)
+        Gr = Sr(Dr)[jy, jx]
+        Rbg = (Sr(rbg, False) & Vr)[jy, jx] & self.inner
+        Rbody = (Sr(rbody, False) & Vr)[jy, jx] & self.inner
+        Rneck = Sr(dr['neck'], False) & Vr                             # (his neck where it is one piece of skin with his face)
+        Rskin = (Rbody & np.isin(Gr, P_SKIN)) | Rneck
+        Rface = (Sr(dr['face'], False) | Sr(dr['ears'], False)) & Vr & ~Rneck
+        Rline = np.isin(Gr, (208, 16, 17, 62)) & ndimage.binary_dilation(Rskin | Rbody, K3) & ~ndimage.binary_dilation(Rface, K3) & ~Rskin & ~Rbody & ~Rbg
+        reb = dr['eb'] + dyr
+        head = Gface | Gears
+        jl = np.isin(src, (208, 16, 17)) & ndimage.binary_dilation(head, K3) & ~head            # (his jaw's line)
+        keep = head | jl
+        L = (Y >= seb - 1) & self.inner & ~keep
+        G[jl & (Y >= seb - 1)] = src[jl & (Y >= seb - 1)]
+        own = L & (Rskin | Rbody | Rline)                              # (the calm picture's neck, its line and its shirt)
+        G[own] = Gr[own]
+        beh = L & Rbg & ~own
+        G[beh] = Gr[beh]
+        rest = L & ~own & ~beh                                         # (the calm picture's own head, where this one's isn't)
+        Fn = _rows_filled(Rskin | (Rface & (Y > reb))) & (Y > reb)
+        for y in range(seb + 1, reb + 1): Fn[y] = Fn[reb + 1]          # (his neck comes up to under his ears)
+        nk = rest & Fn
+        plain = np.isin(src, (83, 84, 67))
+        G[nk & plain] = src[nk & plain]
+        if (nk & ~plain).any():
+            pc, _ = _nearest((Rskin & np.isin(Gr, (83, 84, 67)) & L) | (nk & plain), G); G[nk & ~plain] = pc[nk & ~plain]
+        bh = rest & ~Fn
+        if bh.any():
+            bc, _ = _nearest(Rbg, Gr); G[bh] = bc[bh]
+        body = (own & ~Rline) | nk; bgn = beh | bh                     # (its neck's line is no more body here than there: Gotenks's hair goes over it)
+        skin = body & np.isin(G, P_SKIN) & ~np.isin(G, (16, 17))
+        edge = skin & (np.roll(bgn, 1, 1) | np.roll(bgn, -1, 1))       # (his neck against what is behind him: his skin's line)
+        G[edge] = 208
+        return G, (Gbg & ~L) | bgn, (Gbody & ~L) | body, Ghair & ~L
+
     def inlay(self, gp, kp, form, lift=None):
         """Gohan's own picture gp, in the outfit, under Gotenks's own hair and rolls from his picture kp.
         The owner, Nov 13: 13:15 on `blend`, "The hair is STILL FUCKED"; 14:36, "Fix the ears neck and face more still off"; 15:13,
@@ -1394,6 +1451,8 @@ class Portraits:
         Gface, Gears, Ghair, Gbrow, Gclear, Gsp = (S(m, False) & V for m in (d['face'], d['ears'], d['hair'], d['brow'], d['clear'], d['span']))
         Gbg = (S(dbg, False) & V)[iy, ix] & self.inner
         Gbody = (S(dbody, False) & V)[iy, ix] & self.inner
+        if gp in SHOUT_BODY: G, Gbg, Gbody, Ghair = self._calm_body(gp, kp_eyes=(ke, kmid), lift=lift, layer=(G, Gbg, Gbody, Ghair, Gface, Gears),
+                                                                    src=S(gc)[iy, ix], seb=d['eb'] + dy)
         sk = d['eye'] + dy - 4
         low = (Y >= sk) & self.inner; above = (Y < sk) & self.inner
         out = k.copy()

@@ -1241,6 +1241,17 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     line. Also: a line of the shirt one pixel thick along his jaw in the Super Saiyan shouting picture is hair. Against the form of
     15:13 only the ears, the Super Saiyan brows and what is right round them changed (108-150 pixels a picture; nothing in the
     middle of his face below his brows).
+  - 19:27, the owner: "Jesus christ now fix the shirt on the shouting ones and DONT CHANGE ANYTHING ELSE THE REST IS FINE". So the
+    other five pictures stand as they are (checked: not one pixel of them changed) and in the two shouting ones only the shirt.
+    What was wrong with it: shouting, Gohan is drawn hunched, his head down and his bare shoulders up beside his jaw to his ears
+    (45; in 53 it is his undershirt). Dressed, that was the shirt: black from his ears down either side of his jaw (122 pixels of
+    it beside his jaw in the base picture, 34 in the Super Saiyan one), his neck a strip under his chin, his jaw's own line black
+    with it. `Portraits._calm_body`: from a row above his ears' foot down, all of the shouting picture but his head (face, ears,
+    his jaw's line, brown again) is his calm picture's (`SHOUT_BODY`: 45 on 46, 53 on 54), laid where the calm portrait has it:
+    its neck either side of his jaw, its neck's line, its neckline, its shirt, what is behind him. Where the calm picture has its
+    own head and the shouting one's doesn't cover it, his neck (his own skin there if plain, else the calm neck's nearest); where
+    his neck then lies against what is behind him, his skin's line. Changed: 313 and 271 pixels, all in rows 40-59, none in his
+    face or ears, none of Gotenks's own hair or rolls; the last three rows of each are its calm picture's pixel for pixel.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
