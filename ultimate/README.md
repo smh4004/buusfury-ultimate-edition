@@ -1351,6 +1351,18 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     above it moved up and that row repeated) and the forearm hanging under his chin by 1; his head, hands and vest as Kid Gotenks's
     are. Only those 9 frames changed. `test_adult_gotenks.py`: no wider than Kid Gotenks's, the head where his is, the shoes 2 rows
     higher.
+  - 23:37, the owner, with a picture of Gogeta in Gotenks's colours (black vest, yellow padding, teal sash with a hanging end,
+    white trousers, teal ankle wraps, black boots and wristbands): "Can you change the colors of his waistband/vest/boots to this on
+    the right". Kid Gotenks's frames draw the vest, sash, wristbands, shins and boots in the same greys, so each frame is read part by
+    part (`adult_gotenks.metamoran_parts`): the sash is the dark right on top of his trousers over his hips (and its hanging end, row
+    by row under it), the boots the dark round his soles, the wraps the shin drawn above a boot (or the one row above it where no
+    shin is drawn), the vest and wristbands the rest of the dark above his waist and by his padding and skin. The vest, wristbands
+    and boots go a shade darker (to black, as in the picture), the sash and wraps teal: the palette's nearest (71, 186, 199, colours
+    the game has; no palette change). His head and the trousers' shaded greys are never touched; his Super Saiyan frames are read off
+    base's. His portraits' vest a shade darker to match (`VEST_AS_WORN`). Where his arms cover his waist (running, some punches) the
+    sash stays hidden, as drawn. Previewed: the three forms standing beside the picture, then every animation now and new.
+    `BFU_AG_TEAL=0` gives Kid Gotenks's colours back. `test_adult_gotenks.py`: only outfit greys change, each to its part's colour,
+    no teal by his hair, and standing (every view, every form) teal at the waist and ankles and no grey left in the vest.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

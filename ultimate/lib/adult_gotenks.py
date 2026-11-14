@@ -825,12 +825,157 @@ def _bored(c, ref=None):
     return out
 
 
-def grown_frames(rom, actor_list, form):
-    """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form])."""
+# ---- his outfit's colours (Nov 13, 23:37, the owner, with a picture of Gogeta in Gotenks's colours: "Can you change the colors of his
+# waistband/vest/boots to this on the right"). The picture: the vest black, its padding yellow; a teal sash round his waist, its end hanging
+# at his hip; white trousers; teal wraps round his ankles; black boots; black wristbands. Kid Gotenks's frames draw his vest, sash, wristbands,
+# shins and boots all in the same greys (112, 113, 115; 114 his shins' middle), so which is which is read off each frame (`metamoran_parts`):
+# - the sash: the dark right on top of his trousers (a light trouser colour under it, none above it in that column) over his hips, the
+#   topmost such band only; a second row above it where that row repeats it (from behind it is 2 rows); and its hanging end, row by row
+#   straight down from it (2 wide at its top, 3 at most, 4 rows at most, its last row with light in it: plain dark under it is a leg);
+# - the boots: his soles (black pieces of 2 or more below the sash's top that touch neither it, his skin nor his padding) and the dark round
+#   them; the wraps: the next 2 steps up from a boot where a shin is drawn (114 between dark outline pixels, 1 to 3 long, and the dark of
+#   the same step joined to it), or, where no shin is drawn above a boot, the one step above it;
+# - the vest: the dark above the sash's top, the dark joined to his padding, its 114 grey where he has it (the flexing frames), and his
+#   wristbands (dark pieces touching his skin and not his trousers).
+# The vest and wristbands a shade darker, the boots black (the picture's: the greys one step down), the sash and wraps teal: the nearest
+# the game's palette has (71 its shade, 186, 199 its light). Nothing else changes. His head and the trousers' shading never: the trouser
+# greys he has in shadow are left as drawn. Super Saiyan frames are read off the same base frame (their bodies are its), pixel for pixel.
+TEAL = os.environ.get('BFU_AG_TEAL', '1') != '0'      # (BFU_AG_TEAL=0: Kid Gotenks's colours, the look before)
+OUTFIT_MAPS = {1: {112: 111, 113: 112, 115: 113, 114: 112},       # the vest and wristbands: a shade darker
+               2: {112: 71, 113: 186, 115: 199, 114: 186},        # the sash: teal
+               3: {112: 71, 114: 186, 113: 186, 115: 199},        # the ankle wraps: teal
+               4: {112: 111, 114: 112, 113: 112, 115: 113}}       # the boots: black
+P_DARK3 = (112, 113, 115)
+P_LIGHT = (117, 119, 2)                 # his trousers' light colours (their 114 is their shade, and a shin's)
+_N4 = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
+_N8 = np.ones((3, 3), bool)
+_ROW = np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]], bool)
+
+
+def _sh(m, dy, dx):
+    """m moved by (dy, dx): out[y, x] = m[y - dy, x - dx], nothing coming in from outside."""
+    o = np.zeros_like(m); H, W = m.shape
+    o[max(dy, 0):H + min(dy, 0), max(dx, 0):W + min(dx, 0)] = m[max(-dy, 0):H + min(-dy, 0), max(-dx, 0):W + min(-dx, 0)]
+    return o
+
+
+def _fill(m, into, conn=_N4):
+    while True:
+        g = m | (ndimage.binary_dilation(m, conn) & into)
+        if (g == m).all(): return m
+        m = g
+
+
+def _shins(n):
+    """Where a shin is drawn: runs of 114, 1 to 3 long, across or down, with dark (1, 112) at both ends."""
+    out = np.zeros(n.shape, bool)
+    for ax in (0, 1):
+        m = n.T if ax else n
+        for y in range(m.shape[0]):
+            row = m[y]; x = 0
+            while x < len(row):
+                if row[x] != 114: x += 1; continue
+                e = x
+                while e + 1 < len(row) and row[e + 1] == 114: e += 1
+                if e - x < 3 and x > 0 and e + 1 < len(row) and row[x - 1] in (1, 112) and row[e + 1] in (1, 112):
+                    if ax: out[x:e + 1, y] = True
+                    else: out[y, x:e + 1] = True
+                x = e + 1
+    return out
+
+
+def metamoran_parts(ref):
+    """One of his frames (base Gotenks's body) by part: 0 nothing to change, 1 vest (and wristbands), 2 sash, 3 ankle wraps, 4 boots."""
+    r = _g_axis(ref); n = np.rot90(ref, -r)
+    cls = np.zeros(n.shape, np.uint8); rows = np.arange(n.shape[0])[:, None]
+    yel = np.isin(n, G_YEL)
+    collar = np.nonzero(yel.any(1))[0].min() if yel.any() else n.shape[0]
+    above = n > 0; above[collar:] = False
+    lab, _ = ndimage.label(above, _N8)
+    head = np.isin(lab, list(set(np.unique(lab[np.isin(n, G_HAIR)]).tolist()) - {0}))     # (above his collar, joined to his hair)
+    light = np.isin(n, P_LIGHT) & ~head                 # (his eyes are white and 117 too)
+    dark = np.isin(n, P_DARK3) & ~head
+    seed = dark & _sh(light, -1, 0) & ~_sh(np.maximum.accumulate(light, axis=0), 1, 0)
+    hip = _sh(light, -1, 0) | _sh(light, -2, 0); hip = hip | _sh(hip, 0, 1) | _sh(hip, 0, -1)
+    band = _fill(seed, dark & hip, _ROW)
+    if band.any():
+        lab, k = ndimage.label(band, _ROW); top = np.nonzero(band.any(1))[0].min()
+        for i in range(1, k + 1):
+            if np.nonzero((lab == i).any(1))[0].min() > top + 1: band[lab == i] = False
+    lab, k = ndimage.label(band & _sh(dark, 1, 0) & (n == _sh(n, 1, 0)), _ROW)
+    for i in range(1, k + 1):
+        if (lab == i).sum() >= 3: band |= _sh(lab == i, -1, 0)
+    sash = band.copy()
+    if band.any():
+        end = []; cur = band
+        for t in range(4):
+            nxt = _sh(cur, 1, 0) & dark & ~band
+            nxt = nxt | ((_sh(nxt, 0, 1) | _sh(nxt, 0, -1)) & dark & ~band)
+            if len(np.nonzero(nxt.any(1))[0]) != 1 or nxt.sum() > 3 or (t == 0 and nxt.sum() < 2): break
+            end.append(nxt); cur = nxt
+        while end and not np.isin(n[end[-1]], (113, 115)).any(): end.pop()
+        for m in end: sash |= m
+    cls[sash] = 2
+    wtop = np.nonzero(band.any(1))[0].min() if band.any() else collar + 2
+    lab, k = ndimage.label((n == 1) & ~head, _N4)
+    sole = np.zeros(n.shape, bool)
+    touch = sash | np.isin(n, SKIN + (LINE, 67) + G_YEL)
+    for i in range(1, k + 1):
+        m = lab == i
+        if m.sum() < 2 or np.nonzero(m.any(1))[0].min() <= wtop: continue
+        if (ndimage.binary_dilation(m, _N8) & ~m & touch).any(): continue
+        sole |= m
+    legd = np.isin(n, (112, 113, 114, 115)) & ~head & ~sash & ~light
+    boot = sole | (ndimage.binary_dilation(sole, _N8) & legd)
+    shin = _shins(n)
+    dist = np.full(n.shape, 99); dist[boot] = 0; cur = boot
+    for t in (1, 2):
+        cur = ndimage.binary_dilation(cur, _N4) & legd & (dist == 99); dist[cur] = t
+    wrap = np.zeros(n.shape, bool)
+    for t in (1, 2):
+        layer = dist == t; s_ = shin & layer
+        core = layer & (s_ | ((_sh(s_, 0, 1) | _sh(s_, 0, -1) | _sh(s_, 1, 0) | _sh(s_, -1, 0)) & (n == 112)))
+        wrap |= _fill(core, layer & (n == 112))
+    lab, k = ndimage.label(boot, _N8)
+    for i in range(1, k + 1):
+        ring = ndimage.binary_dilation(lab == i, _N4) & legd & (dist == 1)
+        if not (ring & wrap).any(): wrap |= ring
+    cls[boot] = 4; cls[wrap] = 3
+    vest = dark & (cls == 0) & (rows < wtop + (0 if band.any() else 1))
+    vest |= _fill(dark & ndimage.binary_dilation(yel, _N8), dark & (cls == 0) & (rows <= wtop + 2))
+    cls[vest & (cls == 0)] = 1
+    v114 = (n == 114) & ~head & (rows < wtop) & ~ndimage.binary_dilation(light, _N8) & ndimage.binary_dilation((cls == 1) | yel, _N8)
+    cls[v114] = 1
+    lab, k = ndimage.label(dark & (cls == 0), _N4)
+    skin = np.isin(n, SKIN + (67,))
+    for i in range(1, k + 1):
+        m = lab == i; ring = ndimage.binary_dilation(m, _N8) & ~m
+        if (ring & skin).any() and not (ring & (light | (n == 114))).any(): cls[m] = 1
+    return np.rot90(cls, r)
+
+
+def metamoran(c, ref=None):
+    """Frame c in the picture's colours: its parts read off ref (the same frame of his base form, whose body his Super Saiyan ones
+    share; c itself without one), each pixel where c is ref's."""
+    ref = c if ref is None or not ref.any() else ref
+    part = metamoran_parts(ref); out = c.copy(); same = c == ref
+    for k, mp in OUTFIT_MAPS.items():
+        for a, b in mp.items(): out[(part == k) & same & (c == a)] = b
+    return out
+
+
+def grown_frames(rom, actor_list, form, teal=None):
+    """{slot: [front, back, side frame lists]} for the build (64-column canvases), from Gotenks's own (GROWN[form]); with teal (TEAL by
+    default) in the owner's picture's colours (`metamoran`)."""
+    teal = TEAL if teal is None else teal
     g = cells(rom, actor_list, GROWN[form]); base = cells(rom, actor_list, GROWN['base'])
     def ref(s, d, j):
         return base[s][d][j] if s in base and len(base[s][d]) == len(g[s][d]) else None
     out = {s: [[(_bored(c, ref(s, d, j)) if s == BORED else grown(c, ref(s, d, j)))[OUT] for j, c in enumerate(g[s][d])] for d in range(3)] for s in g}
+    if teal:
+        gb = out if form == 'base' else grown_frames(rom, actor_list, 'base', teal=False)
+        out = {s: [[metamoran(c, gb[s][d][j] if s in gb and len(gb[s][d]) == len(out[s][d]) else None) for j, c in enumerate(out[s][d])]
+                   for d in range(3)] for s in out}
     if 16 not in out and 15 in out: out[16] = out[15]     # (Kid Gotenks's Super Saiyan figures have no banking animation (16): over the
     return out                                            #  world map the game showed nothing while he turned. The flying one in its place)
 
@@ -867,10 +1012,11 @@ LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes s
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
 P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
-VEST_AS_WORN = {88: 1, 169: 1, 89: 112, 170: 112, 90: 113}    # Portraits.inlay: that cloth in the colours his vest has on his figure (Kid
-                                          # Gotenks's frames, G_VEST: 112 most of it, 113 its light, black its edge), shade for shade: the
-                                          # owner, Nov 13, 21:39, "Fix the color of the vest in the portraits and on the body and make sure
-                                          # the colors of the outfit match Kid Gotenks outfit colors"
+VEST_AS_WORN = ({88: 1, 169: 1, 89: 111, 170: 111, 90: 112} if TEAL else    # Portraits.inlay: that cloth in the colours his vest has on
+                {88: 1, 169: 1, 89: 112, 170: 112, 90: 113})               # his figure, shade for shade: the owner, Nov 13, 21:39, "Fix
+                                          # the color of the vest in the portraits and on the body and make sure the colors of the outfit
+                                          # match Kid Gotenks outfit colors" (Kid Gotenks's frames, G_VEST: 112 most of it, 113 its light,
+                                          # black its edge); since 23:37 (TEAL) a shade darker, as his figure's (OUTFIT_MAPS: 111, 112)
 BARE_BODY = 46                            # Portraits.inlay, without: Gohan's calm picture, where his neck and shoulders are drawn bare: every picture's body
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light

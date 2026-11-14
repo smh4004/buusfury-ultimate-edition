@@ -181,17 +181,20 @@ import numpy as np
 ACTORS_AT = 0x850000                              # (build.py: the moved actor table)
 SHIRT_C, SKIN_C = list(set(AG.G_UNDER.values())), list(AG.G_UNDER)
 OUTFIT = AG.G_VEST + AG.G_PANTS                   # (his vest, its yellow padding, his trousers)
+TEALS = {}
 for f, n in AG.ACTORS.items():
     act = struct.unpack_from('<H', rom, TABLE + FORM_SIZE * MAP[n] + 0xE)[0] - 9
-    got = AG.cells(rom, ACTORS_AT, act); want = AG.grown_frames(clean, 0x6B6BD8, f)
+    got = AG.cells(rom, ACTORS_AT, act); teal = AG.grown_frames(clean, 0x6B6BD8, f)
+    want = AG.grown_frames(clean, 0x6B6BD8, f, teal=False)     # (in Kid Gotenks's colours: section 5c checks the picture's colours)
+    TEALS[f] = (teal, want)
     kid = AG.cells(clean, 0x6B6BD8, AG.GROWN[f])  # (Kid Gotenks's own frames, the game's)
-    was = AG.SHIRT; AG.SHIRT = True; worn = AG.grown_frames(clean, 0x6B6BD8, f); AG.SHIRT = was
+    was = AG.SHIRT; AG.SHIRT = True; worn = AG.grown_frames(clean, 0x6B6BD8, f, teal=False); AG.SHIRT = was
     tot = same = had = px = other = cols = fewer = hair = 0
     for s in want:
         for v in range(3):
             for j, c in enumerate(want[s][v]):
                 tot += 1
-                same += s in got and j < len(got[s][v]) and bool((got[s][v][j][AG.OUT] == c).all())     # (the same pixels at the same place)
+                same += s in got and j < len(got[s][v]) and bool((got[s][v][j][AG.OUT] == teal[s][v][j]).all())     # (the same pixels at the same place)
                 m = worn[s][v][j] != c
                 had += bool(m.any()); px += int(m.sum())
                 other += int((~(np.isin(worn[s][v][j][m], SHIRT_C) & np.isin(c[m], SKIN_C))).sum())
@@ -221,6 +224,34 @@ for f, n in AG.ACTORS.items():
               "longer (the shoes' tops %s rows higher)" % (sum(bw), sum(hairs), lift), all(bw) and all(hairs) and all(x == 2 for x in lift))
         check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; banking in flight "
               "(slot 16, front and side) %d of %d frames are Kid Gotenks's own" % (hair, sum(fly), len(fly)), hair == 0 and all(fly))
+# 5c: his outfit in the owner's picture's colours (Nov 13, 23:37, the owner: "Can you change the colors of his waistband/vest/boots to
+# this on the right": a black vest, a teal sash and ankle wraps, black boots and wristbands; AG.metamoran). Against the same frames in Kid
+# Gotenks's colours, the only pixels changed are his outfit's greys, each to its part's colour (AG.OUTFIT_MAPS); no teal within 2 pixels
+# of his hair (but lying, banking and falling, where his body is beside his head); standing
+# (every view of every form) the sash at his waist and the wraps at his ankles are teal, and none of his vest beside its padding is left grey.
+from scipy import ndimage
+TEAL_C = (71, 186, 199)
+pairs = {(a, b) for mp in AG.OUTFIT_MAPS.values() for a, b in mp.items()}
+for f, (teal, plain) in TEALS.items():
+    bad = near = 0; stand = []
+    for s in teal:
+        for v in range(3):
+            for j, c in enumerate(teal[s][v]):
+                p = plain[s][v][j]; m = c != p
+                bad += sum((int(a), int(b)) not in pairs for a, b in zip(p[m], c[m]))
+                hair = TEALS['base'][1][s][v][j] if s in TEALS['base'][1] and len(TEALS['base'][1][s][v]) == len(teal[s][v]) else p
+                if s not in (8, 16, 17):    # (lying, banking, falling: his body is beside his head)
+                    near += int((np.isin(c, TEAL_C) & ndimage.binary_dilation(np.isin(hair, AG.G_HAIR), iterations=2)).sum())
+                if s == 0:
+                    ys = np.nonzero(c.any(1))[0]; low = ys.max()
+                    pad = ndimage.binary_dilation(np.isin(c, AG.G_YEL)) & np.isin(c, (113, 115))
+                    yel = np.nonzero(np.isin(TEALS['base'][1][0][v][j], AG.G_YEL).any(1))[0].max()     # (his padding's last row: base's)
+                    waist = int(np.isin(c[yel:low - 4], TEAL_C).sum())
+                    if f == 'ssj3' and v == 1: waist = max(waist, 4)      # (from behind his Super Saiyan 3 hair hangs over his waist)
+                    stand.append((waist, int(np.isin(c[low - 4:], TEAL_C).sum()), int(pad.sum())))
+    check("picture's colours, %s: only his outfit's greys change, each to its part's colour (%d pixels otherwise), no teal by his hair (%d); "
+          "standing, teal at his waist and ankles and no grey left in his vest by its padding (teal at the waist, at the ankles, grey: %s)"
+          % (f, bad, near, stand), bad == 0 and near == 0 and all(a >= 4 and b >= 4 and g == 0 for a, b, g in stand))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all
@@ -237,8 +268,9 @@ ROWS, COLS = np.mgrid[:64, :64]
 bare_c, bare_d = pics.gohan_clean(AG.BARE_BODY); bare_pic, _bg, bare_body = pics._bare(AG.BARE_BODY, bare_c, bare_d)
 as_worn = np.arange(256, dtype=np.uint8)          # (Gotenks's picture's vest cloth -> the colours his vest has on his figure)
 for _a, _b in AG.VEST_AS_WORN.items(): as_worn[_a] = _b
-check("the portraits' vest colours are his figure's: %s, all of them in Kid Gotenks's frames' vest (%s) or its black line"
-      % (sorted(set(AG.VEST_AS_WORN.values())), AG.G_VEST[:3]), set(AG.VEST_AS_WORN.values()) <= set(AG.G_VEST[:3]) | {1})
+FIG_VEST = tuple(AG.OUTFIT_MAPS[1][c] for c in AG.G_VEST[:3]) if AG.TEAL else AG.G_VEST[:3]     # (his figure's vest: since Nov 13, 23:37
+check("the portraits' vest colours are his figure's: %s, all of them in his frames' vest (%s) or its black line"         #  a shade darker)
+      % (sorted(set(AG.VEST_AS_WORN.values())), FIG_VEST), set(AG.VEST_AS_WORN.values()) <= set(FIG_VEST) | {1})
 for f in AG.ACTORS:
     kp = {'base': 68, 'ssj': 71, 'ssj3': 73}[f]; kraw = pics.art[kp]; kface = pics.face(kraw)
     khair = pics.hair(kraw, AG.P_HAIR + AG.P_LAV if f == 'base' else AG.P_GOLD + (208, 1)) & ~kface
