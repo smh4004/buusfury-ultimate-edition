@@ -236,33 +236,32 @@ for f, n in AG.ACTORS.items():
         check("grown look, base: his head is never stretched: %d frames whose hair differs in size from Kid Gotenks's; banking in flight "
               "(slot 16, front and side) %d of %d frames are Kid Gotenks's own" % (hair, sum(fly), len(fly)), hair == 0 and all(fly))
 # 5c: his outfit in the owner's picture's colours (Nov 13, 23:37, the owner: "Can you change the colors of his waistband/vest/boots to
-# this on the right": a black vest, a teal sash and ankle wraps, black boots and wristbands; AG.metamoran). Against the same frames in Kid
-# Gotenks's colours, the only pixels changed are his outfit's greys, each to its part's colour (AG.OUTFIT_MAPS); no teal within 2 pixels
-# of his hair (but lying, banking and falling, where his body is beside his head); standing
-# (every view of every form) the sash at his waist and the wraps at his ankles are teal, and none of his vest beside its padding is left grey.
+# this on the right": a black vest, a teal sash and ankle wraps, black boots and wristbands; Nov 14, 00:29: "Can you make his vest his
+# dark navy too"; AG.metamoran). Against the same frames in Kid Gotenks's colours, the only pixels changed are his outfit's greys, each to
+# its part's colour (AG.metamoran_parts, read off base's frame; AG.OUTFIT_MAPS); none of his sash or wraps within 2 pixels of his hair (but
+# lying, banking and falling, where his body is beside his head); standing (every view of every form) his sash, wraps, vest and
+# wristbands all there in their colours (pixels of each: at least 4, 4, 4 and 2; from behind his Super Saiyan 3 hair hangs over his
+# back, waist and wristbands).
 from scipy import ndimage
-TEAL_C = (71, 186, 199)
-pairs = {(a, b) for mp in AG.OUTFIT_MAPS.values() for a, b in mp.items()}
 for f, (teal, plain) in TEALS.items():
     bad = near = 0; stand = []
     for s in teal:
         for v in range(3):
             for j, c in enumerate(teal[s][v]):
-                p = plain[s][v][j]; m = c != p
-                bad += sum((int(a), int(b)) not in pairs for a, b in zip(p[m], c[m]))
-                hair = TEALS['base'][1][s][v][j] if s in TEALS['base'][1] and len(TEALS['base'][1][s][v]) == len(teal[s][v]) else p
-                if s not in (8, 16, 17):    # (lying, banking, falling: his body is beside his head)
-                    near += int((np.isin(c, TEAL_C) & ndimage.binary_dilation(np.isin(hair, AG.G_HAIR), iterations=2)).sum())
+                p = plain[s][v][j]
+                bs = 15 if s == 16 and f != 'base' else s     # (his Super Saiyan banking is their flying: AG.grown_frames)
+                ref = TEALS['base'][1][bs][v][j] if bs in TEALS['base'][1] and len(TEALS['base'][1][bs][v]) == len(teal[s][v]) else p
+                part = AG.metamoran_parts(ref); m = c != p
+                bad += sum(AG.OUTFIT_MAPS.get(int(k), {}).get(int(a_)) != int(b_) for a_, b_, k in zip(p[m], c[m], part[m]))
+                if s not in (8, 16, 17):
+                    near += int((m & np.isin(part, (2, 3)) & ndimage.binary_dilation(np.isin(ref, AG.G_HAIR), iterations=2)).sum())
                 if s == 0:
-                    ys = np.nonzero(c.any(1))[0]; low = ys.max()
-                    pad = ndimage.binary_dilation(np.isin(c, AG.G_YEL)) & np.isin(c, (113, 115))
-                    yel = np.nonzero(np.isin(TEALS['base'][1][0][v][j], AG.G_YEL).any(1))[0].max()     # (his padding's last row: base's)
-                    waist = int(np.isin(c[yel:low - 4], TEAL_C).sum())
-                    if f == 'ssj3' and v == 1: waist = max(waist, 4)      # (from behind his Super Saiyan 3 hair hangs over his waist)
-                    stand.append((waist, int(np.isin(c[low - 4:], TEAL_C).sum()), int(pad.sum())))
-    check("picture's colours, %s: only his outfit's greys change, each to its part's colour (%d pixels otherwise), no teal by his hair (%d); "
-          "standing, teal at his waist and ankles and no grey left in his vest by its padding (teal at the waist, at the ankles, grey: %s)"
-          % (f, bad, near, stand), bad == 0 and near == 0 and all(a >= 4 and b >= 4 and g == 0 for a, b, g in stand))
+                    n_ = [int((m & (part == k)).sum()) for k in (2, 3, 1, 5)]
+                    if f == 'ssj3' and v == 1: n_ = [max(n_[0], 4), n_[1], max(n_[2], 4), max(n_[3], 2)]
+                    stand.append(tuple(n_))
+    check("picture's colours, %s: only his outfit's greys change, each to its part's colour (%d pixels otherwise), no sash or wrap by his "
+          "hair (%d); standing, sash, wraps, vest and wristbands in their colours (pixels of each: %s)" % (f, bad, near, stand),
+          bad == 0 and near == 0 and all(x[0] >= 4 and x[1] >= 4 and x[2] >= 4 and x[3] >= 2 for x in stand))
 # 6: the grown look's portraits (Gohan's own picture in the outfit under Gotenks's own hair and rolls, lib/adult_gotenks.py
 # Portraits.inlay): one skin, one background, nothing left of either picture's own (Gotenks's pink skin, Gohan's yellow or cyan behind
 # him, the Super Saiyan pictures' purple), the game's frame untouched; Gotenks's hair is his picture's own (above Gohan's brow line all

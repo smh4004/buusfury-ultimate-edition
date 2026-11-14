@@ -1368,6 +1368,10 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     front: body columns 24-39, face 27-37). Now a column a quarter of his width either side of his middle is doubled, the left
     side moving 1 left and the right 1 right (`adult_gotenks._g_grow`): 2 columns wider than Kid Gotenks, centred under his head
     (24-40 under 27-37). The same 24 Super Saiyan change frames as before stay unwidened (they would pass 32 by 32).
+  - 00:29, the owner: "Can you make his vest his dark navy too". The vest takes the sash's colours (71 most of it, 186 and 199 its
+    light), on his figures and in his portraits (`VEST_AS_WORN`); the wristbands are told apart from it (beside a hand, and the
+    band's rows that repeat it) and stay black with the boots, as in the picture. `test_adult_gotenks.py`: every changed pixel is its
+    part's colour, and standing (every view, every form) the sash, wraps, vest and wristbands each have theirs.
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the

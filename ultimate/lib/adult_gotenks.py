@@ -838,16 +838,20 @@ def _bored(c, ref=None):
 # - the boots: his soles (black pieces of 2 or more below the sash's top that touch neither it, his skin nor his padding) and the dark round
 #   them; the wraps: the next 2 steps up from a boot where a shin is drawn (114 between dark outline pixels, 1 to 3 long, and the dark of
 #   the same step joined to it), or, where no shin is drawn above a boot, the one step above it;
-# - the vest: the dark above the sash's top, the dark joined to his padding, its 114 grey where he has it (the flexing frames), and his
-#   wristbands (dark pieces touching his skin and not his trousers).
-# The vest and wristbands a shade darker, the boots black (the picture's: the greys one step down), the sash and wraps teal: the nearest
-# the game's palette has (71 its shade, 186, 199 its light). Nothing else changes. His head and the trousers' shading never: the trouser
+# - the vest: the dark above the sash's top, the dark joined to his padding, its 114 grey where he has it (the flexing frames), and dark
+#   pieces touching his skin and not his trousers; of that, his wristbands: what is beside a hand (skin touching neither his padding nor
+#   his head) and the step next to it, the band's rows repeating it above or below, and where his fists are up by his hair its dark
+#   pieces of 4 or more with 115 in them.
+# The wristbands a shade darker and the boots black (the picture's: the greys one step down), the sash and wraps teal: the nearest the
+# game's palette has (71 its shade, 186, 199 its light). The vest black too at first; Nov 14, 00:29, the owner: "Can you make his vest
+# his dark navy too": the sash's colours (71 most of it). Nothing else changes. His head and the trousers' shading never: the trouser
 # greys he has in shadow are left as drawn. Super Saiyan frames are read off the same base frame (their bodies are its), pixel for pixel.
 TEAL = os.environ.get('BFU_AG_TEAL', '1') != '0'      # (BFU_AG_TEAL=0: Kid Gotenks's colours, the look before)
-OUTFIT_MAPS = {1: {112: 111, 113: 112, 115: 113, 114: 112},       # the vest and wristbands: a shade darker
+OUTFIT_MAPS = {1: {112: 71, 113: 186, 115: 199, 114: 186},        # the vest: the sash's dark navy (Nov 14, 00:29)
                2: {112: 71, 113: 186, 115: 199, 114: 186},        # the sash: teal
                3: {112: 71, 114: 186, 113: 186, 115: 199},        # the ankle wraps: teal
-               4: {112: 111, 114: 112, 113: 112, 115: 113}}       # the boots: black
+               4: {112: 111, 114: 112, 113: 112, 115: 113},       # the boots: black
+               5: {112: 111, 113: 112, 115: 113, 114: 112}}       # the wristbands: black
 P_DARK3 = (112, 113, 115)
 P_LIGHT = (117, 119, 2)                 # his trousers' light colours (their 114 is their shade, and a shin's)
 _N4 = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
@@ -888,7 +892,7 @@ def _shins(n):
 
 
 def metamoran_parts(ref):
-    """One of his frames (base Gotenks's body) by part: 0 nothing to change, 1 vest (and wristbands), 2 sash, 3 ankle wraps, 4 boots."""
+    """One of his frames (base Gotenks's body) by part: 0 nothing to change, 1 vest, 2 sash, 3 ankle wraps, 4 boots, 5 wristbands."""
     r = _g_axis(ref); n = np.rot90(ref, -r)
     cls = np.zeros(n.shape, np.uint8); rows = np.arange(n.shape[0])[:, None]
     yel = np.isin(n, G_YEL)
@@ -954,6 +958,20 @@ def metamoran_parts(ref):
     for i in range(1, k + 1):
         m = lab == i; ring = ndimage.binary_dilation(m, _N8) & ~m
         if (ring & skin).any() and not (ring & (light | (n == 114))).any(): cls[m] = 1
+    lab, k = ndimage.label(skin & ~head, _N4)          # his wristbands: what of that is beside a hand (his skin touching neither his
+    hand = np.zeros(n.shape, bool)                      # padding nor his head), and the step next to that away from his padding
+    for i in range(1, k + 1):
+        if not (ndimage.binary_dilation(lab == i, _N8) & yel).any(): hand |= lab == i
+    v = cls == 1
+    w = v & ndimage.binary_dilation(hand, _N8)
+    w |= ndimage.binary_dilation(w, _N4) & v & ~ndimage.binary_dilation(yel, _N8)
+    for _ in range(2):                                  # (and the band's rows that repeat it straight above or below: from behind it is
+        w |= v & ((_sh(w, 1, 0) & (n == _sh(n, 1, 0))) | (_sh(w, -1, 0) & (n == _sh(n, -1, 0))))     #  3 rows tall)
+    cls[w] = 5
+    lab, k = ndimage.label(np.isin(n, P_DARK3) & head, _N4)     # (his wristbands where his fists are up by his hair: the head's dark pieces
+    for i in range(1, k + 1):                                    #  of 4 or more with the band's light in them; his eyes are 1 pixel each)
+        m = lab == i
+        if m.sum() >= 4 and (n[m] == 115).any(): cls[m] = 5
     return np.rot90(cls, r)
 
 
@@ -1015,11 +1033,11 @@ LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes s
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
 P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
-VEST_AS_WORN = ({88: 1, 169: 1, 89: 111, 170: 111, 90: 112} if TEAL else    # Portraits.inlay: that cloth in the colours his vest has on
+VEST_AS_WORN = ({88: 1, 169: 1, 89: 71, 170: 71, 90: 186} if TEAL else      # Portraits.inlay: that cloth in the colours his vest has on
                 {88: 1, 169: 1, 89: 112, 170: 112, 90: 113})               # his figure, shade for shade: the owner, Nov 13, 21:39, "Fix
                                           # the color of the vest in the portraits and on the body and make sure the colors of the outfit
                                           # match Kid Gotenks outfit colors" (Kid Gotenks's frames, G_VEST: 112 most of it, 113 its light,
-                                          # black its edge); since 23:37 (TEAL) a shade darker, as his figure's (OUTFIT_MAPS: 111, 112)
+                                          # black its edge); since Nov 14, 00:29 (TEAL) his figure's dark navy (OUTFIT_MAPS[1]: 71, 186)
 BARE_BODY = 46                            # Portraits.inlay, without: Gohan's calm picture, where his neck and shoulders are drawn bare: every picture's body
 G_SSJ_HAIR = P_GOLD + (78, 82, 85, 86, 87, 88, 21, 23, 1, 111)       # Super Saiyan Gohan's hair, its shades and lines
 EAR_LIGHT = ((83, 84), (19, 83), (18, 83), (204, 83), (20, 83), (82, 83), (17, 19), (81, 19), (205, 19))    # Gohan's ears: shade -> his face's light
