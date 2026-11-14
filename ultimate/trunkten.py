@@ -3,11 +3,15 @@ orange belt and orange undershirt you can maybe use this model as a base but kee
 gotenks"; 17:19, on the first preview: "Try Vegitos hair shape instead and use the Potara from him if he has it"). The model is Teen
 Gohan in Goku's gi (teen_bojack.py, approved and locked 16:29): the Super Saiyan frames teen.py makes, his body and face pixel for pixel,
 with the clothes teen_bojack.parts finds dressed again and Vegito's hair in place of his.
-  his gi (the greys of his top, the purple of his trousers): green, lightest to darkest G1-G4 (BF 252, 215, 251, 216: colours the game
-    has; LoG2 has none of them, so the figure's colour map sends LoG2 indices teen.py never uses to them, CMAP);
-  his undershirt (the gi's navy edge on his top: the sleeves and the edges round his neck) and the V under his neck: Goku's orange;
+  his gi (the greys of his top, the purple of his trousers): two greens, GI (BF 215, the lighter greys and purple; 216, the darker),
+    its navy edges the gi's dark outline (BF 70), as Vegito's vest is drawn: one colour, its shade and a dark line round it (17:43, the
+    owner: "make his gi cleaner like vegitos so you can actually see the shirt and undershirt against each other"). LoG2 has none of
+    these colours, so the figure's colour map sends LoG2 indices teen.py never uses to them (CMAP);
+  his undershirt, Goku's orange: its sleeves (sleeves(): the top two rows of his gi at each shoulder, outside his neck, as Vegito's
+    orange shoulders) and Goku's V under his neck;
   his sash (the reds that don't touch his skin): Goku's orange; his wristbands (the reds on his hands): Goku's navy, as the model's;
-  his trousers' navy edge: the darkest green; his socks and shoes: Goku's navy boots, as the model's.
+  his trousers' navy edge: the darkest green; his socks and shoes: orange, the sash's (17:42, the owner: "make his boots orange to
+    match his belt like that first ref pic next to gotenks"), their black as it is.
 Hair (head()): BF's Vegito (actor 275, the game's only Vegito: Super Vegito), his stance's head in each view, every pixel of its hair
 as BF draws it, laid on the model's face by the eyes (the two games draw them the same size: Vegito's eyes, ears and face are as wide
 as Teen Gohan's). Each frame's own head is matched to the stance's head it lies on (front, back, side or the side turned round, moved
@@ -17,8 +21,9 @@ front of his head; where his hair left the forehead or a temple open, Vegito's o
   base: Gotenks's colours turned round (his crown black and sides purple): the crown purple (Gotenks's purples, BF 148/147/146, 138 the
     outline), the sides and what hangs low black with dark grey lights, as LoG2's black hair: where the head's outline, smoothed, faces
     more than A degrees from up and lies near it (split_hair, once per view); his own dark eyes;
-  Super Saiyan: Super Vegito's own colours (BF 25-30, through VEGITO's LoG2 indices); Super Saiyan 2: the model's Super Saiyan 2 golds
-    (no outline, as the owner wanted for it) and its green eyes.
+  Super Saiyan and Super Saiyan 2: the model's Super Saiyan 2 golds (no outline, as the owner wanted for it; 17:42: "Make the SSJ1 hair
+    color cleaner and the same as SSJ2 Trunkten", Super Vegito's own olive-outlined yellow had been the Super Saiyan's); Super Saiyan's
+    eyes the model's teal, Super Saiyan 2's its green.
 Potara earrings: Vegito's (BF 29, his sprite's one pixel under each ear), one under each of the model's ears (EARS, the stance's).
 Knocked down (animation 3's last two frames) every form has the model's long black hair, as Teen Gohan's approved frames do.
 frame() makes a look's frame and checks it (problems()); a frame that fails stops the build. made(look) is sprites.log2_anim's frame
@@ -30,16 +35,17 @@ import teen as T, teen_bojack as B, headfit as F
 
 SKIN = F.cls(T.SKIN_S)
 GOLD = F.cls(T.GOLD_S)
-G1, G2, G3, G4 = 0xa3, 0xa4, 0xa5, 0xa6                     # LoG2 indices for his gi's greens, lightest to darkest (unused by teen.py)
-VEGITO = {25: 0xb6, 26: 0xb7, 27: 0xb8, 28: 0xba, 30: 0xbb}  # Super Vegito's hair colours (BF) -> LoG2 indices teen.py never uses
-EARRING = 0xbc                                              # the Potara earring (BF 29)
-CMAP = {G1: 252, G2: 215, G3: 251, G4: 216, EARRING: 29, **{v: k for k, v in VEGITO.items()}}   # -> BF's (actors.json "cmap")
+GI_MAIN, GI_SHADE, GI_LINE = 0xa3, 0xa4, 0xa5               # LoG2 indices for his gi's green, its shade and its outline (unused by teen.py)
+EARRING = 0xbc                                              # the Potara earring (BF 29), a LoG2 index teen.py never uses
+CMAP = {GI_MAIN: 215, GI_SHADE: 216, GI_LINE: 70, EARRING: 29}    # -> BF's (actors.json "cmap")
 P_LIGHT, P_MAIN, P_SHADE, P_OUT = 0x63, 0xe1, 0xe8, 0xe5    # Gotenks's purples (LoG2 indices that map to BF 148, 147, 146, 138)
 PURPLE = (P_LIGHT, P_MAIN, P_SHADE, P_OUT)
-GI_GREY = {0x02: G1, 0x09: G1, 0x0a: G1, 0x0b: G2, 0x0c: G2, 0x0d: G3, 0x0e: G4}     # his top's greys (as teen_bojack.SHIRT_TO)
+GI_GREY = {0x02: GI_MAIN, 0x09: GI_MAIN, 0x0a: GI_MAIN, 0x0b: GI_MAIN, 0x0c: GI_MAIN, 0x0d: GI_SHADE, 0x0e: GI_SHADE}   # his top's greys
+SLEEVE = {0x02: 0x20, 0x09: 0x20, 0x0a: 0x20, 0x0b: 0x20, 0x0c: 0x21, 0x0d: 0x21, 0x0e: 0x22, 0x50: 0x20, 0x51: 0x21, 0xd3: 0x22}
 SASH = {0x18: 0x20, 0x19: 0x20, 0x1a: 0x21, 0x1b: 0x22}                             # the sash's reds -> Goku's orange
 VEE = {0x50: 0x21, 0x4f: 0x20, 0xd7: 0x23}                                          # Goku's navy V -> orange
-GREENS = (G1, G2, G3, G4)
+BOOT = {0x02: 0x20, 0x09: 0x20, 0x0a: 0x20, 0x0b: 0x21, 0x0c: 0x21, 0x0d: 0x22, 0x0e: 0x22, B.DARK: 0x23}   # socks, shoes -> orange
+GREENS = (GI_MAIN, GI_SHADE, GI_LINE)
 ORANGES = (0x20, 0x21, 0x22, 0x23)
 NAVY = (0x4f, 0x50, 0x51, 0xd7)
 A, RIM, SIGMA = 70, 0.8, 3.5        # the crown: the outline faces within A degrees of up; the rest: smoothed head (sigma) under RIM
@@ -48,8 +54,8 @@ V_HAIR = (25, 26, 27, 28, 30)
 V_EAR = 29
 LOOK_HAIR = {'purple': {30: P_LIGHT, 28: P_MAIN, 27: P_MAIN, 26: P_SHADE, 25: P_OUT},
              'black': {30: 0x0f, 28: 0x01, 27: 0x01, 26: 0x01, 25: 0x01},
-             'ss': VEGITO,
              'ss2': {30: 0x2c, 28: 0x24, 27: 0x25, 26: 0x26, 25: 0x26}}
+LOOK_HAIR['ss'] = LOOK_HAIR['ss2']          # (17:42, the owner: "Make the SSJ1 hair color cleaner and the same as SSJ2 Trunkten")
 V_SKIN = {200: 0x72, 201: 0x73, 203: 0x74, 202: 0x15, 16: 0x17}       # Vegito's skin -> the model's (light to dark, the outline)
 VEGITO_ACTOR = 275
 V_EYES = {0: (-11, 56), 2: (-10, 52)}       # Vegito's eyes in his stance (BF canvas: row from the origin, column)
@@ -228,6 +234,19 @@ def fill_holes(out, old):
         if not got: break
 
 
+def sleeves(top, hm, at):
+    """His undershirt's sleeves: the top two rows of his gi's top in each column (top), outside his neck: 4 columns or more either side
+    of the middle of his head's lowest rows from the front or behind, 3 or more behind it from the side (his shoulder; at: where())."""
+    ys, xs = np.nonzero(hm)
+    nx = xs[ys >= ys.max() - 1].mean()
+    first = np.where(top.any(0), top.argmax(0), 999)
+    Y, X = np.indices(top.shape)
+    near = top & (Y - first[None, :] <= 1)
+    i = at[0] if at else 0
+    if i in (0, 1): return near & (np.abs(X - nx) >= 4)
+    return near & ((X - nx >= 3) if i == 2 else (nx - X >= 3))
+
+
 def wristbands(done):
     """The pieces of red (4-connected) that touch his skin and not his trousers: his wristbands. The rest is his sash."""
     reds = np.isin(done, B.REDS)
@@ -247,20 +266,23 @@ def make(form, k, d, f):
     c = head(form, k, d, f)[0]
     out = c.copy()
     for a, b in GI_GREY.items(): out[shirt & (done == a)] = b
-    for a, b in B.BOOT_TO.items(): out[boots & (done == a)] = b
+    for a, b in BOOT.items(): out[boots & (done == a)] = b
     reds = np.isin(done, B.REDS); wb = wristbands(done)
     for a, b in B.RED_TO.items(): out[wb & (done == a)] = b
     for a, b in SASH.items(): out[reds & ~wb & (done == a)] = b
-    out[body & (done == 0x50)] = G1
-    out[body & (done == 0x51)] = G2
-    out[upper & ~legs & (done == B.EDGE)] = 0x21            # (his undershirt: its sleeves and the edges round his neck)
-    out[(lower | legs) & (done == B.EDGE)] = G4             # (his trousers' edge)
+    out[body & (done == 0x50)] = GI_MAIN
+    out[body & (done == 0x51)] = GI_SHADE
+    out[body & (done == B.EDGE)] = GI_LINE                  # (the gi's edges: its outline)
+    if p['head'].any():                                     # (his undershirt's sleeves at his shoulders)
+        top = (shirt | (np.isin(done, (B.EDGE, 0x50, 0x51)) & upper & ~legs)) & body
+        sl = sleeves(top, p['head'], where(k, d, f, done))
+        for a, b in SLEEVE.items(): out[sl & (done == a)] = b
     for y, x, col in B.vee(done, shirt, p['head']): out[y, x] = VEE[col]
     return out
 
 
 GI_OUT = GREENS + ORANGES + NAVY
-HAIR_OUT = {'base': PURPLE + (0x01, 0x0f), 'ss': tuple(VEGITO.values()), 'ss2': tuple(LOOK_HAIR['ss2'].values())}
+HAIR_OUT = {'base': PURPLE + (0x01, 0x0f), 'ss': tuple(LOOK_HAIR['ss'].values()), 'ss2': tuple(LOOK_HAIR['ss2'].values())}
 
 
 def problems(form, k, d, f, out):
@@ -278,11 +300,10 @@ def problems(form, k, d, f, out):
     o = ((ref != 0) != (done != 0)) & ~(old | hair | ear | (np.isin(ref, tuple(V_SKIN.values())) & old))
     if o.any(): bad.append('outline changed outside the hair %d' % o.sum())
     cloth = np.isin(done, list(B.CLOTH)) & ~old
-    navy = np.isin(out, NAVY + (0x01,))
     dark = (done == B.DARK) & ~hm
-    x = dark & (out != done) & ((out != 0xd7) | ~F.grown(navy & ~dark, 1))
+    x = dark & (out != done) & ((out != BOOT[B.DARK]) | ~F.grown(np.isin(out, ORANGES + (0x01,)) & ~dark, 1))
     if x.any(): bad.append('dark grey made something else %d' % x.sum())
-    cloth |= dark & (out == 0xd7)
+    cloth |= dark & (out == BOOT[B.DARK])
     x = (out != ref) & ~cloth
     if x.any(): bad.append('non-clothes changed %d' % x.sum())
     if hm.any() and (old.any() or hair.any()):
@@ -312,7 +333,7 @@ def problems(form, k, d, f, out):
         if not white and (ring & (out != 0)).sum() >= 0.5 * ring.sum() and (ring & gi_out).any(): left |= m
         if not (out[m] == B.WHITE).any() and (ring & gi_out).any(): left |= m
     left |= ~hm & (np.isin(out, B.REDS + (B.EDGE,)) | ((done == 0x01) & (out != 0x01) & ~old))
-    left |= p['body'] & np.isin(done, (0x50, 0x51)) & ~np.isin(out, GREENS + NAVY)
+    left |= p['body'] & np.isin(done, (0x50, 0x51)) & ~np.isin(out, GREENS + ORANGES + NAVY)
     if left.any(): bad.append('purple gi colours left %d' % left.sum())
     reds = np.isin(done, B.REDS)
     x = reds & ~np.isin(out, tuple(SASH.values()) + tuple(B.RED_TO.values()))

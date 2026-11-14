@@ -1098,9 +1098,13 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   (actor 275, Super Vegito, the game's only one), each view's stance head laid on the model's face by the eyes (the two games' faces are
   the same size), and on every frame where the frame's head matches the stance head best (moved up to 8 pixels), so it never moves on his
   head; the model's hair goes, holes it leaves inside the figure take their neighbours' colour, specks it alone held go, and the tips go
-  where the frame would pass 32 rows. Base: Gotenks's colours turned round (crown purple, the sides and low hair black); Super Saiyan:
-  Super Vegito's own colours; Super Saiyan 2: the model's Super Saiyan 2 golds. Vegito's Potara earring (BF 29, one pixel) under each ear.
-  438 frames, each checked (`problems`). Previewed; not in the build until the owner approves.
+  where the frame would pass 32 rows. Base: Gotenks's colours turned round (crown purple, the sides and low hair black); Super Saiyan
+  and 2: the model's Super Saiyan 2 golds (17:42: "Make the SSJ1 hair color cleaner and the same as SSJ2 Trunkten"). Vegito's Potara
+  earring (BF 29, one pixel) under each ear. 17:42-17:43: "make his boots orange to match his belt like that first ref pic next to
+  gotenks", "make his gi cleaner like vegitos so you can actually see the shirt and undershirt against each other": orange boots; the
+  gi one green and its shade (BF 215, 216) with a dark outline (BF 70) where the model's navy edges were, the undershirt's orange
+  sleeves at the shoulders (`sleeves`: the top two rows of the gi outside his neck) and Goku's V. 438 frames, each checked
+  (`problems`). Previewed; not in the build until the owner approves.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
