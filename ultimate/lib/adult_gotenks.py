@@ -660,8 +660,8 @@ def frames(rom, actor_list, form='base', variant='head', slots=None, gh=None, gt
 # ---- the second attempt: Kid Gotenks grown (Nov 13, 09:40, the owner: "do a second attempt and literally just upscale gotenks to adult size
 # and then give him the black sleeveless undershirt from Gohan and see if that's easier"). Gotenks's own frames (117, 120, 121, every slot,
 # his own moves and ghost attacks), each with his head up: three rows more of body (one in his chest, one in his thighs, one in his shins,
-# everything above each moved up, so his feet stay on the ground: 30 pixels tall to 33, Gohan 31) and one column wider below his collar
-# (his body's middle doubled); his bare chest inside the vest the black undershirt (Gohan's black suit's black and greys, by the light
+# everything above each moved up, so his feet stay on the ground: 30 pixels tall to 33, Gohan 31) and wider below his collar (since
+# Nov 14 a column each side of his middle doubled; one column, his middle, before: that left him half a pixel off his head's line); his bare chest inside the vest the black undershirt (Gohan's black suit's black and greys, by the light
 # that was there). His head stays Gotenks's. Nov 13, 21:17, the owner: no shirt, the vest only (SHIRT): his chest stays as Gotenks's is.
 GROWN = {'base': 117, 'ssj': 120, 'ssj3': 121}
 G_YEL = (243, 27, 250, 242)
@@ -727,8 +727,8 @@ def _g_chest(n):
 
 
 def _g_params(n):
-    """Where a frame with his head up grows: (rows to double, from his collar row down; the first row and the column his widening starts
-    from) or None."""
+    """Where a frame with his head up grows: (rows to double, from his collar row down; the first row of his widening, his body's middle
+    column and how far either side of it a column is doubled) or None."""
     yel = np.isin(n, G_YEL); ys = np.nonzero(n.any(1))[0]
     if not yel.any() or not len(ys): return None
     collar = np.nonzero(yel.any(1))[0].min(); L = ys.max() - collar
@@ -737,7 +737,8 @@ def _g_params(n):
     c2 = collar                                         # (widened from his collar down: never his face)
     body = np.zeros(n.shape, bool); body[collar:] = n[collar:] > 0
     cx = int(np.round(np.argwhere(body)[:, 1].mean()))
-    return rows, c2, cx
+    xs = np.nonzero(body.any(0))[0]
+    return rows, c2, cx, max(1, (xs.max() - xs.min() + 1) // 4)
 
 
 def _g_grow(n, prm, head=None, widen=True):
@@ -749,7 +750,7 @@ def _g_grow(n, prm, head=None, widen=True):
     Gotenks's own. (The owner, Nov 13, 21:48, on those frames, which the preview had mislabelled "Ghost attack": "Wtf is that ghost
     attack frame": his head had been pulled 3 rows taller.)"""
     if prm is None: return n
-    rows, c2, cx = prm
+    rows, c2, cx, q = prm
     out = n.copy(); hr = None if head is None else head.copy(); kept = done = 0
     for r in rows:
         if hr is not None and hr[r]: kept += 1; continue
@@ -757,9 +758,11 @@ def _g_grow(n, prm, head=None, widen=True):
         if hr is not None: t = hr[:r + 1].copy(); hr[:r] = t[1:]; hr[r] = t[r]
     if kept and not done: return n
     if not widen: return out
-    res = out.copy(); res[c2:, :cx] = out[c2:, 1:cx + 1]; res[c2:, cx] = out[c2:, cx]
-    if hr is not None: res[hr] = out[hr]
-    return res
+    res = out.copy()                    # (wider by a column each side of his middle, the same on both: one doubled a quarter of his width to
+    res[c2:, :cx - q] = out[c2:, 1:cx - q + 1]                  #  its left, everything left of it moved 1 left; one to its right, everything
+    res[c2:, cx + q + 1:] = out[c2:, cx + q:-1]                 #  right of it 1 right. The owner, Nov 14, 00:07, of a single column on the
+    if hr is not None: res[hr] = out[hr]                        #  left: "His posture seems slightly off to the side by a pixel or two fix
+    return res                                                  #  it": his body had been half a pixel left of his head)
 
 
 def _span(a):
@@ -799,8 +802,8 @@ def _bored(c, ref=None):
     if _g_axis(ref) == 0:
         prm = _g_params(ref)
         if prm is None: return c.copy()
-        rows, c2, cx = prm
-        return _g_grow(c, (rows[:2], c2, cx), np.isin(ref, G_HAIR).any(1), widen=False)
+        rows, c2, cx, q = prm
+        return _g_grow(c, (rows[:2], c2, cx, q), np.isin(ref, G_HAIR).any(1), widen=False)
     out = c.copy()
     hair = np.isin(ref, G_HAIR)
     if not hair.any(): return out

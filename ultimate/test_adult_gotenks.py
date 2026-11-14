@@ -211,6 +211,17 @@ for f, n in AG.ACTORS.items():
     feet = [(last(got[0][v][j][AG.OUT]), last(kid[0][v][j][AG.OUT])) for v in range(3) for j in range(len(kid[0][v]))]
     check("grown look, %s: he stands where Kid Gotenks stands: his feet's row in his idle frames in the ROM and Kid Gotenks's %s" % (f, feet),
           all(a_ == b_ for a_, b_ in feet))
+    # (Nov 14, 00:07, the owner: "His posture seems slightly off to the side by a pixel or two fix it": widened on his left only, his
+    # body was half a pixel left of his head.) Standing, from the front and from behind, his body below his collar is centred where
+    # Kid Gotenks's is
+    def mid(c, by):                               # (by: base's frame: where his collar is, and his body is what is the same as in it,
+        top = np.nonzero(np.isin(by, AG.G_YEL).any(1))[0].min()      #  not his Super Saiyan hair, yellow too and long)
+        xs = np.nonzero(((c == by) & (c > 0))[top:].any(0))[0]
+        return (xs.min() + xs.max()) / 2
+    kb = AG.cells(clean, 0x6B6BD8, AG.GROWN['base'])
+    mids = [(mid(want[0][v][j], TEALS['base'][1][0][v][j]), mid(kid[0][v][j][AG.OUT], kb[0][v][j][AG.OUT])) for v in (0, 1) for j in range(len(kid[0][v]))]
+    check("grown look, %s: standing, his body is centred where Kid Gotenks's is, under his head (his, Kid Gotenks's: %s)" % (f, mids),
+          all(a_ == b_ for a_, b_ in mids))
     if f == 'base':
         fly = [bool((want[16][v][j] == kid[16][v][j][AG.OUT]).all()) for v in (0, 2) for j in range(len(kid[16][v]))]
         # his bored animation (Nov 13, 23:16, the owner: "That "lying" down is broken"): no wider than Kid Gotenks's, his head as drawn,

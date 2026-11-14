@@ -1142,7 +1142,7 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     first rows 3 or more pixels out from his neck's middle; from the side its first row), black between. The second attempt is
     `BFU_AG_HEAD=grown` (`grown`, `grown_frames`): Gotenks's own frames (117, 120, 121, with his own record, so his own moves and ghost
     attacks), each with his head up three rows more of body (chest, thighs, shins; his feet stay on the ground: 30 pixels to 33) and one
-    column wider below his collar; his bare chest inside the vest the black undershirt. Its portraits are Gotenks's own with the
+    column wider below his collar (two since Nov 14: one each side, below); his bare chest inside the vest the black undershirt. Its portraits are Gotenks's own with the
     undershirt (`Portraits.gotenks_own`). Built and played (`test_adult_gotenks.py` passes on both looks).
   - 09:58, the owner picked the grown Gotenks and his own portraits (`BFU_AG_HEAD` defaults to 'grown'): "fix all the fucked up pixels
     and bugs in grown gotenks, and make the face in portrait look older not kid gotenks". Fixed: his Super Saiyan and Super Saiyan 3 hair
@@ -1363,6 +1363,11 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
     sash stays hidden, as drawn. Previewed: the three forms standing beside the picture, then every animation now and new.
     `BFU_AG_TEAL=0` gives Kid Gotenks's colours back. `test_adult_gotenks.py`: only outfit greys change, each to its part's colour,
     no teal by his hair, and standing (every view, every form) teal at the waist and ankles and no grey left in the vest.
+  - Nov 14, 00:07, the owner: "His posture seems slightly off to the side by a pixel or two fix it". Growing him wider had doubled
+    one column, his body's middle, and moved everything left of it 1 left: his body sat half a pixel left of his head (standing,
+    front: body columns 24-39, face 27-37). Now a column a quarter of his width either side of his middle is doubled, the left
+    side moving 1 left and the right 1 right (`adult_gotenks._g_grow`): 2 columns wider than Kid Gotenks, centred under his head
+    (24-40 under 27-37). The same 24 Super Saiyan change frames as before stay unwidened (they would pass 32 by 32).
 - Nov 12, the owner: Perfect Cell's fight "possible crash/hang". Watched in the game (`test_cell.py`'s route, his fight played 30 seconds
   with the player kept alive): a jump to 0xF083A4C0, the game frozen. He fights with Kid Buu's row (zone26 `CELL`), and Kid Buu's state
   that takes a copy back (state table 0x0804B148, second method, 0x08032DC8) asks every Kid Buu to answer (message 6) and then takes the
