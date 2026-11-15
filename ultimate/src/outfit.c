@@ -58,7 +58,7 @@ static void guest_sync(void) {
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
         teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
-        trunkten[] = {5, 7, 1, VICTORY_SKILL, PINBALL_SKILL, 20},     /* Trunkten: ki blasts, Banshee Blast, Super Victory Cannon, Potara Pinball, Super Saiyan (and 2 through it) */
+        trunkten[] = {5, 7, 1, GHOSTFIST_SKILL, PINBALL_SKILL, 20},     /* Trunkten: ki blasts, Banshee Blast, Kamikaze Ghost Dragon Fist, Potara Pinball, Super Saiyan (and 2 through it) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -2025,6 +2025,155 @@ void dragon_use(u8 *record, void *sprite) {
     DragonFist_Use(record, sprite);
     if (actor && actor[0] > FIST_POSE && *(const u32 *)(actor + 0x54 + 4 * FIST_POSE)) Sprite_SetFacing(sprite, FIST_POSE);
 }
+/* Shared by the two below: a puff of ghostly mist (the game's puff of smoke, which the ghost attack's leftover ghosts burst into, in
+   white: the owner, Nov 14, "make the sandy dust smoke look like white smoke/ghostly mist"), and a blast that hits every enemy near a
+   place, each knocked away from it. */
+#define SCENE ((void *)0x03001C4C)
+#define Explode ((void *(*)(int, int *, int))0x0801952D)
+#define BeamOff ((void (*)(void *))0x0802082B)
+#define BeamGo ((void (*)(void *, int, int *))0x080207D3)
+#define Free ((void (*)(void *))0x0803D63D)
+#define ObjBox2 ((void (*)(int *, void *))0x0800FE79)
+const u32 ghost_mist[12] = {1};        /* build.py: the game's puff of smoke (0x08712FDC: four frames) as white, ghostly mist */
+#define Particles ((u32 *(*)(void *, int *, const void *, int, int, int, int))0x0802A81D)
+static void smoke_at(int x, int y) {   /* as the game makes its puff (sub_0801952C), with the mist's frames */
+    int at[2]; u32 *e;
+    at[0] = x; at[1] = y;
+    e = Particles(0, at, ghost_mist, 4, Random(0x1000) + 0x1000, 0x400, 0x38);
+    if (e) { e[0] = 0x0804A2C0; ListAdd(SCENE, e); }
+}
+static void blast_at(void *by, int cx, int cy, int radius, int power) {
+    int i, n = ENEMY_COUNT;
+    if (n > 32) n = 32;
+    for (i = 0; i < n; i++) {
+        u8 *e = ENEMY_LIST[i];
+        u32 hit[16];
+        int k, box[4], dx, dy;
+        if (!e || *(int *)(e + 0x28C) <= 0 || !*(u8 *)(e + 0x1CC) || *(u8 *)(e + 0x1D0) != 0) continue;
+        ObjBox2(box, e);
+        dx = ((box[0] + box[2]) >> 1) - cx; dy = ((box[1] + box[3]) >> 1) - cy;
+        if (dx * dx + dy * dy > radius * radius) continue;
+        for (k = 0; k < 16; k++) hit[k] = 0;
+        *(u8 *)&hit[0] = 1;
+        hit[1] = box[0]; hit[2] = box[1]; hit[3] = box[2]; hit[4] = box[3];
+        *(u8 *)&hit[5] = (dx < 0 ? -dx : dx) >= (dy < 0 ? -dy : dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 1 : 0);
+        hit[6] = power; hit[7] = 0x086B8098; hit[8] = (u32)by; hit[12] = (u32)by;
+        HitObjects(SCENE, 0, hit);
+    }
+}
+
+/* Trunkten's Kamikaze Ghost Dragon Fist (Nov 14; the owner sent fan art titled "Super Kamikaze Ghost Dragon Fist" and asked "can we
+   possibly adapt this move instead of rock paper scissors"). Dragon Fist Explosion's code (behaviour 0x0804D9B0, as Super Saiyan 4's
+   red one above: the dragon is made on the update's 16th frame, a head and five segments chained through +0x48, each showing its rows
+   of 0x0877AD10 through +0x5C and +0x18) with the dragon as a ghost, white and pale blue (build.py ghost_dragon), steered with the
+   +Control Pad as the original. Then a ghost attack's end: when it bites, or he is hit, it bursts as the game's does (every part gone in
+   a puff at its middle, sub_08038DEC) but in white mist, and a blast at its head (GHOSTFIST_RADIUS, GHOSTFIST_POWER) on top of the bite. He holds his Dragon Fist pose (slot
+   FIST_POSE, build.py fist_poses). It costs what Dragon Fist Explosion costs (300) and asks what it asks (0x08019E9F). The
+   behaviour is the original's 0x10 bytes and more: +0x10 the dragon recoloured, +0x14 him (for the blast). */
+const u32 ghost_dragon[48] = {1};
+#define SoundOnce ((void (*)(void *, const void *))0x0803E303)
+#define ListRemove ((void (*)(void *, void *))0x08011945)
+const int ghostfist_vt[9] = {1};
+#define GHOSTFIST_COST 300
+#define GHOSTFIST_RADIUS 36
+#define GHOSTFIST_POWER 0x2000
+static void ghost_burst(u32 *seg, void *player) {   /* as the game's end of the dragon (sub_08038DEC: every part off in a puff at its middle), in mist */
+    int hx = ((int)seg[10] + (int)seg[12]) >> 1, hy = ((int)seg[11] + (int)seg[13]) >> 1;
+    u32 *next;
+    SoundOnce((void *)0x03003E5C, (const void *)0x08319428);
+    for (; seg; seg = next) {
+        next = (u32 *)seg[0x12];
+        smoke_at(((int)seg[10] + (int)seg[12]) >> 1, ((int)seg[11] + (int)seg[13]) >> 1);
+        ListRemove(SCENE, seg);
+    }
+    if (player) blast_at(player, hx, hy, GHOSTFIST_RADIUS, GHOSTFIST_POWER);
+}
+void ghostfist_update(u32 *self, int *player) {
+    u32 *seg, *head = (u32 *)self[1];
+    self[5] = (u32)player;
+    DragonFist_Update(self, player);
+    if (head && !self[1] && self[4]) { ghost_burst(head, player); return; }      /* it bit (sub_08038E42 marks the parts and lets go of them) */
+    if (self[1] && !self[4]) {
+        for (seg = (u32 *)self[1]; seg; seg = (u32 *)seg[0x12]) {
+            if (seg[0x17] >= DRAGON_ROWS && seg[0x17] < DRAGON_ROWS + 0xC0) seg[0x17] = (u32)ghost_dragon + (seg[0x17] - DRAGON_ROWS);
+            if (seg[6] >= DRAGON_ROWS && seg[6] < DRAGON_ROWS + 0xC0) seg[6] = (u32)ghost_dragon + (seg[6] - DRAGON_ROWS);
+            Segment_Refresh(seg);
+        }
+        self[4] = 1;
+    }
+}
+void ghostfist_end(u32 *self) {
+    if (self[1] && self[4]) { ghost_burst((u32 *)self[1], (void *)self[5]); self[1] = 0; }      /* hit while it was out */
+    DragonFist_End(self);
+}
+int ghostfist_can(u8 *record) { return DragonFist_Can(record); }
+void ghostfist_use(u8 *record, void *sprite) {
+    const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
+    u32 *b = Alloc(0x18);
+    if (b) { b[0] = (u32)ghostfist_vt; b[1] = b[2] = b[3] = b[4] = b[5] = 0; }
+    KiPay(record, GHOSTFIST_COST);
+    Sprite_SetFacing(sprite, 0x13);
+    if (actor && actor[0] > FIST_POSE && *(const u32 *)(actor + 0x54 + 4 * FIST_POSE)) Sprite_SetFacing(sprite, FIST_POSE);
+    Sprite_SetBehaviour(sprite, b);
+}
+
+/* Twin Ki Beam (Nov 14): Rock-Paper-Scissors's scissors, kept as a move of its own when that move gave way to the Kamikaze Ghost Dragon
+   Fist (the owner: "Save that twin ki beam as a potential move", then "maybe give it to adult gotenks": skills_sync). Press B: he gathers ki in both hands
+   and two gold beams (the Super Victory Cannon's, kv_params[3], at its middle size) go out side by side for TWIN_FRAMES. Its behaviour
+   (build.py twin_vt, from the Kamehameha's) runs two Kamehameha beams, each a Kamehameha state inside ours ([2] its beam, [3] its level):
+   +4..+0x1C and +0x20..+0x2C; +8 the pose's slot (twin_pose). */
+const int twin_vt[9] = {1};
+#define TWIN_COST 200
+#define TWIN_FRAMES 70
+static const signed char twin_launch[4][2] = {{8, 16}, {8, -16}, {-16, -6}, {32, -6}};     /* 0x0871E128: where a beam leaves a fighter */
+static void twin_off(u32 *self) {
+    int k;
+    for (k = 0; k < 2; k++) if (self[6 + 4 * k]) { BeamOff((void *)self[6 + 4 * k]); self[6 + 4 * k] = 0; }
+}
+static int slot_frames(void *sprite, int slot) {
+    const u8 *actor = *(const u8 * const *)((const u8 *)sprite + 0x58);
+    const u32 *anim = actor && actor[0] > slot ? *(const u32 * const *)(actor + 0x54 + 4 * slot) : 0;
+    return anim ? (int)(anim[0] & 0xFF) : 0;
+}
+static int twin_pose(void *sprite) {   /* the beam pose where there is one (beam_pose), else his ki blast (slot 3): Adult Gotenks's slot 18 is one
+                                          frame (Mystic Gohan's), and the Kamehameha's code shows three (he vanished, junk over the HUD's tiles) */
+    int p = beam_pose(sprite);
+    return p == BEAM_POSE || slot_frames(sprite, p) >= 3 ? p : 3;
+}
+void twin_start(u32 *self, u8 *player) {
+    int k;
+    for (k = 0; k < 2; k++) { u32 *beam = self + 4 + 4 * k; beam[2] = 0; beam[3] = 1; kv_begin(beam, player, kv_params[3]); }
+    player[0x11] = 0;
+}
+void twin_update(u32 *self, u8 *player) {
+    int t = ++self[1], k, dir = player[0x10] & 3, at[2];
+    if (t == 0x18) {
+        SpritePlace(at, player);
+        for (k = 0; k < 2; k++) {
+            u8 *beam = (u8 *)self[6 + 4 * k];
+            int p[2];
+            if (!beam) continue;
+            p[0] = at[0] + twin_launch[dir][0]; p[1] = at[1] + twin_launch[dir][1];
+            if (dir < 2) p[0] += k ? 6 : -6; else p[1] += k ? 6 : -6;
+            BeamGo(beam, dir, p);
+        }
+    }
+    if (t > 0x18) player[0x11] = self[2] == 3 ? 2 : ((t >> 3) & 1) + 1;      /* a ki blast's arm out is held, not flickered */
+    if (t == 0x18 + TWIN_FRAMES) twin_off(self);
+    if (t >= 0x18 + TWIN_FRAMES + 12) CALL_V(player, 0x28)(player, 0);
+}
+void twin_end(u32 *self) { twin_off(self); Free(self); }
+void twin_cancel(u32 *self, u8 *player) { CALL_V(player, 0x28)(player, 0); }
+static int is_adult_gotenks(int form);
+int twin_can(u8 *record) { return (record != RECORDS + 5 * RECORD_SIZE || is_adult_gotenks(record[0x14])) && KiCan(record, TWIN_COST); }
+void twin_use(u8 *record, void *sprite) {
+    u32 *b = (u32 *)Alloc(0x30);
+    int k;
+    KiPay(record, TWIN_COST);
+    if (b) { for (k = 0; k < 12; k++) b[k] = 0; b[0] = (u32)twin_vt; b[2] = twin_pose(sprite); }
+    Sprite_SetFacing(sprite, twin_pose(sprite));
+    Sprite_SetBehaviour(sprite, b);
+}
 /* The Fusion Dance (skill 12) can't be used in Super 13's fight (Nov 11, the owner: "make the Super 13 fight specifically only startable
    and maybe only playable as Goku"): its finish is Goku's Spirit Bomb. Zone 26's areas 15 to 18: Android 13, his change, Super 13, the finish. */
 #define FusionCan ((int (*)(u8 *))0x0801A169)
@@ -2546,6 +2695,25 @@ void skill_replace(int *sp) {
     ((void (*)(u8 *, int, int))0x08013B13)(rec_of(c), from, to);
 }
 /* what play has earned: run for the fighter in control now and then, and for a character as the Skills tab opens */
+static int is_adult_gotenks(int form) {
+#ifdef ADULT_GOTENKS
+    return form == FORM_AG || form == FORM_AG_SSJ || form == FORM_AG_SSJ3;
+#else
+    return 0;
+#endif
+}
+static void drop_skill(int c, u8 *rec, int skill) {   /* out of his hands and his book's known ones (shelved_fix's way of closing the gap) */
+    int i, n = 0, pick = 0;
+    set_known(c, skill, 0);
+    if (slot_of(rec, skill) < 0) return;
+    for (i = 0; i < rec[0x0C]; i++) {
+        if (rec[0x0D + i] == skill) continue;
+        if (i == rec[0x15]) pick = n;
+        rec[0x0D + n] = rec[0x0D + i]; rec[0x2E + 2 * n] = rec[0x2E + 2 * i]; rec[0x2F + 2 * n] = rec[0x2F + 2 * i];
+        n++;
+    }
+    rec[0x0C] = n; rec[0x15] = pick;
+}
 static void learn(int c, int skill, int ok) {
     u8 *rec = rec_of(c);
     if (!ok || knows(c, skill) || slot_of(rec, skill) >= 0) { if (ok && slot_of(rec, skill) >= 0) set_known(c, skill, 1); return; }
@@ -2764,6 +2932,7 @@ void fusion_native(int *sp) {
     }
 #endif
     NativeA8(sp);
+    if (fused == 5) skills_sync(5);          /* Adult Gotenks's own move (the Twin Ki Beam) at once, not at the next round of syncs */
 }
 static void story_sync(int post) {
     int i;
@@ -2886,6 +3055,12 @@ void skills_sync(int c) {
         learn(c, SUPER_KAME_SKILL, post && derived_level(0, 15) == 2 && KAME_COUNT >= SUPER_KAME_USES);
     }
     if (c == 1) learn(c, FP_SKILL, GetFlag(G_FLAGS, MYSTIC_FLAG));      /* Full Power: with the orange gi */
+    if (c == 5) {                       /* the Twin Ki Beam is Adult Gotenks's (Nov 14, the owner: "maybe give it to adult gotenks"): the
+                                           Gotenks of GT Goten and Trunks's dance; Kid Gotenks (the same record) doesn't keep it */
+        int ag = is_adult_gotenks(rec[0x14]);
+        if (!ag) drop_skill(c, rec, TWIN_SKILL);
+        learn(c, TWIN_SKILL, ag);
+    }
     if (c == 4) {
         learn(c, GALICK_SKILL, 1);
         learn(c, 36, gt); learn(c, FINAL_SHINE_SKILL, gt);

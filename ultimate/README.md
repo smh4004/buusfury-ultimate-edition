@@ -1133,6 +1133,31 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
 - Nov 14, the full test run after Trunkten: the debug builds set every outfit's flag at the start, and Trunkten's is the Trials' own
   (895, all four won), which also teaches Goku and Vegeta the Potara, so they knew it from the start (test_fusion, test_loadout and
   test_shelved failed on it). `debug_edits` leaves that flag out: in a debug build he opens with the Trials, as in the game.
+- Nov 14, 20:31, the owner on the Super Victory Cannon's pose and zig-zag: "looks like shit"; then "New attack instead of victory
+  cannon", "Be more creative". Rock-Paper-Scissors was built (two ghosts play; the winning throw picks a ground punch, a ki wave or twin
+  beams) and shown; 21:12 "Save that twin ki beam as a potential move and can we possibly adapt this move instead of rock paper
+  scissors", with fan art of a "Super Kamikaze Ghost Dragon Fist" (a ghost shaped as a dragon). Rock-Paper-Scissors came out (its code
+  is kept outside the repo); in its place:
+  - Kamikaze Ghost Dragon Fist (skill 51, `GHOSTFIST_SKILL`, the Victory Cannon's id): Dragon Fist Explosion's code (as Super Saiyan
+    4's red one) with the dragon as a ghost, white and pale blue (`GHOST_RAMP`, by brightness, colours the game has), steered with the
+    +Control Pad; when it bites (the update lets go of the head, sub_08038E42) or he is hit, it bursts: every part off in a puff, as the
+    game's own end (sub_08038DEC) but in white mist (21:22, the owner: "make the sandy dust smoke look like white smoke/ghostly mist":
+    the game's puff, 0x08712FDC, its five sands as white and pale blue-greys, `MIST`, for this move only), and a blast at its head hits
+    the enemies there (0x2000). He holds a Dragon Fist pose (`fist_poses`: his stance, his ki blast's wind-up and arm out, slot 29).
+    Costs 300, as the original. `outfit.c ghostfist_*`. His moves: ki blasts, Banshee Blast, Kamikaze Ghost Dragon Fist, Potara
+    Pinball, Super Saiyan.
+  - Twin Ki Beam (skill 53, `TWIN_SKILL`): press B, two of the Victory Cannon's gold beams (middle size) go out side by side, 12
+    pixels apart. `outfit.c twin_*`. 21:34, the owner: "Make sure twin ki beam each beam hits independently and maybe give it to adult
+    gotenks". Each beam is its own (a Kamehameha beam each): measured in a fight, an enemy in one beam's way loses about 900, one in
+    both about 1,800, and two enemies, one in each lane, are each hit by their own. It is Adult Gotenks's: in Gotenks's book
+    (`SKILL_BOOK[5]`), learned while record 5 is in an Adult Gotenks form and dropped (`drop_skill`) when he is Kid Gotenks
+    (`skills_sync`; the dance syncs at once, `fusion_native`), and only usable as Adult Gotenks (`twin_can`). His figures' slot 18 is
+    one frame (Mystic Gohan's), and the Kamehameha's code shows three: he vanished and junk went over the HUD's tiles, so he fires in his
+    ki blast's frames, its wind-up then its arm out held (`twin_pose`; his locked figures aren't touched).
+  Captured in a fight against three of the test enemy (`BFU_RIG_MORE="x y,x y"` adds more to the `--enemy` build): the dragon hits all
+  three and bursts in mist; Adult Gotenks's twin beams hit, one enemy each. The tests' guest slot (`lib/guestnav.py`) knows a debug build leaves Trunkten shut.
+  The full suite on all of it (Nov 15, 00:30): 1,672 checks passed, none failed (the run before had one miss on Android 13's health in
+  the arena, not seen again: likely timing).
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,

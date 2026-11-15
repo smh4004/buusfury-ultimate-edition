@@ -21,11 +21,19 @@ def groups():
     return out
 
 
+TRIALS_FLAG = 895      # zone26.TRIAL_ALL: a debug build doesn't set it (build.py debug_edits: it teaches the Potara), so its looks stay shut
+
+
+def debug_open():
+    """the looks a debug build opens at the start: every one but those the Trials open (Trunkten's)"""
+    return [o['form'] for o in json.load(open(os.path.join(HERE, '..', 'outfits.json')))['characters']['8'] if o['flag'] != TRIALS_FLAG]
+
+
 def keys(target, start='broly', open_=None, wait=40):
     """key presses on the guest slot from look `start` to look `target`: Downs between fighters, then Rs through his looks.
-    open_: the looks open (default all)."""
+    open_: the looks open (default: a debug build's, debug_open)."""
     names, gs = guests(), groups()
-    open_ = set(open_ if open_ is not None else names)
+    open_ = set(open_ if open_ is not None else debug_open())
     fighters = []                                   # each fighter's group, by its first look, if any of its looks is open
     for i, g in enumerate(gs):
         if g not in fighters and gs.index(g) == i and any(gs[j] == g and names[j] in open_ for j in range(len(names))): fighters.append(g)
