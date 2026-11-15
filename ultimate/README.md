@@ -1571,9 +1571,15 @@ the official in Hercule City), screenshots looked at before it was called done.
   kick). `lib/gt_dance.py` dresses the kid figures' own dance in each GT look's colours (trousers: the clothing above the feet; heads,
   skin and sparkles the kid's). Seen both ways round, base looks and the green one.
 - Teen Gohan's Saiyan armor look: LoG2's short-haired armor record (r53, his Cell Games hair) for r52, the long-haired one (the purple
-  gi's head). The owner had said "Saiyan armor in adult Gohan"; Future Trunks (LoG2's style: kid Trunks's head) waits on a preview of
-  an adult-height version.
-- Not found yet: the flight flicker and "a dot on Goku's flying sprite" (not seen in mGBA or gpSP, flying as Goku and GT Goku; VBA-M not tried yet).
+  gi's head). The owner had said "Saiyan armor in adult Gohan".
+- "Future Trunks on kid Trunks": LoG2 drew him at kid Trunks's height. On a preview of a taller one the owner said "Yes":
+  `lib/tall.py` draws two rows of his legs twice in every frame he stands in (the rows most like the one below, narrowest first,
+  never side by side; the feet stay on their row, so everything above sits two rows higher in every frame alike and no idle moves its
+  head). Frames that grow past 32 rows use 32x64 pieces; his four actors (jacket, armor, both Super Saiyans) reserve 2 KB a frame, as
+  Android 17's. Seen in the game: Switch Character, a fight (ki blast, Super Saiyan, Galick Gun) and flying; `test_frames.py` passes.
+- Not found yet: the flight flicker and "a dot on Goku's flying sprite". Not seen in mGBA or gpSP (flying as Goku and GT Goku), nor
+  in VBA-M (libretro core, his ROM and save: 30 seconds from West City in every direction, every frame checked: the mini-map's markers
+  in all of them, no jump in the screen's brightness). Waiting on a recording.
 
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The
