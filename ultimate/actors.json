@@ -62,11 +62,11 @@
  },
  "gohan_armor": {
   "template": 98,
-  "log2_record": "r52",
+  "log2_record": "r53",
   "stretch": true,
   "extra_slots": {
-   "22": "r52:13",
-   "23": "r52:6"
+   "22": "r53:13",
+   "23": "r53:6"
   }
  },
  "gohan_armor_ss": {

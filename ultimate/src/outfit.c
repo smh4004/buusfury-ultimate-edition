@@ -468,6 +468,7 @@ void heap_init(void) {
     for (i = 0; i < 8; i++) ((volatile u32 *)0x0203FFB0)[i] = 0;     /* Super Saiyan 4's ki bar state, the Super Dragon Fist, and the rest to 0x0203FFCF */
     BENCH.magic = 0;
     CL.active = 0; CL.cool = 0; CL.surge = 0; CL.p_at = 0; CL.e_at = 0;
+    *(u32 *)0x0203F244 = 0;                /* zero_watch: nobody watched */
     *(u32 *)0x0203F300 = 0;                /* no bomb sprite */
     *(u32 *)0x0203F280 = 0;                /* no boss bar */
     ENDLESS_ON = 0; ENDLESS_WINS = 0;
@@ -776,14 +777,34 @@ static void arena_chase(u8 *e) {
     else AC.idle = 0;
     AC.x = *(int *)(e + 0x1A0) >> 8; AC.y = *(int *)(e + 0x1A4) >> 8;
 }
+/* A post-game foe left at no health who still stands and fights (Nov 15, the owner: the World Tournament "froze during a fight", in
+   a beam clash with Goku's Kamehameha). The game takes a hit only while health is above 0 (0x0800FA2A: at 0 it returns at once), so
+   a foe whose death didn't take was out of reach for good: reproduced in the release build, Super Saiyan 4 Goku winning a clash
+   against the final's Kid Buu, whose health the winning beam took to 0 while his own attack was still on; he walked about at 0
+   for minutes, punches doing nothing, the round never ending. Punches alone killed him every time. What stood there was his copy
+   (Kid Buu splits; the copy is made on his story row, 61, so postgame_foe doesn't know it): the winning beam had killed Kid Buu
+   himself while the copy was out, and nobody was left to take it back. Any foe in a post-game room (zone 26, every one of them is)
+   or on a post-game row, still at 0 a second on, gets one point back, so the next hit kills him the game's own way. A foe dying as
+   he should has left the enemy list by then (seen: a round's foe was gone at the next look, a dozen frames on). */
+#define ZERO_FOE (*(u8 * volatile *)0x0203F244)
+#define ZERO_AT (*(volatile u32 *)0x0203F248)
+#define ZERO_WAIT 60
+static int zero_watch(u8 *e) {
+    if (ZERO_FOE && ZERO_FOE != e) return 0;          /* one at a time (Kid Buu's copy may be at 0 too) */
+    if (*(int *)(e + 0x28C) != 0) { ZERO_FOE = 0; return 0; }
+    if (!ZERO_FOE) { ZERO_FOE = e; ZERO_AT = FRAMES; return 1; }
+    if (FRAMES - ZERO_AT > ZERO_WAIT) { *(int *)(e + 0x28C) = 1 << 10; ZERO_FOE = 0; }
+    return 1;
+}
 static void arena_keep(void) {
     u16 at = *(volatile u16 *)0x0300197C;
-    int i, n = *(volatile int *)0x03001BB0, arena = (at & 0xFF) == 26 && (at >> 8) < 32 && ((ARENA_ROOMS >> (at >> 8)) & 1);
+    int i, n = *(volatile int *)0x03001BB0, arena = (at & 0xFF) == 26 && (at >> 8) < 32 && ((ARENA_ROOMS >> (at >> 8)) & 1), watched = 0, post = (at & 0xFF) == 26;
     for (i = 0; i < n && i < 32; i++) {
         u8 *e = ((u8 **)0x03001BB4)[i];
         int *x, *y;
         if (!IN_EWRAM(e) || e[0x1D0] == 1) continue;      /* team 1: the player's side */
         if (postgame_foe(e)) no_story_walk(e);
+        if ((post || postgame_foe(e)) && (e == ZERO_FOE || !ZERO_FOE)) watched |= zero_watch(e);
         if (!arena) continue;
         arena_chase(e);
         x = (int *)(e + 0x1A0); y = (int *)(e + 0x1A4);
@@ -791,6 +812,7 @@ static void arena_keep(void) {
         if (*x < ARENA_X0 << 8) *x = ARENA_X0 << 8;
         else if (*x > ARENA_X1 << 8) *x = ARENA_X1 << 8;
     }
+    if (!watched) ZERO_FOE = 0;                       /* he has gone (or was never there) */
 }
 static void crackle(void);
 static void glow_tick(void);
@@ -3749,14 +3771,27 @@ int bossbar_visible(u8 *a) {                              /* every frame, for a 
    crash/hang". */
 #define SendAll ((void (*)(u32, int, u32 *))0x08011C71)
 #define KindOf ((u32 (*)(int))0x08000159)
+/* The one taking the other back keeps going with both healths added up (the method's own sum) and his own row. His copy is made on
+   the story's row (61), so when the copy was the one to take the original back in a post-game fight, what was left was the story's
+   Kid Buu: the round's end (the post-game row's death, zone26 tour_next) went with the original, and the copy, at 0 where the two
+   had been worn down, couldn't die (Nov 15, the owner: the World Tournament "froze during a fight", a beam clash; reproduced in the
+   release build, SSJ4 Goku against the final's Kid Buu: the copy walked about for minutes). Now the one who stays takes the other's
+   row when that was a post-game one and his own isn't: health, stats and the fight's end. */
 int buu_merge(u32 *state, u8 *me) {
     u32 q[16];
-    int i;
+    const u8 *keep = 0;
+    int i, r;
     for (i = 0; i < 16; i++) q[i] = 0;
     q[0] = KindOf(0x2F);
     SendAll(*(const u32 *)0x0875922C, 6, q);
     if (q[1] < 2) return 1;
-    return ((int (*)(u32 *, u8 *))0x08032DC9)(state, me);
+    {
+        u8 *other = (u8 *)(q[2] == (u32)me ? q[3] : q[2]);
+        if (IN_EWRAM(other) && postgame_foe(other) && !postgame_foe(me)) keep = *(const u8 * const *)(other + 0x224);
+    }
+    r = ((int (*)(u32 *, u8 *))0x08032DC9)(state, me);
+    if (keep) *(const u8 **)(me + 0x224) = keep;
+    return r;
 }
 static void bossbar_tick(void) {
     int hp, full, name;
