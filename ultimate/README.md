@@ -1547,6 +1547,34 @@ landed, and that the fighter was not touched. What it reads:
   fighter stands in line with him, the tournament's fighters and Majin Vegeta are out of reach of a strike thrown from 40 pixels
   (Future Trunks's sword landed from 24), and Broly leaps away after a combo.
 
+## Fixes from the owner's play, Nov 15
+Each one played in the release build (the owner's way where it could be: the everything save, Switch Character, flight, Mr. Popo,
+the official in Hercule City), screenshots looked at before it was called done.
+- "Tournaments keep crashing", "Beam clash froze the game" (the owner then: in the World Tournament, during a fight, Goku's
+  Kamehameha). Reproduced in his ROM: Super Saiyan 4 Goku wins a clash against the final's Kid Buu. Kid Buu splits and takes his copy
+  back (`buu_merge`, the behaviour's second method, which adds the two healths and keeps the one doing it); his copy is made on the
+  story's row (61), so when the copy did it the post-game row (health, stats, and the death that ends the round, zone26 `tour_next`)
+  went with the original. The copy, at 0, could not be hit (0x0800FA2A returns at 0 health) and walked about for minutes. Now the
+  one who stays takes the other's post-game row, and `zero_watch` (in `arena_keep`) gives any foe in a zone-26 room or on a post-game
+  row still at 0 a second on one point back, so the next hit kills him the game's own way (a foe dying as he should is off the enemy
+  list a dozen frames on). Played after: that clash, and six more runs (base and Super Saiyan 4, Normal and Hard, the clash won and
+  lost): every round ends and goes home. `test_clash.py`: all pass. Every bracket (Normal by draw and by three sets of picks, Hard,
+  Endless) played to its end: `check/tour_play.py`, `tour_clash.py`, `tour_kb2.py` in the session's scratch.
+- "SSJ2 doesn't drain ki": the yellow bar (Super Saiyan 3's pool, record +0x20) is what the HUD shows in Super Saiyan 2, and nothing
+  emptied it: `ss_tick` empties it there. Seen draining on screen.
+- "Why is gokus charged attack showing ssj1 in ssj4": GT kid Goku's figures borrowed the base figure's charged-hit slots (22 and 23);
+  `build.py own_charge` copies the record without them, so the game plays his own frames. Seen.
+- "Why does kid goten come ... with gt trunks": the dance's partner is now put in the same kind of look as the dancer (`dance_partner`:
+  GT with GT, kid with kid; a partner already in a GT look of that kind, GT Goten's green one, keeps it), so GT Trunks's dance makes
+  Adult Gotenks, with the Twin Ki Beam, his adult portrait and (option A) a navy vest. Seen.
+- "gt trunks fusion dance so fucked": the GT looks' slot 21 was the sheet's own (GT Goten: one crouched frame; GT Trunks: a dash and a
+  kick). `lib/gt_dance.py` dresses the kid figures' own dance in each GT look's colours (trousers: the clothing above the feet; heads,
+  skin and sparkles the kid's). Seen both ways round, base looks and the green one.
+- Teen Gohan's Saiyan armor look: LoG2's short-haired armor record (r53, his Cell Games hair) for r52, the long-haired one (the purple
+  gi's head). The owner had said "Saiyan armor in adult Gohan"; Future Trunks (LoG2's style: kid Trunks's head) waits on a preview of
+  an adult-height version.
+- Not found yet: the flight flicker and "a dot on Goku's flying sprite" (not seen in mGBA or gpSP, flying as Goku, GT Goku, Broly).
+
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The
 raid, the form, the Chou Makouhou, the twice-size drawing and the camera lift are out of the build; all of it, with its notes, is on the
