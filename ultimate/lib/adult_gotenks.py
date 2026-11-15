@@ -850,7 +850,7 @@ def _bored(c, ref=None):
 # changes. His head and the trousers' shading never: the trouser
 # greys he has in shadow are left as drawn. Super Saiyan frames are read off the same base frame (their bodies are its), pixel for pixel.
 TEAL = os.environ.get('BFU_AG_TEAL', '1') != '0'      # (BFU_AG_TEAL=0: Kid Gotenks's colours, the look before)
-OUTFIT_MAPS = {1: {112: 69, 113: 69, 115: 158, 114: 69},          # the vest: dark navy (Nov 14, 00:52: the owner's picture's, (24, 40, 88))
+OUTFIT_MAPS = {1: {112: 158, 113: 158, 115: 160, 114: 158},      # the vest: navy blue (Nov 15, the owner's pick A of the preview: 158 (0, 32, 136), its light 160 (0, 56, 176); the dark navy 69 read as black)
                2: {112: 71, 113: 186, 115: 199, 114: 186},        # the sash: teal
                3: {112: 71, 114: 186, 113: 186, 115: 199},        # the ankle wraps: teal
                4: {112: 111, 114: 112, 113: 112, 115: 113},       # the boots: black
@@ -1081,7 +1081,7 @@ LIFT = {'base': 2, 'ssj': 1, 'ssj3': 2}   # Portraits.inlay: rows Gohan's eyes s
 HUNCHED = (45, 53)                        # Gohan's pictures where he shouts: his head down, his shoulders up beside his ears
 SHOUT_BODY = {45: 46, 53: 54}             # Portraits.inlay, with SHIRT: where he shouts, the calm picture his neck and shirt are taken from
 P_VEST = (88, 89, 90, 169, 170)           # Gotenks's vest's cloth in his pictures (purple; lavender as a Super Saiyan)
-VEST_AS_WORN = ({88: 1, 169: 1, 89: 69, 170: 69, 90: 158} if TEAL else      # Portraits.inlay: that cloth in the colours his vest has on
+VEST_AS_WORN = ({88: 1, 169: 1, 89: 158, 170: 158, 90: 160} if TEAL else      # Portraits.inlay: that cloth in the colours his vest has on
                 {88: 1, 169: 1, 89: 112, 170: 112, 90: 113})               # his figure, shade for shade: the owner, Nov 13, 21:39, "Fix
                                           # the color of the vest in the portraits and on the body and make sure the colors of the outfit
                                           # match Kid Gotenks outfit colors" (Kid Gotenks's frames, G_VEST: 112 most of it, 113 its light,

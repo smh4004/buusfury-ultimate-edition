@@ -3146,6 +3146,28 @@ def ssj4_fix(rom, actors, at):
     return ins.cur, (changed, hits[0])
 
 
+# Charged melee (outfit.c charged_melee: slot 22 the charge, 23 the hit). Nov 15, the owner: "Why is gokus charged attack showing ssj1 in ssj4".
+# These figures were built on another figure's record and kept its slots 22 and 23: Kid Goku's three GT looks show BF Goku's and BF Super
+# Saiyan Goku's charge (the Super Saiyan 4 one copied from the Super Saiyan one), Goku Black and Rose BF Goku's, orange gi and all. With those
+# slots gone the charge shows the figure's own power-up (slot 13) and the hit its own punches, as Super Saiyan 3 Kid Goku and GT Vegeta did.
+BORROWED_CHARGE = ('kid_goku', 'kid_goku_ssj', 'kid_goku_ssj4', 'goku_black', 'goku_rose')
+
+
+def own_charge(rom, index, at):
+    """Slots 22 and 23 off the BORROWED_CHARGE figures (a copy of each record, repointed). -> the end of what was written"""
+    u = lambda o: struct.unpack_from('<I', rom, o)[0]
+    ins = sprites.Inserter(rom, (at + 3) & ~3)
+    for name in BORROWED_CHARGE:
+        aid = struct.unpack_from('<H', rom, SPACE + FORM_SIZE * index[name] + 0x0E)[0] - 9
+        rec = u(ACTORS_AT + 4 * aid) - ROM_BASE
+        n = u(rec) & 0xFF
+        if n <= 23: sys.exit('%s: no charge slots to take off (%d slots)' % (name, n))
+        new = bytearray(rom[rec:rec + 0x54 + 4 * n])
+        struct.pack_into('<II', new, 0x54 + 4 * 22, 0, 0)
+        struct.pack_into('<I', rom, ACTORS_AT + 4 * aid, ins.put(bytes(new)))
+    return ins.cur
+
+
 KID_GOTENKS_COLOURS = os.environ.get('BFU_KID_GOTENKS_TEAL', '1') != '0'
 KID_GOTENKS_FORMS = {'kid_gotenks': 31, 'kid_gotenks_ssj': 34, 'kid_gotenks_ssj3': 35}     # (the game's own forms, named for locked.json)
 
@@ -3329,6 +3351,7 @@ def main():
     if KID_GOTENKS_COLOURS:
         actors_end, touched = kid_gotenks_colours(rom, clean, actors_end)
         print('Kid Gotenks: %d pictures in the outfit colours, %d frame records through them' % touched)
+    actors_end = own_charge(rom, index, actors_end)
     if actors_end > 0x1000000: sys.exit('ROM layout overflow after the Super Saiyan 4 passes: sprites end %X' % actors_end)
     still = idle_still(rom, index)
     if still: print('idles made still (their second frame moved the head or changed pose): %s' % ', '.join('%s %s' % (n, '/'.join(v)) for n, v in still))

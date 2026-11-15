@@ -2868,8 +2868,10 @@ static void potara_tick(void) {
         ScriptRun(state, (const void *)0x0877D028, args);           /* global script 14: the fusion is over */
     }
 }
+static void dance_partner(int me);
 void dance_use(u8 *record, void *sprite) {
     u8 *g = REC(7);
+    dance_partner(*(u8 *)0x03001068);
     DANCE_SSJ4 = gogeta_dance(record, *(u8 *)0x03001068) == 1;
     DANCE_FORM = GetFlag(G_FLAGS, 149) && (g[0] & 1) && *(int *)(g + 8) < 0 ? g[0x14] + 1 : 0;
     DANCE_AT = FRAMES;
@@ -2907,6 +2909,27 @@ static void fused_restore(u8 *g) {
 #ifdef ADULT_GOTENKS
 static const u8 gt_goten[] = GT_GOTEN, gt_trunks[] = GT_TRUNKS;
 #endif
+/* Goten's and Trunks's dance (Nov 15, the owner: "Why does fucking kid goten come to use with gt trunks to make adult gotenks"): Adult Gotenks
+   needs both in GT looks, and the dancer not playing kept whatever look he had, so GT Trunks danced with kid Goten and made Kid Gotenks
+   (his portrait, his vest, no Twin Ki Beam). The one who starts the dance now brings the other in the same kind of look: GT with GT, the
+   kid looks with the kid looks, base or Super Saiyan as the dancer is. (GT_GOTEN: goten_gt, its Super Saiyan, the green jacket and its;
+   GT_TRUNKS: trunks_gt and its Super Saiyan. The kid looks are forms 19 and 21 and their up.) */
+static void dance_partner(int me) {
+#ifdef ADULT_GOTENKS
+    int partner = me == 2 ? 3 : me == 3 ? 2 : -1, mine, ss, gt, want;
+    const u8 *list;
+    if (partner < 0 || !ready(partner)) return;
+    mine = FORM_OF(me); ss = flags_of(mine) & 1;
+    gt = in_list(me == 2 ? gt_goten : gt_trunks, me == 2 ? sizeof gt_goten : sizeof gt_trunks, mine);
+    list = partner == 2 ? gt_goten : gt_trunks;
+    if (gt) want = list[ss ? 1 : 0];                                   /* goten_gt / trunks_gt, or their Super Saiyan */
+    else {
+        want = partner == 2 ? 19 : 21;                                 /* Goten's gi, Trunks's green gi */
+        if (ss && up_of(want) != 255 && (flags_of(up_of(want)) & 1)) want = up_of(want);
+    }
+    if (FORM_OF(partner) != want) FORM_OF(partner) = want;
+#endif
+}
 void fusion_native(int *sp) {
     int n = *sp, fused = sp[n - 4], fresh = GetFlag(G_FLAGS, 149) && (u16)((u16)FRAMES - DANCE_AT) < 3600;     /* (only after the ending: the story's
                                                                           own Gogeta never danced through dance_use, and work RAM isn't cleared at boot) */
@@ -3184,6 +3207,11 @@ int ss_tick(u8 *rec) {
         u16 *pool = (u16 *)(rec + 0x1E);
         if (*pool > 4) *pool -= 3;
         else if (*pool > 1) *pool = 1;
+        /* Nov 15, the owner: "Why does ssj2 still not fucking drain ki". It did drain (Super Saiyan's pool, +0x1E), but Super Saiyan 2 goes up
+           through the game's Super Saiyan 3 power-up (to_ss2: SS3_Use), which fills Super Saiyan 3's pool (+0x20) too, and the HUD draws that
+           one, orange and full, over the draining yellow: the bar never moved on screen until he dropped out of Super Saiyan 2. Super Saiyan 2
+           doesn't use that pool (Super Saiyan 3's own power-up fills it again), so it is emptied here and the HUD shows the drain. */
+        *(u16 *)(rec + 0x20) = 0;
     }
     return 0;
 }
