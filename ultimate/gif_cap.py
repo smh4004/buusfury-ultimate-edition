@@ -11,7 +11,7 @@ POS = {0: 0, 1: 1, 3: 2, 4: 3, 6: 4, 8: 5, 7: 5}
 ROUTE = [l for l in open('tools/harness/long.txt').read().split('\n')[:93] if not l.startswith('shot ')]
 NAMES = {1: 'Banshee Blast', 2: 'Big Bang', 3: 'Big Bang Kamehameha', 4: 'Burning Attack', 5: 'Dragon Fist Explosion', 6: 'Electric Kamehameha', 7: 'Energy Blast',
          8: 'Energy Punch', 9: 'Energy Sword', 10: 'Final Flash', 11: 'Flame Kamehameha', 13: 'Super Kamikaze Ghost Attack', 15: 'Kamehameha', 16: 'Kamekameha',
-         17: 'Masenko', 51: 'Super Victory Cannon', 18: 'Great Saiyaman', 19: 'Spirit Bomb', 20: 'Super Saiyan', 23: 'Ultra Volleyball Attack', 24: 'Eraser Cannon', 25: 'SS Deadly Bomber',
+         17: 'Masenko', 51: 'Super Victory Cannon', 52: 'Potara Pinball', 18: 'Great Saiyaman', 19: 'Spirit Bomb', 20: 'Super Saiyan', 23: 'Ultra Volleyball Attack', 24: 'Eraser Cannon', 25: 'SS Deadly Bomber',
          26: 'Special Beam Cannon', 27: 'Blitz', 28: 'Destructo Disc', 29: 'Energy wave', 33: 'Black Kamehameha', 35: 'Super Saiyan 2', 38: 'Galick Gun',
          39: '10x Kamehameha', 40: 'Final Shine', 41: 'Super Dragon Fist', 43: 'Super Kamehameha', 14: 'Instant Transmission', 22: 'Super Saiyan 3',
          36: 'Super Saiyan 4', 44: 'Super Saiyan Blue', 37: 'Kaioken'}

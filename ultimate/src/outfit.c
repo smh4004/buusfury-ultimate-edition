@@ -58,7 +58,7 @@ static void guest_sync(void) {
         uub[] = {4, 7, 8, 15, MAJUUB_SKILL},     /* Uub: ki blasts, rush, Kamehameha, Majuub */
         roshi[] = {4, 7, 8, 15, MAX_POWER_SKILL},    /* Master Roshi: ki blasts, rush, the Kamehameha (his own), Max Power */
         teen[] = {5, 7, 8, 17, 15, 20},     /* Teen Gohan: ki blasts, rush, Masenko, Kamehameha, Super Saiyan (and 2 through it: ss2_open) */
-        trunkten[] = {5, 7, 1, 11, VICTORY_SKILL, 20},     /* Trunkten: ki blasts, Banshee Blast, Flame Kamehameha, Super Victory Cannon, Super Saiyan (and 2 through it) */
+        trunkten[] = {5, 7, 1, VICTORY_SKILL, PINBALL_SKILL, 20},     /* Trunkten: ki blasts, Banshee Blast, Super Victory Cannon, Potara Pinball, Super Saiyan (and 2 through it) */
         buu[] = {3, 7, 8, 15};     /* Kid Buu and Majin Buu: the Kamehameha too (Nov 10, the owner: "give all playable Buus forms kamehameha") */
     u8 *r = RECORDS + 8 * RECORD_SIZE;
     int form = FORM_OF(8), i;
@@ -1845,6 +1845,77 @@ void superkame_start(u32 *self, void *player) { kv_begin(self, player, kv_params
 void superkame_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[2]); }
 void victory_start(u32 *self, void *player) { kv_begin(self, player, kv_params[3]); }      /* Trunkten's Super Victory Cannon (Nov 14) */
 void victory_use(u8 *record, void *sprite) { kv_use(record, sprite, kv_vt[3]); }
+
+/* Trunkten's Potara Pinball (Nov 14, the owner picked it from the drafts: "two ghost afterimages of him, one Goten-coloured and one
+   Trunks-coloured, rush the enemy from both sides"). The Super Kamikaze Ghost Attack's behaviour (build.py pinball_vt: its vtable with
+   this update), its update (sub_0801B916) written out here with three changes: two ghosts, not three; each its own figure, Goten's
+   orange first, then Trunks's lavender (build.py PINBALL_GHOSTS, character ids PINBALL_CHARS); and where they wait, one each side of
+   him across the way he faces, so they come at the enemy from both sides when he lets go (the release, sub_0801B880, sends them as
+   it sends Gotenks's). Each costs the same ki (0xA0) and hits as his ghosts do. Two, not more: the game stopped (froze) as a fourth
+   ghost came out in the emulator, and the original keeps to three; a ghost the game can't make (GhostSpawn returns 0) isn't counted. */
+#define GhostSpawn ((void *(*)(int, void *, void *, int *))0x08039135)
+#define CharActor ((void *(*)(int))0x08000159)
+#define VecAdd ((void (*)(int *, const int *, const int *))0x08052FB5)
+#define SpritePlace ((void (*)(int *, void *))0x0804F945)
+#define KiCan ((int (*)(void *, int))0x080134B9)
+#define KiPay ((void (*)(void *, int))0x08013599)
+#define ListAdd ((void (*)(void *, void *))0x0801191B)
+#define GHOST_STATS ((u8 *)0x08711274 + 0x930)          /* gEnemyStats row 98: the ghosts' */
+#define GHOST_LIST (*(void **)(0x0871DD38 + 4))
+#define GHOST_ACTION ((void *)0x03001B10)
+#define PINBALL_MAX 2
+const int pinball_vt[9] = {1};
+static const u16 pinball_chars[2] = {PINBALL_CHARS};
+static const int pinball_spot[4][PINBALL_MAX][2] = {           /* where they wait, by his facing: down, up, left, right */
+    {{-36, 10}, {40, 10}}, {{-36, -26}, {40, -26}}, {{-34, -40}, {-34, 28}}, {{34, -40}, {34, 28}}};
+static const int pinball_from[4][2] = {{6, 1}, {-4, -8}, {-16, -6}, {16, -6}};      /* where each appears (the ghost attack's own) */
+void pinball_update(u32 *self, u8 *player) {
+    int k, place[2], at[2], dir = player[0x10] & 3;
+    u16 t;
+    for (k = 0; k < (int)self[1]; k++) {
+        int *g = (int *)((u8 *)self[3 + k] + 0x1A0);
+        SpritePlace(place, player);
+        VecAdd(at, place, pinball_spot[dir][k]);
+        g[0] = (g[0] * 31 + (at[0] << 8)) >> 5;
+        g[1] = (g[1] * 31 + (at[1] << 8)) >> 5;
+    }
+    t = *(u16 *)(player + 0x12) + 1;
+    *(u16 *)(player + 0x12) = t;
+    if (t >= 0x28) {
+        u8 *input;
+        if (self[2] > self[1]) self[1] = self[2];
+        input = (u8 *)CALL_V(player, 0x84)(player);
+        if (!(*(u16 *)(input + 2) & 2)) { CALL_V(player, 0x28)(player, 0); return; }
+        player[0x11] = 0;
+        if (self[2] < PINBALL_MAX && KiCan((void *)CALL_V(player, 0x80)(player), 0xA0)) {
+            KiPay((void *)CALL_V(player, 0x80)(player), 0xA0);
+            *(u16 *)(player + 0x12) = 0;
+        }
+        return;
+    }
+    player[0x11] = t >> 3;
+    if (t == 0x10) {
+        void *ghost;
+        SpritePlace(place, player);
+        VecAdd(at, place, pinball_from[dir]);
+        ghost = GhostSpawn(0, CharActor(pinball_chars[self[2] & 1]), GHOST_STATS, at);
+        if (!ghost) return;
+        Sprite_SetFacing(ghost, 0x12);
+        Sprite_SetBehaviour(ghost, GHOST_ACTION);
+        ((u8 *)ghost)[0x10] = player[0x10];
+        self[3 + self[2]] = (u32)ghost;
+        self[2]++;
+        ListAdd(GHOST_LIST, ghost);
+    }
+}
+void pinball_use(u8 *record, void *sprite) {
+    u32 *b;
+    KiPay(record, 0xA0);
+    b = Alloc(12 + 4 * PINBALL_MAX);
+    if (b) { b[0] = (u32)pinball_vt; b[1] = 0; b[2] = 0; }
+    Sprite_SetFacing(sprite, 0x13);
+    Sprite_SetBehaviour(sprite, b);
+}
 /* Goku's Kamehameha counts its uses at its top level towards the Super Kamehameha (skills_sync) */
 static int derived_level(int c, int skill);
 #define MASTERY_BYTES (BENCH.mastery)

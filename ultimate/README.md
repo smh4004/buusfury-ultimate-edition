@@ -1122,6 +1122,17 @@ played in the emulator; `ultimate/audit_moves.py` and `test_frames.py` 10-13 now
   beam on the Kamehameha's code (`KAME_VARIANTS`, `outfit.c victory_start`, `victory_use`), white, gold and his sash's orange, 1.3x a
   Kamehameha; his fifth move (`outfit.c trunkten`). Captured in the game at its top level. The straight beam for now: the drafted pose
   before it and the zig-zag between enemies are still to do. Potara Pinball next.
+- Nov 14, Potara Pinball (skill 52, `PINBALL_SKILL`), the owner's draft 3: "two ghost afterimages of him, one Goten-coloured and one
+  Trunks-coloured, rush the enemy from both sides". The Super Kamikaze Ghost Attack's behaviour with its update written out in
+  `outfit.c pinball_update` (`build.py pinball_vt`): hold B and two ghosts come out, Goten's orange first, then Trunks's lavender
+  (`PINBALL_GHOSTS`: the ghost figure, actor 148, hue-turned by `hue_remap`, made after everything else; their character ids go to
+  `PINBALL_CHARS`), and wait one each side of him across the way he faces; let go and the release (the game's own) sends both at the
+  closest enemy. Each costs the ghost attack's ki. Two, not four as first written: a fourth ghost froze the game in the emulator (the
+  original stops at three), and a ghost the game can't make isn't counted. His move list: ki blasts, Banshee Blast, Super Victory
+  Cannon, Potara Pinball, Super Saiyan. Captured in a fight (the test Bomber, `test_moves.py`'s rig): both ghosts hit, two hits.
+- Nov 14, the full test run after Trunkten: the debug builds set every outfit's flag at the start, and Trunkten's is the Trials' own
+  (895, all four won), which also teaches Goku and Vegeta the Potara, so they knew it from the start (test_fusion, test_loadout and
+  test_shelved failed on it). `debug_edits` leaves that flag out: in a debug build he opens with the Trials, as in the game.
 - Nov 12, the owner (17:28): the world map flickers in flight. The map markers (`minimap_draw`) were drawn into OBJ tile 300 every frame,
   and a 64x64 flying figure's sprite memory runs from 244 to 371 (Broly, Full Power Broly, Super 13: read from OAM in flight; everyone
   else is 32x32, 210-241): his own pixels were overwritten, then his frame loaded again. The marker is in the last two tiles (1022) now,
