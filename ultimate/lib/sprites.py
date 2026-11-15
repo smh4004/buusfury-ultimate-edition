@@ -348,7 +348,7 @@ def build_actors(rom, cfg, clean_dir, at, l2=None, colour_ctx=None, proto=None, 
                 if str(k).startswith('r'): src, k = str(k).split(':', 1)    # "r51:3@0:2" = LoG2 actor 51, anim 3
                 k, sl = (str(k).split('@') + [None])[:2]
                 sl = ([int(v) for v in sl.split(',')] if ',' in sl else slice(*map(int, sl.split(':')))) if sl else None   # a..b or an exact list of frames
-                ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post, a.get('log2_source'))
+                ptr = log2_anim(ins, l2, log2_rec(l2, src), int(k), cmap, cache, want, sl, edit, a.get('log2_scale', {}).get(str(src)), a.get('size_scale'), a.get('reserve', 1024), post, a.get('log2_source'), a.get('tall'))
                 if ptr: struct.pack_into('<I', rec, 0x54 + 4 * int(slot), ptr)
         ins.frame_limit = a.get('frame_limit', 4096 if a.get('big') else 1024)   # boss-class actors may use one 64x64 piece
         if 'raw_frames' in a:                              # frames given as arrays of BF OBJ indices (tools/doors.py:
@@ -474,7 +474,7 @@ def log2_colour_map(l2, usable, pal_rgb):
     return m.astype(np.uint8)
 
 
-def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=None, grow=None, limit=1024, post=None, source=None):
+def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=None, grow=None, limit=1024, post=None, source=None, tall=None):
     """Convert LoG2 animation k of the actor record at slice offset `rec` into a BF animation. Returns ptr or 0.
     sl = frames a..b-1 only (a slice with a step, e.g. 3:-5:-1, plays them backwards); want = repeat frames evenly to
     that count (the replaced BF slot's own frame count). edit(k, d, pixels) -> (key, pixels): optional pixel edit of each
@@ -483,7 +483,8 @@ def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=No
     get 1 KB of OBJ VRAM per frame). source(rec, k, d, f) -> (32x32 LoG2 colour indices as shown, (x, y, 32, 32) as
     shown) or None: a frame made elsewhere (teen.py's Teen Gohan) in place of the record's own, in the place and with
     the flips of the record's entry for that view (a mirrored entry stores its pixels turned back; the box is where the
-    frame is shown, as the game stores a mirrored frame's)."""
+    frame is shown, as the game stores a mirrored frame's).
+    tall: rows added to the legs of every frame that stands (lib/tall.py: Future Trunks at adult height)."""
     from wfz import decompress_stream
     u = lambda o: struct.unpack_from('<I', l2, o)[0]
     dirs = [u(rec + 0x4C + 16 * k + 4 * d) for d in range(4)]
@@ -534,12 +535,15 @@ def log2_anim(ins, l2, rec, k, cmap, cache, want=0, sl=None, edit=None, scale=No
                 bf = cmap[img]
                 if post: bf = post(bf, None if len(set(dirs)) == 1 else min(d, 2))
                 if grow: bf, fbox = grow_box(bf, fbox, *grow)
+                if tall:
+                    import tall as tall_mod
+                    bf, fbox = tall_mod.stretch_piece(bf, fbox, tall)
                 hh, ww = bf.shape
                 data = bf.reshape(hh // 8, 8, ww // 8, 8).transpose(0, 2, 1, 3).reshape(-1).tobytes()
                 cache[key] = (ins.put(struct.pack('<II', 0, len(data)) + data), fbox)
             tptr, fbox = cache[key]
             if scale: attr = (attr & 0x30000000) | 0x80002000        # one 32x32 8bpp piece, keep the flip bits
-            if grow:                                             # the grown piece's own OBJ shape and size
+            if grow or tall:                                     # the grown piece's own OBJ shape and size
                 sh, sz = SHAPE[(fbox[2], fbox[3])]
                 attr = (attr & 0x30000000) | (sz << 30) | (sh << 14) | 0x2000
                 assert fbox[2] * fbox[3] <= limit, 'grown frame over the actor budget'

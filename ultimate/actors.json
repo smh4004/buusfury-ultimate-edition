@@ -44,6 +44,8 @@
  },
  "trunks_armor": {
   "template": 260,
+  "tall": 2,
+  "reserve": 2048,
   "log2_record": "r126",
   "stretch": true,
   "extra_slots": {
@@ -53,6 +55,8 @@
  },
  "trunks_armor_ss": {
   "template": 261,
+  "tall": 2,
+  "reserve": 2048,
   "log2_record": "r127",
   "stretch": true,
   "extra_slots": {
@@ -189,6 +193,8 @@
  },
  "future_trunks": {
   "template": 260,
+  "tall": 2,
+  "reserve": 2048,
   "log2_record": "r125",
   "stretch": true,
   "extra_slots": {
@@ -198,6 +204,8 @@
  },
  "future_trunks_ss": {
   "template": 261,
+  "tall": 2,
+  "reserve": 2048,
   "log2_record": "r131",
   "stretch": true,
   "extra_slots": {
