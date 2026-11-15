@@ -425,6 +425,11 @@ def actors(clean, pal, lengths):
             p13, n13, n0 = have[13], nxt[13], nxt[0]
             have[10] = [[p13[0][0]] * 2 + [n13[0][0]] * 8 + [n0[0][0]] for v in range(3)]
             gaps[name] = [m for m in gaps[name] if m[0] != 10]
+    # GT Goten's and GT Trunks's Fusion Dance (slot 21, outfit.c dance_use): the sheet's slot 21 is another move, so the kid figures'
+    # own dance in the GT clothes (gt_dance.py; Nov 15, the owner: "why the fuck is gt trunks fusion dance so fucked").
+    import gt_dance
+    for name in gt_dance.SOURCE:
+        if name in haves: haves[name][21] = gt_dance.dance(clean, name); gaps[name] = [m for m in gaps[name] if m[0] != 21]
     out = {}
     for name, tpl in ACTORS.items():
         have, missing = haves[name], gaps[name]; slots, n = template_slots(clean, tpl)

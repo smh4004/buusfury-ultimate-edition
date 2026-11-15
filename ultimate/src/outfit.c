@@ -2922,6 +2922,8 @@ static void dance_partner(int me) {
     mine = FORM_OF(me); ss = flags_of(mine) & 1;
     gt = in_list(me == 2 ? gt_goten : gt_trunks, me == 2 ? sizeof gt_goten : sizeof gt_trunks, mine);
     list = partner == 2 ? gt_goten : gt_trunks;
+    /* a partner already in a GT look of the same kind (GT Goten's green one, say) keeps it */
+    if (gt && in_list(list, partner == 2 ? sizeof gt_goten : sizeof gt_trunks, FORM_OF(partner)) && (flags_of(FORM_OF(partner)) & 1) == ss) return;
     if (gt) want = list[ss ? 1 : 0];                                   /* goten_gt / trunks_gt, or their Super Saiyan */
     else {
         want = partner == 2 ? 19 : 21;                                 /* Goten's gi, Trunks's green gi */
