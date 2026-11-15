@@ -1573,7 +1573,7 @@ the official in Hercule City), screenshots looked at before it was called done.
 - Teen Gohan's Saiyan armor look: LoG2's short-haired armor record (r53, his Cell Games hair) for r52, the long-haired one (the purple
   gi's head). The owner had said "Saiyan armor in adult Gohan"; Future Trunks (LoG2's style: kid Trunks's head) waits on a preview of
   an adult-height version.
-- Not found yet: the flight flicker and "a dot on Goku's flying sprite" (not seen in mGBA or gpSP, flying as Goku, GT Goku, Broly).
+- Not found yet: the flight flicker and "a dot on Goku's flying sprite" (not seen in mGBA or gpSP, flying as Goku and GT Goku; VBA-M not tried yet).
 
 ## The Great Ape: shelved (Nov 10)
 The owner: "Remove the whole great ape thing from the game and shelf it for now it just looks bad honestly needs a redo for sprites". The
