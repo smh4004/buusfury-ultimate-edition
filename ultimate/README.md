@@ -1577,6 +1577,21 @@ the official in Hercule City), screenshots looked at before it was called done.
   never side by side; the feet stay on their row, so everything above sits two rows higher in every frame alike and no idle moves its
   head). Frames that grow past 32 rows use 32x64 pieces; his four actors (jacket, armor, both Super Saiyans) reserve 2 KB a frame, as
   Android 17's. Seen in the game: Switch Character, a fight (ki blast, Super Saiyan, Galick Gun) and flying; `test_frames.py` passes.
+- Outfit check (the owner, 22:25: "Are you sure ... you didnt ... make outfits across multiple chars"): every frame of all 433
+  figures compared with the build he played (every pixel, three views; the form table; the palettes). 408 identical; the 25 that differ
+  are the day's changes only (Future Trunks 5, Teen Gohan's armor 4, the GT dance 5, the Gotenks vest 6, the borrowed charge frames 5).
+  It found one outfit change on transforming, already in his build: GT Goten's green jacket went white in Super Saiyan.
+- GT looks keep their clothes when they transform (22:35, the owner: "make sure his fucking outfit stays the same when he transforms,
+  and Gohan glasses on and off as well don't change shit make it for both"; `lib/gt_keep.py`). The sheet has one Super Saiyan figure
+  for each pair of looks. GT Goten's green look gets its own (`goten_gt_green_ssj`: the white one's frames, each jacket pixel the colour
+  the green look gives the white look's pixel at that place, else its usual green; the dance kid Goten's in green), as previewed to
+  the owner. GT Gohan with glasses keeps them in Super Saiyan and 2 and in the Super Saiyan frames of his change: drawn round his teal
+  eyes as the glasses look draws them (rims, bridge, bars, arms; from the side the rim and the arm), a blink or a wince takes the eyes'
+  place from the matching head or the glasses look's own frame. GT Gohan without glasses gets his own (`gohan_gt_ng_ssj` and `_ss2`): the
+  old figure, with his own look's power-down (gold, brown, black, no glasses) instead of one ending on the glasses look's stance. The
+  new figures are built last, so no actor id moves. Compared with the build before: only `gohan_gt` (slots 10 and 11), `gohan_gt_ssj` /
+  `_ss2` and the three new figures differ, the three forms point at their new figures, the palettes are the same. Played in the release
+  build: both Gohan looks base, Super Saiyan, 2 and back; GT Goten in green to Super Saiyan.
 - Not found yet: the flight flicker and "a dot on Goku's flying sprite". Not seen in mGBA or gpSP (flying as Goku and GT Goku), nor
   in VBA-M (libretro core, his ROM and save: 30 seconds from West City in every direction, every frame checked: the mini-map's markers
   in all of them, no jump in the screen's brightness). Waiting on a recording.

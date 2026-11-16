@@ -1524,6 +1524,23 @@ def add_actors(rom, clean):
     cfg['goku_black'] = {'template': goku_black.SOURCE['black'], 'raw_frames': {str(k): v for k, v in looks['black'].items()}}
     cfg['goku_rose'] = {'template': goku_black.SOURCE['rose'], 'raw_frames': {str(k): v for k, v in looks['rose'].items()}}
     cfg.update(gt.actors(clean, pal, lengths))      # GT: Black Star Odyssey's fighters (bso_import.py; BFU_BSO points at the owner's sheet)
+    # GT looks keep their clothes when they transform (lib/gt_keep.py; Nov 15, the owner: "make sure his fucking outfit stays the same when
+    # he transforms, and Gohan glasses on and off as well"). The sheet has one Super Saiyan figure per pair of looks: GT Goten's green jacket
+    # went white, GT Gohan's glasses came off (and the look without them got them back powering down). The glasses look's Super Saiyan (and
+    # 2) and the Super Saiyan frames of its own change get the glasses; the look without them and the green jacket get figures of their own,
+    # built after every other actor (below), so no id moves.
+    import gt_keep, gt_dance
+    raw = lambda n: cfg[n]['raw_frames']
+    keep = {'gohan_gt_ng_ssj': dict(cfg['gohan_gt_ssj'], raw_frames=gt_keep.no_glasses_ssj(raw('gohan_gt_ssj'), raw('gohan_gt_noglasses')))}
+    keep['gohan_gt_ng_ss2'] = {'same_as': 'gohan_gt_ng_ssj'}
+    frames, made, matched = gt_keep.glasses_frames(raw('gohan_gt_ssj'), raw('gohan_gt'))
+    cfg['gohan_gt_ssj'] = dict(cfg['gohan_gt_ssj'], raw_frames=frames)
+    frames, made2, _ = gt_keep.glasses_frames(raw('gohan_gt'))
+    cfg['gohan_gt'] = dict(cfg['gohan_gt'], raw_frames=frames)
+    print('gohan_gt glasses: %d Super Saiyan frames, %d by the matching head or the glasses look; %d in the glasses look\'s change' % (made, len(matched), made2))
+    green = gt_keep.green_ssj(raw('goten_gt_ssj'), raw('goten_gt'), raw('goten_gt_green'))
+    if '21' in green: green['21'] = gt_dance.dance(clean, 'goten_gt_green_ssj')
+    keep['goten_gt_green_ssj'] = dict(cfg['goten_gt_ssj'], raw_frames=green)
     # The Garlic Jr. quest (garlic.py; lib/garlic_art.py): Garlic Jr. is kid Goten's frames with his head on Pilaf's (the owner's choice) and his
     # cloak, cassock and shoes; Super Garlic Jr. is Spopovich's frames made his (the owner's choice); the Spice Boys and the Makyans are fighters of the
     # same build recoloured. Each keeps the record (and so the slots) of the fighter whose behaviour row it fights with. Right after the GT
@@ -1587,7 +1604,7 @@ def add_actors(rom, clean):
     cfg['_change_canvases'] = {n: mystic_change(clean) for n in FP_LOOKS}
     cfg['_powerup_still'] = []
     cfg['_powerup'] = [101, 104, 105, 'gohan_orange_ss', 273, 274, 261, 276, 'vegeta_armor_ss', 'trunks_armor_ss', 'future_trunks_ss', 'gohan_armor_ss2_art',
-                      'gohan_gt_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
+                      'gohan_gt_ssj', 'gohan_gt_ng_ssj']     # armour Gohan's Super Saiyan has LoG2's own change into 2 (its animation 9). GT Gohan's (Nov 10): his slot 10
                                           # was the base's change, so into 2 he went back to black hair and glasses first (test_frames 14)
     cfg['broly_player'] = {'template': 29}       # the playable Broly's own copy of the story's figure: his slot 18 is the Eraser Cannon's pose (fighter_poses), the boss keeps his. Last: scripts name the ids before it
     # Great Saiyaman worn over another outfit (the saiyaman_from_ forms): BF's figure (actor 102) ends its change back (slots 11 and 19)
@@ -1619,6 +1636,7 @@ def add_actors(rom, clean):
     # Potara Pinball's ghosts (Nov 14): the ghost attack's cyan ghosts in Goten's orange and in Trunks's lavender. After everything.
     for name, hue in PINBALL_GHOSTS:
         cfg[name] = {'tint_of': GHOST_FIGURE, 'tint': hue_remap(pal, one, hue), 'high': True}
+    cfg.update(keep)       # the GT looks' own Super Saiyan figures (gt_keep above): after everything, so no id moves
     ids, end = sprites.build_actors(rom, cfg, clean_dir, ACTORS_AT, combo[0x800000:], lambda act: (usable, pal), open(PROTO, 'rb').read(), high=0x1000000 if ROM32 else None)
     return ids, fighter_poses(rom, ids, powerup_frames(rom, ids, end))
 
@@ -1715,7 +1733,7 @@ def fighter_poses(rom, ids, at):
     # Dragon Fist (outfit.c dragon4_use: the Dragon Fist's code, which shows slot 19 the same way and carries him along with the dragon) made
     # him vanish (Nov 10, the owner: "SSJ4 Goku does instant transmission on dragon fist"). No form of his in that figure has Instant
     # Transmission (kid Goku's moves: Energy Blast, the Kamehamehas, the Dragon Fist), so nothing else plays the slot.
-    for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'gogeta_ssj4', 'kid_goku_ssj4'):
+    for name in ('goten_gt', 'goten_gt_ssj', 'goten_gt_green', 'goten_gt_green_ssj', 'gogeta_ssj4', 'kid_goku_ssj4'):
         set_slot(name, 19, [need(name, 0, 0), need(name, 3, 0)] + [need(name, 3, 1)] * 8)
     # Full Power Broly's (approved Nov 10 as the strike's wind-up, then the hand out) flickered the same way: frame 0 is the wind-up. The hand out.
     set_slot('broly_fp', 18, [need('broly_fp', 18, 1)] * len(anim(rec_of('broly_fp'), 18)))

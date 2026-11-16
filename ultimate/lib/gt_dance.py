@@ -25,7 +25,7 @@ LOOKS = {
     'trunks_gt':      {'jacket': (111, 112, 113, 113), 'cuff': (1, 111, 112, 112), 'pants': (115, 118, 120, 120), 'crease': (115, 115, 118, 118),
                        'shoes': (111, 205, 205, 205), 'belt': 113, 'sole': 111, 'shirt': (176, 174, 174, 174)},
 }
-SOURCE = {'goten_gt': 114, 'goten_gt_ssj': 115, 'goten_gt_green': 114, 'trunks_gt': 260, 'trunks_gt_ssj': 261}      # (the green look's Super Saiyan plays goten_gt_ssj's figure)
+SOURCE = {'goten_gt': 114, 'goten_gt_ssj': 115, 'goten_gt_green': 114, 'goten_gt_green_ssj': 115, 'trunks_gt': 260, 'trunks_gt_ssj': 261}   # (goten_gt_green_ssj: its own figure since Nov 15, gt_keep)
 
 
 def look_of(name):

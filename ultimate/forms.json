@@ -470,7 +470,7 @@
   {
    "id": "gohan_gt_ng_ssj",
    "copy": 16,
-   "actor": "gohan_gt_ssj",
+   "actor": "gohan_gt_ng_ssj",
    "owner": 1,
    "portrait": "gt:gohan_ssj",
    "down": "gohan_gt_noglasses",
@@ -542,7 +542,7 @@
   {
    "id": "goten_gt_green_ssj",
    "copy": 20,
-   "actor": "goten_gt_ssj",
+   "actor": "goten_gt_green_ssj",
    "owner": 2,
    "portrait": [
     "gt:goten_ssj",
@@ -736,7 +736,7 @@
   {
    "id": "gohan_gt_ng_ss2",
    "copy": 16,
-   "actor": "gohan_gt_ss2",
+   "actor": "gohan_gt_ng_ss2",
    "owner": 1,
    "portrait": "gt:gohan_ssj",
    "up": 255,
