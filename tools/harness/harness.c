@@ -8,6 +8,7 @@
  *   shot NAME          write outdir/NAME.png and print a frame hash
  *   audio FILE         write the game's sound to FILE, 16-bit stereo 44100 Hz (`audio -` stops)
  *   hash               print frame hash only
+ *   layer ID 0|1       hide or show a video layer (0-3 BG0-3, 4 sprites), for clean backdrops
  *   dump NAME ADDR LEN write raw bus memory to outdir/NAME.bin
  *   bp ADDR N          single-step up to N frames until PC == ADDR; print regs, stack and recent ROM jumps
  *   until LO HI N      single-step (max N frames) until LO <= PC < HI in a non-IRQ mode; print regs + stack
@@ -24,6 +25,7 @@
  *                      leaves BIOS/EWRAM/IWRAM/ROM[0x08000000,ROMEND) (catches jumps through stale pointers)
  * Original code for the buusfury disassembly project.
  */
+#include <mgba/flags.h>          /* first: core.h lays mCore out by these flags (USE_DEBUGGERS moves enableVideoLayer) */
 #include <mgba/core/core.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/config.h>
@@ -363,6 +365,7 @@ int main(int argc, char** argv) {
         }
         else if (!strcmp(cmd, "poke")) { core->busWrite32(core, strtoul(a1, 0, 16), strtoul(a2, 0, 16)); }
         else if (!strcmp(cmd, "poke8")) { core->busWrite8(core, strtoul(a1, 0, 16), strtoul(a2, 0, 16)); }
+        else if (!strcmp(cmd, "layer")) { core->enableVideoLayer(core, atoi(a1), atoi(a2) != 0); }   /* layer ID 0|1: 0-3 BG0-3, 4 OBJ (mGBA ids) */
         else if (!strcmp(cmd, "reset")) { core->reset(core); }
         else if (!strcmp(cmd, "dump")) {
             char p[600]; snprintf(p, sizeof p, "%s/%s.bin", argv[3], a1);
